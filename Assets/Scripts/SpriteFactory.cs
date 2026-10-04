@@ -9,6 +9,30 @@ public static class SpriteFactory
 
     public static Sprite Circle() => Get("circle", true);
     public static Sprite Square() => Get("square", false);
+    public static Texture2D CircleTexture() => Circle().texture;
+
+    static Texture2D glow;
+
+    // 가운데가 밝고 바깥으로 갈수록 투명해지는 빛 번짐 그림 (뽑기 연출용)
+    public static Texture2D GlowTexture()
+    {
+        if (glow != null) return glow;
+        const int size = 128;
+        glow = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        glow.wrapMode = TextureWrapMode.Clamp;
+        float r = size / 2f;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = new Vector2(x + 0.5f - r, y + 0.5f - r).magnitude / r;
+                float a = Mathf.Clamp01(1f - d);
+                glow.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+            }
+        }
+        glow.Apply();
+        return glow;
+    }
 
     static Sprite Get(string key, bool circle)
     {

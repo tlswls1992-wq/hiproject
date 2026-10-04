@@ -14,13 +14,13 @@ public class Projectile : MonoBehaviour
     public static void Launch(Unit from, Unit target, float damage, float splash, Color color)
     {
         var go = new GameObject("Projectile");
-        go.transform.SetParent(GameManager.Instance.World, false);
+        go.transform.SetParent(BattleManager.Instance.World, false);
         go.transform.position = from.transform.position;
         go.transform.localScale = Vector3.one * (splash > 0f ? 0.3f : 0.15f);
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = SpriteFactory.Circle();
         sr.color = color;
-        sr.sortingOrder = 5;
+        sr.sortingOrder = 1000; // 유닛들보다 항상 위에 그림
 
         var p = go.AddComponent<Projectile>();
         p.target = target;
@@ -32,9 +32,9 @@ public class Projectile : MonoBehaviour
 
     void Update()
     {
-        var gm = GameManager.Instance;
-        if (gm == null) { Destroy(gameObject); return; }
-        if (gm.IsPaused) return;
+        var battle = BattleManager.Instance;
+        if (battle == null) { Destroy(gameObject); return; }
+        if (battle.IsPaused) return;
 
         if (target != null && target.IsAlive) lastTargetPos = target.transform.position;
 
@@ -42,7 +42,7 @@ public class Projectile : MonoBehaviour
         transform.position = next;
         if ((next - lastTargetPos).sqrMagnitude < 0.0001f)
         {
-            gm.ApplyHit(lastTargetPos, target != null && target.IsAlive ? target : null, team, damage, splash);
+            battle.ApplyHit(lastTargetPos, target != null && target.IsAlive ? target : null, team, damage, splash);
             Destroy(gameObject);
         }
     }
