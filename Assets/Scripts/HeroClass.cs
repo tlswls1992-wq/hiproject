@@ -28,14 +28,14 @@ public class HeroClass
     {
         name = "궁수", role = "원거리 · 단일 공격", synergyText = "공격 속도 증가",
         color = new Color(0.35f, 0.85f, 0.40f), baseCost = 15,
-        hp = 60, damage = 10, range = 5f, cooldown = 1.0f, speed = 2.6f, size = 0.5f, ranged = true,
+        hp = 60, damage = 10, range = 6.5f, cooldown = 1.0f, speed = 2.6f, size = 0.5f, ranged = true,
     };
 
     public static readonly HeroClass Mage = new HeroClass
     {
         name = "마법사", role = "원거리 · 범위 공격", synergyText = "폭발 범위 증가",
         color = new Color(0.75f, 0.45f, 1.00f), baseCost = 20,
-        hp = 50, damage = 8, range = 4f, cooldown = 1.6f, speed = 2.4f, size = 0.5f, splash = 1.2f, ranged = true,
+        hp = 50, damage = 8, range = 5.5f, cooldown = 1.6f, speed = 2.4f, size = 0.5f, splash = 1.2f, ranged = true,
     };
 
     public static readonly HeroClass[] All = { Warrior, Archer, Mage };

@@ -17,7 +17,7 @@ public class Unit : MonoBehaviour
     public float size;
     public bool ranged;
     public int goldReward;           // 적을 잡았을 때 얻는 골드
-    public Vector2 formationOffset;  // 부대 안에서 서 있을 자리
+    public Vector2 formationSlot;    // 영웅이 진을 치고 서 있을 자리
 
     const float BarWidth = 0.8f;
 
@@ -25,6 +25,8 @@ public class Unit : MonoBehaviour
     float flashTimer;
     Color baseColor;
     SpriteRenderer body;
+    SpriteRenderer hpBack;
+    SpriteRenderer hpFillRenderer;
     Transform hpFill;
 
     public bool IsAlive => hp > 0f;
@@ -41,15 +43,17 @@ public class Unit : MonoBehaviour
         body = bodyGo.AddComponent<SpriteRenderer>();
         body.sprite = sprite;
         body.color = color;
-        body.sortingOrder = 1;
 
         float barY = size * 0.5f + 0.15f;
-        MakeBar("HpBack", new Color(0f, 0f, 0f, 0.6f), barY, 2).localScale = new Vector3(BarWidth, 0.1f, 1f);
-        hpFill = MakeBar("HpFill", team == Team.Hero ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f), barY, 3);
+        hpBack = MakeBar("HpBack", new Color(0f, 0f, 0f, 0.6f), barY);
+        hpBack.transform.localScale = new Vector3(BarWidth, 0.1f, 1f);
+        hpFillRenderer = MakeBar("HpFill", team == Team.Hero ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f), barY);
+        hpFill = hpFillRenderer.transform;
         UpdateHpBar();
+        UpdateSorting();
     }
 
-    Transform MakeBar(string barName, Color color, float y, int order)
+    SpriteRenderer MakeBar(string barName, Color color, float y)
     {
         var go = new GameObject(barName);
         go.transform.SetParent(transform, false);
@@ -57,8 +61,7 @@ public class Unit : MonoBehaviour
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = SpriteFactory.Square();
         sr.color = color;
-        sr.sortingOrder = order;
-        return go.transform;
+        return sr;
     }
 
     public void UpdateHpBar()
@@ -67,6 +70,15 @@ public class Unit : MonoBehaviour
         float pct = Mathf.Clamp01(hp / maxHp);
         hpFill.localScale = new Vector3(BarWidth * pct, 0.1f, 1f);
         hpFill.localPosition = new Vector3(-BarWidth * (1f - pct) / 2f, hpFill.localPosition.y, 0f);
+    }
+
+    // 옆에서 보는 화면이라 아래쪽(앞쪽)에 있는 유닛이 위에 그려지도록 순서를 정합니다.
+    void UpdateSorting()
+    {
+        int order = Mathf.RoundToInt(-transform.position.y * 20f) * 3;
+        body.sortingOrder = order;
+        hpBack.sortingOrder = order + 1;
+        hpFillRenderer.sortingOrder = order + 2;
     }
 
     void Update()
@@ -84,29 +96,47 @@ public class Unit : MonoBehaviour
 
         Vector2 pos = transform.position;
         Unit target = gm.FindNearestOpponent(this);
-        Vector2 moveDir = Vector2.zero;
-
-        if (team == Team.Hero)
-        {
-            // 영웅: 부대 집결지 근처의 적만 쫓아가고, 너무 멀어지면 자기 자리로 돌아옵니다.
-            Vector2 slot = gm.RallyPoint + formationOffset;
-            bool tooFar = Vector2.Distance(pos, gm.RallyPoint) > GameManager.HeroAggroRadius + 2f;
-            bool targetNearRally = target != null &&
-                Vector2.Distance(target.transform.position, gm.RallyPoint) <= GameManager.HeroAggroRadius;
-
-            if (!tooFar && target != null && InRange(pos, target)) TryAttack(target);
-            else if (!tooFar && targetNearRally) moveDir = DirectionTo(pos, target.transform.position);
-            else if (Vector2.Distance(pos, slot) > 0.1f) moveDir = DirectionTo(pos, slot);
-        }
-        else if (target != null)
-        {
-            // 적: 가장 가까운 영웅에게 달려가서 공격합니다.
-            if (InRange(pos, target)) TryAttack(target);
-            else moveDir = DirectionTo(pos, target.transform.position);
-        }
+        Vector2 moveDir = team == Team.Hero ? HeroThink(pos, target) : EnemyThink(pos, target, gm);
 
         Vector2 velocity = moveDir * moveSpeed * gm.MoveMultiplier(this) + gm.SeparationFor(this);
-        transform.position = pos + velocity * dt;
+        Vector2 next = pos + velocity * dt;
+        next.y = Mathf.Clamp(next.y, GameManager.LaneBottom, GameManager.LaneTop);
+        transform.position = next;
+        UpdateSorting();
+    }
+
+    // 영웅: 자기 자리를 지키며 싸웁니다. 근접 영웅만 가까이 온 적에게 돌격했다가 돌아옵니다.
+    Vector2 HeroThink(Vector2 pos, Unit target)
+    {
+        bool tooFar = Vector2.Distance(pos, formationSlot) > GameManager.HeroLeash + 1.5f;
+        if (target != null && !tooFar)
+        {
+            if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
+            if (!ranged && Vector2.Distance(target.transform.position, formationSlot) <= GameManager.HeroLeash)
+                return DirectionTo(pos, target.transform.position);
+        }
+        return Vector2.Distance(pos, formationSlot) > 0.1f ? DirectionTo(pos, formationSlot) : Vector2.zero;
+    }
+
+    // 적: 오른쪽에서 왼쪽으로 행군하다가, 가까운 영웅이 있으면 싸우고, 성에 닿으면 성을 공격합니다.
+    Vector2 EnemyThink(Vector2 pos, Unit target, GameManager gm)
+    {
+        if (target != null)
+        {
+            if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
+            float aggro = attackRange + size * 0.5f + 1.5f;
+            if (Vector2.Distance(pos, target.transform.position) <= aggro)
+                return DirectionTo(pos, target.transform.position);
+        }
+
+        if (pos.x - size * 0.5f > GameManager.CastleFrontX + attackRange) return Vector2.left;
+
+        if (cooldownTimer <= 0f)
+        {
+            cooldownTimer = attackCooldown;
+            gm.DamageCastle(damage);
+        }
+        return Vector2.zero;
     }
 
     bool InRange(Vector2 pos, Unit target)

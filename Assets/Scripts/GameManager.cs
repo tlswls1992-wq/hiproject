@@ -8,20 +8,30 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     // ---- 밸런스 숫자 (자유롭게 바꿔 보세요) ----
-    public const float HeroAggroRadius = 5f; // 집결지에서 이 거리 안의 적만 영웅이 쫓아감
     public const int MaxHeroes = 50;
     const int StartGold = 30;
-    const float RallySpeed = 4f;
+    const float CastleMaxHp = 200f;
     const float SpawnInterval = 0.5f;
     const float WaveBreak = 2f;
+
+    // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
+    public const float LaneTop = 2.5f;       // 유닛이 다닐 수 있는 가장 위쪽
+    public const float LaneBottom = -5.5f;   // 가장 아래쪽
+    public const float CastleX = -12.5f;     // 성의 가운데 위치
+    public const float CastleFrontX = -11.3f; // 적이 여기까지 오면 성을 공격
+    public const float HeroLeash = 3.5f;     // 근접 영웅이 자기 자리에서 이만큼 안의 적에게 돌격
+    const float FrontLineX = -3f;            // 영웅 진형의 맨 앞줄
+    const float ColumnGap = 1.0f;            // 줄 사이 간격 (가로)
+    const int RowsPerColumn = 7;             // 한 줄에 서는 영웅 수 (세로)
+    const float HalfWorldWidth = 14f;        // 화면에 항상 보이는 가로 반폭
 
     public readonly List<Unit> heroes = new List<Unit>();
     public readonly List<Unit> enemies = new List<Unit>();
 
-    public Vector2 RallyPoint { get; private set; }
     public Transform World { get; private set; }
     public int Gold { get; private set; }
     public int Wave { get; private set; }
+    public float CastleHp { get; private set; }
     public bool IsGameOver { get; private set; }
     public bool IsPaused => IsGameOver || upgradeChoices != null;
 
@@ -32,8 +42,8 @@ public class GameManager : MonoBehaviour
     float hpBonus = 1f;
 
     Camera cam;
-    Transform rallyMarker;
-    Vector2 arenaHalfSize;
+    SpriteRenderer castleRenderer;
+    float castleFlashTimer;
     bool waveInProgress;
     int enemiesLeftToSpawn;
     int brutesLeftToSpawn;
@@ -83,11 +93,19 @@ public class GameManager : MonoBehaviour
             cam = go.AddComponent<Camera>();
         }
         cam.orthographic = true;
-        cam.orthographicSize = 8f;
         cam.transform.SetPositionAndRotation(new Vector3(0f, 0f, -10f), Quaternion.identity);
         cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.12f, 0.14f, 0.18f);
+        cam.backgroundColor = new Color(0.45f, 0.68f, 0.88f); // 하늘색
+        FitCamera();
     }
+
+    // 화면 비율이 달라도 성부터 오른쪽 끝까지 전장 전체가 보이도록 맞춥니다.
+    void FitCamera()
+    {
+        cam.orthographicSize = Mathf.Max(8f, HalfWorldWidth / cam.aspect);
+    }
+
+    float HalfScreenWidth => cam.orthographicSize * cam.aspect;
 
     // ================= 판(런) 시작 =================
 
@@ -98,18 +116,11 @@ public class GameManager : MonoBehaviour
         enemies.Clear();
 
         World = new GameObject("World").transform;
+        BuildBattlefield();
 
-        var marker = new GameObject("RallyPoint");
-        marker.transform.SetParent(World, false);
-        marker.transform.localScale = Vector3.one * 1.2f;
-        var sr = marker.AddComponent<SpriteRenderer>();
-        sr.sprite = SpriteFactory.Circle();
-        sr.color = new Color(1f, 1f, 1f, 0.12f);
-        rallyMarker = marker.transform;
-
-        RallyPoint = Vector2.zero;
         Gold = StartGold;
         Wave = 0;
+        CastleHp = CastleMaxHp;
         IsGameOver = false;
         upgradeChoices = null;
         waveInProgress = false;
@@ -121,40 +132,51 @@ public class GameManager : MonoBehaviour
         SpawnHero(HeroClass.Archer);
     }
 
+    // 땅과 성을 그립니다. (나중에 진짜 그림으로 바꿀 부분)
+    void BuildBattlefield()
+    {
+        MakeBlock("Ground", new Vector2(0f, (LaneTop + LaneBottom) / 2f - 4f),
+            new Vector2(80f, LaneTop - LaneBottom + 9f), new Color(0.40f, 0.62f, 0.32f), -2000);
+        MakeBlock("Horizon", new Vector2(0f, LaneTop + 0.9f), new Vector2(80f, 0.3f), new Color(0.32f, 0.50f, 0.26f), -1999);
+
+        float castleBottom = LaneBottom - 0.8f;
+        float castleTop = LaneTop + 2.5f;
+        castleRenderer = MakeBlock("Castle", new Vector2(CastleX, (castleTop + castleBottom) / 2f),
+            new Vector2(2.4f, castleTop - castleBottom), new Color(0.55f, 0.55f, 0.6f), -1500);
+        for (int i = 0; i < 3; i++)
+            MakeBlock("Battlement", new Vector2(CastleX - 0.8f + i * 0.8f, castleTop + 0.3f),
+                new Vector2(0.5f, 0.6f), new Color(0.5f, 0.5f, 0.55f), -1500);
+        MakeBlock("Gate", new Vector2(CastleX + 0.6f, castleBottom + 1.2f), new Vector2(1.2f, 2.4f),
+            new Color(0.35f, 0.25f, 0.18f), -1499);
+    }
+
+    SpriteRenderer MakeBlock(string blockName, Vector2 center, Vector2 scale, Color color, int order)
+    {
+        var go = new GameObject(blockName);
+        go.transform.SetParent(World, false);
+        go.transform.position = center;
+        go.transform.localScale = new Vector3(scale.x, scale.y, 1f);
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = SpriteFactory.Square();
+        sr.color = color;
+        sr.sortingOrder = order;
+        return sr;
+    }
+
     // ================= 매 프레임 =================
 
     void Update()
     {
-        arenaHalfSize = new Vector2(cam.orthographicSize * cam.aspect, cam.orthographicSize);
-        if (IsPaused) return;
+        FitCamera();
 
-        Vector2 input = ReadMoveInput();
-        Vector2 p = RallyPoint + input * RallySpeed * Time.deltaTime;
-        p.x = Mathf.Clamp(p.x, -arenaHalfSize.x + 1.5f, arenaHalfSize.x - 1.5f);
-        p.y = Mathf.Clamp(p.y, -arenaHalfSize.y + 2.5f, arenaHalfSize.y - 1.5f);
-        RallyPoint = p;
-        rallyMarker.position = p;
-
-        UpdateWaves();
-    }
-
-    static Vector2 ReadMoveInput()
-    {
-        Vector2 v = Vector2.zero;
-#if ENABLE_INPUT_SYSTEM
-        var kb = UnityEngine.InputSystem.Keyboard.current;
-        if (kb != null)
+        if (castleFlashTimer > 0f)
         {
-            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) v.x -= 1f;
-            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) v.x += 1f;
-            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) v.y -= 1f;
-            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) v.y += 1f;
+            castleFlashTimer -= Time.deltaTime;
+            castleRenderer.color = castleFlashTimer > 0f ? new Color(0.9f, 0.5f, 0.5f) : new Color(0.55f, 0.55f, 0.6f);
         }
-#else
-        v.x = Input.GetAxisRaw("Horizontal");
-        v.y = Input.GetAxisRaw("Vertical");
-#endif
-        return v.sqrMagnitude > 1f ? v.normalized : v;
+
+        if (IsPaused) return;
+        UpdateWaves();
     }
 
     // ================= 웨이브 =================
@@ -202,16 +224,8 @@ public class GameManager : MonoBehaviour
 
     void SpawnEnemy(bool brute)
     {
-        // 화면 바깥 가장자리 중 한 곳에서 등장
-        Vector2 pos;
-        float ex = arenaHalfSize.x + 1f, ey = arenaHalfSize.y + 1f;
-        switch (Random.Range(0, 4))
-        {
-            case 0: pos = new Vector2(Random.Range(-ex, ex), ey); break;
-            case 1: pos = new Vector2(Random.Range(-ex, ex), -ey); break;
-            case 2: pos = new Vector2(-ex, Random.Range(-ey, ey)); break;
-            default: pos = new Vector2(ex, Random.Range(-ey, ey)); break;
-        }
+        // 화면 오른쪽 바깥에서 등장
+        var pos = new Vector2(HalfScreenWidth + 1f, Random.Range(LaneBottom, LaneTop));
 
         float hpMul = 1f + 0.2f * (Wave - 1);
         float dmgMul = 1f + 0.08f * (Wave - 1);
@@ -257,7 +271,8 @@ public class GameManager : MonoBehaviour
     void SpawnHero(HeroClass c)
     {
         if (heroes.Count >= MaxHeroes) return;
-        var u = CreateUnit(c.name, Team.Hero, RallyPoint + Random.insideUnitCircle * 0.5f);
+        // 성문에서 나와서 자기 자리로 걸어갑니다.
+        var u = CreateUnit(c.name, Team.Hero, new Vector2(CastleFrontX, Random.Range(LaneBottom, LaneBottom + 2f)));
         u.heroClass = c;
         u.maxHp = c.hp * hpBonus;
         u.damage = c.damage;
@@ -272,14 +287,25 @@ public class GameManager : MonoBehaviour
         RefreshFormation();
     }
 
-    // 영웅들이 집결지 주변에 해바라기 씨앗 모양으로 고르게 서도록 자리를 정합니다.
+    // 영웅 진형: 전사가 맨 앞, 그 뒤에 궁수, 맨 뒤에 마법사가 줄을 섭니다.
     void RefreshFormation()
     {
-        for (int i = 0; i < heroes.Count; i++)
+        int index = 0;
+        foreach (var c in HeroClass.All)
         {
-            float r = 0.6f * Mathf.Sqrt(i);
-            float a = i * 2.39996f;
-            heroes[i].formationOffset = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
+            foreach (var h in heroes)
+            {
+                if (h.heroClass != c) continue;
+                int column = index / RowsPerColumn;
+                int row = index % RowsPerColumn;
+                float rowGap = (LaneTop - LaneBottom) / (RowsPerColumn - 1);
+                // 줄마다 살짝 엇갈리게 세워서 겹쳐 보이지 않게 합니다.
+                float y = LaneTop - row * rowGap - (column % 2) * rowGap * 0.5f;
+                h.formationSlot = new Vector2(FrontLineX - column * ColumnGap, Mathf.Max(y, LaneBottom));
+                index++;
+            }
+            // 직업이 바뀌면 새 줄에서 시작
+            if (index % RowsPerColumn != 0) index += RowsPerColumn - index % RowsPerColumn;
         }
     }
 
@@ -404,7 +430,18 @@ public class GameManager : MonoBehaviour
         else if (heroes.Remove(u))
         {
             RefreshFormation();
-            if (heroes.Count == 0) GameOver();
+        }
+    }
+
+    public void DamageCastle(float amount)
+    {
+        if (IsGameOver) return;
+        CastleHp -= amount;
+        castleFlashTimer = 0.1f;
+        if (CastleHp <= 0f)
+        {
+            CastleHp = 0f;
+            GameOver();
         }
     }
 
@@ -437,6 +474,7 @@ public class GameManager : MonoBehaviour
                 {
                     foreach (var h in heroes) { h.hp = h.maxHp; h.UpdateHpBar(); }
                 } },
+            new Upgrade { title = "성벽 보수", desc = "성 체력 +80 회복", apply = () => CastleHp = Mathf.Min(CastleMaxHp, CastleHp + 80f) },
             new Upgrade { title = "전리품", desc = "골드 +" + (20 + Wave * 3), apply = () => Gold += 20 + Wave * 3 },
         };
         foreach (var c in HeroClass.All)
@@ -475,7 +513,7 @@ public class GameManager : MonoBehaviour
         small.normal.textColor = new Color(1f, 1f, 1f, 0.8f);
         var button = new GUIStyle(GUI.skin.button) { fontSize = 18 };
 
-        GUI.Label(new Rect(20, 12, 800, 34), $"웨이브 {Wave}    골드 {Gold}    영웅 {heroes.Count}/{MaxHeroes}", big);
+        GUI.Label(new Rect(20, 12, 900, 34), $"웨이브 {Wave}    골드 {Gold}    영웅 {heroes.Count}/{MaxHeroes}    성 체력 {Mathf.CeilToInt(CastleHp)}/{CastleMaxHp:0}", big);
         if (!waveInProgress && !IsPaused && waveBreakTimer > 0f)
             GUI.Label(new Rect(20, 44, 400, 26), $"다음 웨이브까지 {waveBreakTimer:0.0}초", small);
 
@@ -499,7 +537,7 @@ public class GameManager : MonoBehaviour
             Time.timeScale = fastForward ? 2f : 1f;
         }
         var helpStyle = new GUIStyle(small) { alignment = TextAnchor.UpperRight };
-        GUI.Label(new Rect(w - 420, 58, 400, 26), "WASD / 방향키: 부대 이동", helpStyle);
+        GUI.Label(new Rect(w - 420, 58, 400, 26), "적이 성에 닿지 못하게 막아내세요!", helpStyle);
         GUI.Label(new Rect(w - 420, 82, 400, 26), $"최고 기록: 웨이브 {bestWave}", helpStyle);
 
         // 아래: 영웅 고용 버튼
@@ -545,7 +583,7 @@ public class GameManager : MonoBehaviour
         GUI.Box(new Rect(0, 0, w, 720), "");
         GUI.Box(new Rect(0, 0, w, 720), "");
         var title = new GUIStyle(big) { alignment = TextAnchor.MiddleCenter, fontSize = 40 };
-        GUI.Label(new Rect(0, 220, w, 60), "부대 전멸!", title);
+        GUI.Label(new Rect(0, 220, w, 60), "성이 함락되었습니다!", title);
         var sub = new GUIStyle(big) { alignment = TextAnchor.MiddleCenter };
         GUI.Label(new Rect(0, 290, w, 40), $"웨이브 {Wave}까지 버텼습니다   (최고 기록: {bestWave})", sub);
         if (GUI.Button(new Rect(w / 2 - 110, 360, 220, 60), "다시 시작", button))
