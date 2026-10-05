@@ -31,7 +31,7 @@ public class GachaScreen
         this.onClose = onClose;
         bannerName = banner.name;
         cards.Clear();
-        best = Rarity.Common;
+        best = Rarity.Normal;
 
         foreach (var def in banner.Roll(count))
         {
@@ -60,7 +60,7 @@ public class GachaScreen
     // 가장 좋은 결과에 따라 마법진 색이 바뀝니다 (모바일 가챠의 '확정 연출')
     Color HintColor()
     {
-        if (best >= Rarity.Epic) return RarityInfo.Animated(best);
+        if (best >= Rarity.SuperRare) return RarityInfo.Animated(best);
         return new Color(0.5f, 0.75f, 1f);
     }
 
@@ -193,21 +193,21 @@ public class GachaScreen
         float widthScale = Mathf.Abs(Mathf.Cos(flipT * Mathf.PI));
         var rr = new Rect(r.center.x - r.width * widthScale / 2f, r.y, r.width * widthScale, r.height);
 
-        // 영웅 등급 이상은 뒤집기 전부터 뒤에서 빛이 납니다
-        if (rarity >= Rarity.Epic)
+        // 슈퍼레어 이상은 뒤집기 전부터 뒤에서 빛이 납니다
+        if (rarity >= Rarity.SuperRare)
         {
             float pulse = 1f + 0.06f * Mathf.Sin(Now * 6f);
             UI.Glow(r.center, r.width * 0.95f * pulse, UI.WithAlpha(rc, 0.55f * alpha));
         }
 
-        // 전설 이상: 뒤집힌 직후 빛이 퍼져 나감
+        // 유니크 이상: 뒤집힌 직후 빛이 퍼져 나감
         float burst = Now - (card.flipStart + FlipDuration);
-        if (card.flipStart >= 0f && rarity >= Rarity.Legendary && burst > 0f && burst < 0.9f)
+        if (card.flipStart >= 0f && rarity >= Rarity.Unique && burst > 0f && burst < 0.9f)
             UI.Glow(r.center, r.width * (0.6f + burst * 2.5f), UI.WithAlpha(rc, 1f - burst / 0.9f));
 
         if (!showFront)
         {
-            Color frame = rarity >= Rarity.Epic ? rc : new Color(0.75f, 0.75f, 0.85f);
+            Color frame = rarity >= Rarity.SuperRare ? rc : new Color(0.75f, 0.75f, 0.85f);
             UI.Fill(rr, new Color(0.10f, 0.12f, 0.30f, alpha));
             UI.Fill(new Rect(rr.x + 8f, rr.y + 8f, rr.width - 16f, rr.height - 16f), new Color(0.16f, 0.18f, 0.42f, alpha));
             UI.Frame(rr, UI.WithAlpha(frame, alpha), 4f);
@@ -244,8 +244,11 @@ public class GachaScreen
         UI.Text(new Rect(r.x + 4f, r.y + 185f * s, r.width - 8f, 36f * s), def.name, Mathf.RoundToInt(26 * s), Color.white, TextAnchor.MiddleCenter, true);
         UI.Text(new Rect(r.x + 4f, r.y + 222f * s, r.width - 8f, 26f * s), $"{RarityInfo.Name(def.rarity)} · {def.job.name}",
             Mathf.RoundToInt(18 * s), rc, TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(r.x + 8f, r.y + 250f * s, r.width - 16f, 44f * s), def.desc, Mathf.RoundToInt(14 * s),
-            new Color(1f, 1f, 1f, 0.7f), TextAnchor.UpperCenter, false, false);
+        // 기본 설정 [종족 / 소속 / 직업 / 성향]
+        UI.Text(new Rect(r.x + 6f, r.y + 248f * s, r.width - 12f, 22f * s), def.Profile, Mathf.RoundToInt(13 * s),
+            new Color(1f, 0.92f, 0.7f), TextAnchor.MiddleCenter, false, false);
+        UI.Text(new Rect(r.x + 8f, r.y + 270f * s, r.width - 16f, 28f * s), def.desc, Mathf.RoundToInt(12 * s),
+            new Color(1f, 1f, 1f, 0.65f), TextAnchor.UpperCenter, false, false);
 
         if (!string.IsNullOrEmpty(tag))
         {

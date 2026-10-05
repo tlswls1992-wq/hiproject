@@ -101,6 +101,16 @@ public static class UI
         Fill(new Rect(r.x + 2f, r.y + 2f, (r.width - 4f) * Mathf.Clamp01(pct), r.height - 4f), fill);
     }
 
+    // 회전해서 그리기: BeginRotate로 돌리고, 그린 다음 EndRotate에 돌려받은 값을 넘겨 원래대로 되돌립니다.
+    public static Matrix4x4 BeginRotate(float angle, Vector2 pivot)
+    {
+        var saved = GUI.matrix;
+        GUIUtility.RotateAroundPivot(angle, pivot * Scale);
+        return saved;
+    }
+
+    public static void EndRotate(Matrix4x4 saved) => GUI.matrix = saved;
+
     public static Color Darken(Color c, float k) => new Color(c.r * k, c.g * k, c.b * k, c.a);
     public static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
 

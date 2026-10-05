@@ -12,11 +12,12 @@ public class Unit : MonoBehaviour
     public float damage;
     public float attackRange;
     public float attackCooldown;
-    public float moveSpeed;          // 적만 움직입니다 (동료는 칸에 고정)
+    public float moveSpeed;
     public float splashRadius;
     public float size;
     public bool ranged;
     public int goldReward;           // 적을 잡았을 때 얻는 골드
+    public Vector2 homePosition;     // 편성한 자리 (동료만 사용)
     public bool isBoss;
     public bool isLeader;            // 용사
 
@@ -109,50 +110,57 @@ public class Unit : MonoBehaviour
         }
 
         Vector2 pos = transform.position;
-        if (team == Team.Hero)
-        {
-            // 동료: 편성한 칸에서 움직이지 않고 싸웁니다.
-            HeroThink(pos, battle);
-            return;
-        }
-
-        Vector2 moveDir = EnemyThink(pos, battle);
+        Vector2 moveDir = team == Team.Hero ? HeroThink(pos, battle) : EnemyThink(pos, battle);
         Vector2 velocity = moveDir * moveSpeed + battle.SeparationFor(this);
-        Vector2 next = pos + velocity * dt;
-        next.y = Mathf.Clamp(next.y, BattleManager.LaneBottom, BattleManager.LaneTop);
-        transform.position = next;
+        transform.position = battle.ClampToArena(pos + velocity * dt);
         UpdateSorting();
     }
 
-    // 동료: 사거리 안에 들어온 가장 가까운 적을 공격합니다. 사제는 다친 아군을 치유합니다.
-    void HeroThink(Vector2 pos, BattleManager battle)
+    // 동료: 근거리는 적에게 다가가서 공격하고, 원거리는 사거리 안에 들어올 때까지 다가가서 공격합니다.
+    // 적이 없으면 편성한 자리로 돌아갑니다.
+    Vector2 HeroThink(Vector2 pos, BattleManager battle)
     {
-        if (cooldownTimer > 0f) return;
-
-        if (heroClass != null && heroClass.healer)
-        {
-            Unit ally = battle.FindMostHurtAlly(this, attackRange * battle.RangeMultiplier(this));
-            if (ally == null) return;
-            cooldownTimer = attackCooldown * battle.CooldownMultiplier(this);
-            ally.Heal(damage * battle.HealMultiplier(this));
-            battle.SpawnEffect(ally.transform.position, ally.size + 0.6f, new Color(0.5f, 1f, 0.5f, 0.5f));
-            return;
-        }
+        if (heroClass != null && heroClass.healer) return HealerThink(pos, battle);
 
         Unit target = battle.FindNearestOpponent(this);
-        if (target != null && InRange(pos, target)) TryAttack(target);
+        if (target == null) return ToHome(pos);
+        if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
+        return DirectionTo(pos, target.transform.position);
     }
 
-    // 적: 자기 줄을 따라 왼쪽으로 행군하다가, 가장 가까운 동료에게 다가가 공격합니다.
+    // 사제: 다친 아군이 있으면 사거리까지 다가가서 치유하고, 없으면 아군 뒤를 따라갑니다.
+    Vector2 HealerThink(Vector2 pos, BattleManager battle)
+    {
+        float range = attackRange * battle.RangeMultiplier(this);
+        Unit ally = battle.FindMostHurtAlly(this);
+        if (ally != null)
+        {
+            if (Vector2.Distance(pos, ally.transform.position) > range) return DirectionTo(pos, ally.transform.position);
+            if (cooldownTimer <= 0f)
+            {
+                cooldownTimer = attackCooldown * battle.CooldownMultiplier(this);
+                ally.Heal(damage * battle.HealMultiplier(this));
+                battle.SpawnEffect(ally.transform.position, ally.size + 0.6f, new Color(0.5f, 1f, 0.5f, 0.5f));
+            }
+            return Vector2.zero;
+        }
+
+        if (!battle.HasEnemies) return ToHome(pos);
+        Unit friend = battle.FindNearestFighter(this);
+        if (friend != null && Vector2.Distance(pos, friend.transform.position) > range * 0.6f)
+            return DirectionTo(pos, friend.transform.position);
+        return Vector2.zero;
+    }
+
+    Vector2 ToHome(Vector2 pos) => Vector2.Distance(pos, homePosition) > 0.1f ? DirectionTo(pos, homePosition) : Vector2.zero;
+
+    // 적: 가장 가까운 파티원에게 다가가서 공격합니다.
     Vector2 EnemyThink(Vector2 pos, BattleManager battle)
     {
         Unit target = battle.FindNearestOpponent(this);
         if (target == null) return Vector2.zero;
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
-
-        Vector2 tpos = target.transform.position;
-        if (pos.x - tpos.x > 2.5f + attackRange) return Vector2.left;
-        return DirectionTo(pos, tpos);
+        return DirectionTo(pos, target.transform.position);
     }
 
     bool InRange(Vector2 pos, Unit target)

@@ -12,11 +12,18 @@ public class HeroClass
     public float damage;       // 공격력 (사제는 치유량)
     public float range;        // 공격 사거리
     public float cooldown;     // 공격 간격(초)
-    public float speed;        // (지금은 사용 안 함: 동료는 칸에 고정)
+    public float speed;        // 이동 속도
     public float splash;       // 범위 공격 반경 (0이면 한 명만 공격)
     public float size;         // 몸 크기
     public bool ranged;        // 원거리 공격(투사체) 여부
     public bool healer;        // 공격 대신 아군을 치유
+
+    public static readonly HeroClass Soldier = new HeroClass
+    {
+        name = "하급 병사", letter = "병", role = "근접 · 기본", synergyText = "공격력 증가",
+        color = new Color(0.60f, 0.55f, 0.45f),
+        hp = 90, damage = 9, range = 0.6f, cooldown = 0.9f, speed = 2.5f, size = 0.55f,
+    };
 
     public static readonly HeroClass Warrior = new HeroClass
     {
@@ -51,9 +58,9 @@ public class HeroClass
     {
         name = "용사", letter = "용", role = "근접 · 만능", synergyText = "",
         color = new Color(1.00f, 0.82f, 0.25f),
-        hp = 150, damage = 14, range = 0.7f, cooldown = 0.8f, speed = 0f, size = 0.7f,
+        hp = 150, damage = 14, range = 0.7f, cooldown = 0.8f, speed = 2.6f, size = 0.7f,
     };
 
     // 시너지가 있는 직업들
-    public static readonly HeroClass[] All = { Warrior, Archer, Mage, Priest };
+    public static readonly HeroClass[] All = { Soldier, Warrior, Archer, Mage, Priest };
 }

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 전투 한 판을 진행합니다: 전장, 편성 칸에 동료 배치, 웨이브, 강화 카드, 전투 화면 UI.
-// 파티원(용사 포함)이 모두 쓰러지면 패배, 모든 웨이브를 막으면 승리입니다.
+// 전투 한 판을 진행합니다: 전장, 편성대로 동료 배치, 웨이브, 강화 카드, 전투 화면 UI.
+// 파티원(용사 포함)이 모두 쓰러지면 패배, 모든 웨이브를 물리치면 승리입니다.
 public class BattleManager : MonoBehaviour
 {
     public static BattleManager Instance { get; private set; }
@@ -13,10 +13,11 @@ public class BattleManager : MonoBehaviour
     const float AwakenBonus = 0.1f;          // 용사 각성 1단계마다 능력치 +10%
 
     // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
-    public const float LaneTop = 2.5f;       // 맨 윗줄의 높이
-    public const float LaneBottom = -5.5f;   // 맨 아랫줄의 높이
-    const float FrontX = -1f;                // 선두 줄의 가로 위치
-    const float ColumnGap = 1.6f;            // 줄 사이 간격 (선두 → 후미 방향)
+    public const float LaneTop = 2.5f;       // 유닛이 다닐 수 있는 가장 위쪽
+    public const float LaneBottom = -5.5f;   // 가장 아래쪽
+    const float FrontX = -2f;                // 선두 줄의 가운데 가로 위치
+    const float ColumnGap = 1.8f;            // 줄 사이 간격 (선두 → 후미 방향)
+    const float ZoneWidth = 1.5f;            // 한 줄의 가로 폭
 
     enum EnemyKind { Grunt, Archer, Brute, Boss }
 
@@ -29,6 +30,7 @@ public class BattleManager : MonoBehaviour
     public int GoldEarned { get; private set; }
     public bool Fled { get; private set; }   // 도망쳤는지
     public bool IsPaused => World == null || finished || upgradeChoices != null;
+    public bool HasEnemies => enemies.Count > 0;
 
     // 강화 카드로 올라가는 보너스 (이번 판에서만 유지)
     float damageBonus = 1f;
@@ -68,11 +70,19 @@ public class BattleManager : MonoBehaviour
 
     float HalfScreenWidth => cam.orthographicSize * cam.aspect;
 
-    static float RowGap => (LaneTop - LaneBottom) / (SaveData.Rows - 1);
+    static float ColumnCenterX(int column) => FrontX - column * ColumnGap;
 
-    // 편성 칸의 실제 위치 (column 0 = 선두)
-    public static Vector2 CellPosition(int column, int row) =>
-        new Vector2(FrontX - column * ColumnGap, LaneTop - row * RowGap);
+    // 편성한 자리의 실제 위치 (column 0 = 선두, fx 0 = 줄의 앞쪽, fy 0 = 위쪽)
+    public static Vector2 PlacementPosition(int column, float fx, float fy) =>
+        new Vector2(ColumnCenterX(column) + (0.5f - fx) * ZoneWidth, LaneTop - fy * (LaneTop - LaneBottom));
+
+    public Vector2 ClampToArena(Vector2 p)
+    {
+        float half = HalfScreenWidth;
+        p.x = Mathf.Clamp(p.x, -half + 0.5f, half + 2f);
+        p.y = Mathf.Clamp(p.y, LaneBottom, LaneTop);
+        return p;
+    }
 
     // ================= 전투 시작 / 끝 =================
 
@@ -97,15 +107,15 @@ public class BattleManager : MonoBehaviour
         BuildBattlefield();
 
         SaveData.EnsureHeroPlaced();
-        for (int col = 0; col < SaveData.Columns; col++)
+        foreach (var p in SaveData.Party)
         {
-            for (int row = 0; row < SaveData.Rows; row++)
-            {
-                var def = SaveData.DefAt(SaveData.CellIndex(col, row));
-                if (def != null) SpawnCompanion(def, CellPosition(col, row));
-            }
+            var def = SaveData.DefOf(p.value);
+            if (def != null) SpawnCompanion(def, PlacementPosition(p.column, p.fx, p.fy));
         }
         partySize = heroes.Count;
+
+        fastForward = SaveData.FastBattle;
+        Time.timeScale = fastForward ? 2f : 1f;
     }
 
     public void End()
@@ -129,7 +139,7 @@ public class BattleManager : MonoBehaviour
         Time.timeScale = 1f;
     }
 
-    // 땅과 편성 칸을 그립니다. (나중에 진짜 그림으로 바꿀 부분)
+    // 땅과 편성 줄을 그립니다. (나중에 진짜 그림으로 바꿀 부분)
     void BuildBattlefield()
     {
         Color ground = Stages.GroundColor(Level);
@@ -137,11 +147,10 @@ public class BattleManager : MonoBehaviour
             new Vector2(80f, LaneTop - LaneBottom + 9f), ground, -2000);
         MakeBlock("Horizon", new Vector2(0f, LaneTop + 1.2f), new Vector2(80f, 0.3f), UI.Darken(ground, 0.8f), -1999);
 
-        // 5줄 x 5칸 편성 칸 표시
+        // 선두 ~ 후미 줄 표시 (시작 위치)
         for (int col = 0; col < SaveData.Columns; col++)
-            for (int row = 0; row < SaveData.Rows; row++)
-                MakeBlock("Cell", CellPosition(col, row), new Vector2(ColumnGap - 0.25f, RowGap - 0.4f),
-                    new Color(0f, 0f, 0f, col % 2 == 0 ? 0.12f : 0.07f), -1900);
+            MakeBlock("Column", new Vector2(ColumnCenterX(col), (LaneTop + LaneBottom) / 2f),
+                new Vector2(ZoneWidth, LaneTop - LaneBottom + 1f), new Color(0f, 0f, 0f, col % 2 == 0 ? 0.10f : 0.05f), -1900);
     }
 
     SpriteRenderer MakeBlock(string blockName, Vector2 center, Vector2 scale, Color color, int order)
@@ -227,9 +236,9 @@ public class BattleManager : MonoBehaviour
 
     void SpawnEnemy(EnemyKind kind)
     {
-        // 편성 칸과 같은 5개의 줄 중 하나를 따라 들어옵니다.
-        int lane = kind == EnemyKind.Boss ? SaveData.Rows / 2 : Random.Range(0, SaveData.Rows);
-        var pos = new Vector2(HalfScreenWidth + 1f, LaneTop - lane * RowGap + Random.Range(-0.3f, 0.3f));
+        // 화면 오른쪽 바깥에서 등장
+        float y = kind == EnemyKind.Boss ? (LaneTop + LaneBottom) / 2f : Random.Range(LaneBottom, LaneTop);
+        var pos = new Vector2(HalfScreenWidth + 1f, y);
 
         float hpMul = 1f + 0.12f * (Level - 1) + 0.1f * (Wave - 1);
         float dmgMul = 1f + 0.05f * (Level - 1);
@@ -290,6 +299,8 @@ public class BattleManager : MonoBehaviour
         var u = CreateUnit(def.name, Team.Hero, pos);
         u.heroClass = c;
         u.isLeader = def.IsHero;
+        u.homePosition = pos;
+        u.moveSpeed = c.speed;
         u.maxHp = c.hp * m * hpBonus;
         u.damage = c.damage * m;
         u.attackRange = c.range;
@@ -318,7 +329,13 @@ public class BattleManager : MonoBehaviour
         return n >= 6 ? 2 : n >= 3 ? 1 : 0;
     }
 
-    public float DamageMultiplier(Unit u) => u.team == Team.Hero ? damageBonus : 1f;
+    public float DamageMultiplier(Unit u)
+    {
+        if (u.team != Team.Hero) return 1f;
+        float m = damageBonus;
+        if (u.heroClass == HeroClass.Soldier) m *= 1f + 0.2f * SynergyTier(HeroClass.Soldier);
+        return m;
+    }
 
     public float RangeMultiplier(Unit u) => u.team == Team.Hero && (u.ranged || u.heroClass.healer) ? rangeBonus : 1f;
 
@@ -364,29 +381,43 @@ public class BattleManager : MonoBehaviour
         return best;
     }
 
-    public Unit FindMostHurtAlly(Unit healer, float range)
+    // 체력 비율이 가장 낮은 아군 (다친 아군이 없으면 null)
+    public Unit FindMostHurtAlly(Unit healer)
     {
         Unit best = null;
         float lowest = 0.999f;
-        Vector2 pos = healer.transform.position;
         foreach (var h in heroes)
         {
             if (h == null || !h.IsAlive) continue;
             float pct = h.hp / h.maxHp;
             if (pct >= lowest) continue;
-            if (Vector2.Distance(pos, h.transform.position) > range) continue;
             lowest = pct;
             best = h;
         }
         return best;
     }
 
-    // 적끼리 한 점에 겹치지 않도록 살짝 밀어냅니다.
+    // 사제가 따라갈, 가장 가까운 싸우는 아군 (사제 제외)
+    public Unit FindNearestFighter(Unit healer)
+    {
+        Unit best = null;
+        float bestDist = float.MaxValue;
+        Vector2 pos = healer.transform.position;
+        foreach (var h in heroes)
+        {
+            if (h == null || !h.IsAlive || h.heroClass.healer) continue;
+            float d = ((Vector2)h.transform.position - pos).sqrMagnitude;
+            if (d < bestDist) { bestDist = d; best = h; }
+        }
+        return best;
+    }
+
+    // 같은 편끼리 한 점에 겹치지 않도록 살짝 밀어냅니다.
     public Vector2 SeparationFor(Unit u)
     {
         Vector2 pos = u.transform.position;
         Vector2 push = Vector2.zero;
-        foreach (var other in enemies)
+        foreach (var other in u.team == Team.Hero ? heroes : enemies)
         {
             if (other == u || other == null) continue;
             float minDist = (u.size + other.size) * 0.5f;
@@ -525,7 +556,7 @@ public class BattleManager : MonoBehaviour
         // 줄 이름 (선두 ~ 후미)
         for (int col = 0; col < SaveData.Columns; col++)
         {
-            var p = UI.WorldToUI(cam, CellPosition(col, 0) + new Vector2(0f, RowGap * 0.5f + 0.2f));
+            var p = UI.WorldToUI(cam, new Vector2(ColumnCenterX(col), LaneTop + 1.2f));
             UI.Text(new Rect(p.x - 40, p.y - 26, 80, 24), SaveData.ColumnNames[col], 16, new Color(1f, 1f, 1f, 0.75f), TextAnchor.MiddleCenter, true);
         }
 

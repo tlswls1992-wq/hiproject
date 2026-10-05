@@ -1,23 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 동료 등급: 일반 < 희귀 < 영웅 < 전설 < 신화
-public enum Rarity { Common, Rare, Epic, Legendary, Mythic }
+// 캐릭터 등급: 노말 < 레어 < 슈퍼레어 < 유니크 < 전설 < 신화
+public enum Rarity { Normal, Rare, SuperRare, Unique, Legendary, Mythic }
+
+// 캐릭터 성향
+public enum Alignment { 혼돈, 중립, 질서, 명예, 실리, 선, 악 }
 
 public static class RarityInfo
 {
-    static readonly string[] names = { "일반", "희귀", "영웅", "전설", "신화" };
+    static readonly string[] names = { "노말", "레어", "슈퍼레어", "유니크", "전설", "신화" };
     static readonly Color[] colors =
     {
-        new Color(0.75f, 0.75f, 0.75f), // 일반: 회색
-        new Color(0.30f, 0.65f, 1.00f), // 희귀: 파랑
-        new Color(0.75f, 0.40f, 1.00f), // 영웅: 보라
-        new Color(1.00f, 0.78f, 0.20f), // 전설: 금색
+        new Color(0.75f, 0.75f, 0.75f), // 노말: 회색
+        new Color(0.30f, 0.65f, 1.00f), // 레어: 파랑
+        new Color(0.75f, 0.40f, 1.00f), // 슈퍼레어: 보라
+        new Color(1.00f, 0.55f, 0.15f), // 유니크: 주황
+        new Color(1.00f, 0.85f, 0.25f), // 전설: 금색
         new Color(1.00f, 0.30f, 0.35f), // 신화: 빨강 (화면에서는 무지개로 빛남)
     };
-    // 등급별 능력치 배수 (일반 = 1배)
-    static readonly float[] statMultipliers = { 1f, 1.5f, 2.2f, 3.2f, 4.5f };
+    // 등급별 능력치 배수 (노말 = 1배)
+    static readonly float[] statMultipliers = { 1f, 1.4f, 1.9f, 2.6f, 3.4f, 4.5f };
 
+    public static int Count => names.Length;
     public static string Name(Rarity r) => names[(int)r];
     public static float StatMultiplier(Rarity r) => statMultipliers[(int)r];
     public static int Stars(Rarity r) => (int)r + 1;
@@ -32,48 +37,60 @@ public static class RarityInfo
     }
 }
 
-// 뽑을 수 있는 동료 한 명의 정보
+// 뽑을 수 있는 캐릭터 한 명의 정보
+// 기본 설정: [종족 / 소속 / 직업 / 성향]
 public class CompanionDef
 {
     public string id;
     public string name;
-    public string desc;
     public Rarity rarity;
-    public HeroClass job;
+    public string race;          // 종족
+    public string faction;       // 소속
+    public HeroClass job;        // 직업
+    public Alignment alignment;  // 성향
+    public string desc;
 
-    CompanionDef(string id, string name, Rarity rarity, HeroClass job, string desc)
+    CompanionDef(string id, string name, Rarity rarity, string race, string faction, HeroClass job, Alignment alignment, string desc)
     {
-        this.id = id; this.name = name; this.rarity = rarity; this.job = job; this.desc = desc;
+        this.id = id; this.name = name; this.rarity = rarity;
+        this.race = race; this.faction = faction; this.job = job; this.alignment = alignment;
+        this.desc = desc;
     }
 
-    // ★ 새 동료를 추가하려면 이 목록에 한 줄을 추가하세요. (id는 겹치지 않게)
+    // [종족/소속/직업/성향] 한 줄 표시
+    public string Profile => $"{race} / {faction} / {job.name} / {alignment}";
+
+    // ★ 새 캐릭터를 추가하려면 이 목록에 한 줄을 추가하세요. (id는 겹치지 않게)
+    //   순서: id, 이름, 등급, 종족, 소속, 직업, 성향, 한 줄 설명
     public static readonly CompanionDef[] All =
     {
         // 용사 본인도 뽑기에서 나옵니다. 용사가 나오면 '각성'해서 강해져요.
-        new CompanionDef(HeroId,         "용사",          Rarity.Epic,      HeroClass.Brave,   "가챠의 힘을 가진 용사. 뽑으면 각성!"),
+        new CompanionDef(HeroId, "용사", Rarity.Unique, "인간", "용사 파티", HeroClass.Brave, Alignment.중립, "가챠의 힘을 가진 용사. 뽑으면 각성!"),
 
-        new CompanionDef("c_villager",   "마을 청년",     Rarity.Common,    HeroClass.Warrior, "괭이 대신 검을 든 용감한 청년"),
-        new CompanionDef("c_hunter",     "사냥꾼",        Rarity.Common,    HeroClass.Archer,  "토끼 사냥이 특기"),
-        new CompanionDef("c_apprentice", "견습 마법사",   Rarity.Common,    HeroClass.Mage,    "가끔 주문을 틀린다"),
-        new CompanionDef("c_nun",        "수녀",          Rarity.Common,    HeroClass.Priest,  "기도로 상처를 낫게 한다"),
+        new CompanionDef("n_balo",       "발로",          Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Soldier, Alignment.선,   "정의감 하나는 누구에게도 지지 않는 신참 병사"),
+        new CompanionDef("n_deboram",    "드보람",        Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Soldier, Alignment.실리, "받은 만큼만 일하는 현실적인 병사"),
+        new CompanionDef("c_villager",   "마을 청년",     Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Warrior, Alignment.선,   "괭이 대신 검을 든 용감한 청년"),
+        new CompanionDef("c_hunter",     "사냥꾼",        Rarity.Normal,    "인간",     "자유민",      HeroClass.Archer,  Alignment.중립, "토끼 사냥이 특기"),
+        new CompanionDef("c_apprentice", "견습 마법사",   Rarity.Normal,    "인간",     "마탑",        HeroClass.Mage,    Alignment.혼돈, "가끔 주문을 틀린다"),
+        new CompanionDef("c_nun",        "수녀",          Rarity.Normal,    "인간",     "성교회",      HeroClass.Priest,  Alignment.선,   "기도로 상처를 낫게 한다"),
 
-        new CompanionDef("r_mercenary",  "용병 검사",     Rarity.Rare,      HeroClass.Warrior, "돈만 주면 어디든 간다"),
-        new CompanionDef("r_ranger",     "숲의 궁수",     Rarity.Rare,      HeroClass.Archer,  "숲에서 자란 명사수"),
-        new CompanionDef("r_pyro",       "불꽃 마법사",   Rarity.Rare,      HeroClass.Mage,    "모든 것을 태워 버린다"),
-        new CompanionDef("r_cleric",     "성당 사제",     Rarity.Rare,      HeroClass.Priest,  "왕국 대성당 출신"),
+        new CompanionDef("r_mercenary",  "용병 검사",     Rarity.Rare,      "인간",     "용병단",      HeroClass.Warrior, Alignment.실리, "돈만 주면 어디든 간다"),
+        new CompanionDef("r_ranger",     "숲의 궁수",     Rarity.Rare,      "엘프",     "숲의 부족",   HeroClass.Archer,  Alignment.중립, "숲에서 자란 명사수"),
+        new CompanionDef("r_pyro",       "불꽃 마법사",   Rarity.Rare,      "인간",     "마탑",        HeroClass.Mage,    Alignment.혼돈, "모든 것을 태워 버린다"),
+        new CompanionDef("r_cleric",     "성당 사제",     Rarity.Rare,      "인간",     "성교회",      HeroClass.Priest,  Alignment.질서, "올 왕국 대성당 출신"),
 
-        new CompanionDef("e_paladin",    "성기사",        Rarity.Epic,      HeroClass.Warrior, "신의 방패를 든 기사"),
-        new CompanionDef("e_sniper",     "그림자 저격수", Rarity.Epic,      HeroClass.Archer,  "한 발이면 충분하다"),
-        new CompanionDef("e_frost",      "얼음 마녀",     Rarity.Epic,      HeroClass.Mage,    "북쪽 설산의 마녀"),
-        new CompanionDef("e_bishop",     "대주교",        Rarity.Epic,      HeroClass.Priest,  "기적을 일으키는 자"),
+        new CompanionDef("e_paladin",    "성기사",        Rarity.SuperRare, "인간",     "성교회",      HeroClass.Warrior, Alignment.명예, "신의 방패를 든 기사"),
+        new CompanionDef("e_sniper",     "그림자 저격수", Rarity.SuperRare, "하프엘프", "그림자 길드", HeroClass.Archer,  Alignment.실리, "한 발이면 충분하다"),
+        new CompanionDef("e_frost",      "얼음 마녀",     Rarity.SuperRare, "인간",     "북방 설산",   HeroClass.Mage,    Alignment.혼돈, "북쪽 설산의 마녀"),
+        new CompanionDef("e_bishop",     "대주교",        Rarity.SuperRare, "인간",     "성교회",      HeroClass.Priest,  Alignment.질서, "기적을 일으키는 자"),
 
-        new CompanionDef("l_swordsaint", "검성",          Rarity.Legendary, HeroClass.Warrior, "천 번의 결투에서 진 적 없다"),
-        new CompanionDef("l_windarcher", "바람의 명궁",   Rarity.Legendary, HeroClass.Archer,  "바람이 화살을 인도한다"),
-        new CompanionDef("l_archmage",   "대마법사",      Rarity.Legendary, HeroClass.Mage,    "마탑의 주인"),
-        new CompanionDef("l_saint",      "성녀",          Rarity.Legendary, HeroClass.Priest,  "죽은 자도 일으킨다는 전설"),
+        new CompanionDef("l_swordsaint", "검성",          Rarity.Legendary, "인간",     "자유민",      HeroClass.Warrior, Alignment.명예, "천 번의 결투에서 진 적 없다"),
+        new CompanionDef("l_windarcher", "바람의 명궁",   Rarity.Legendary, "엘프",     "숲의 부족",   HeroClass.Archer,  Alignment.선,   "바람이 화살을 인도한다"),
+        new CompanionDef("l_archmage",   "대마법사",      Rarity.Legendary, "인간",     "마탑",        HeroClass.Mage,    Alignment.질서, "마탑의 주인"),
+        new CompanionDef("l_saint",      "성녀",          Rarity.Legendary, "인간",     "성교회",      HeroClass.Priest,  Alignment.선,   "죽은 자도 일으킨다는 전설"),
 
-        new CompanionDef("m_dragon",     "용기사",        Rarity.Mythic,    HeroClass.Warrior, "용과 계약한 최강의 기사"),
-        new CompanionDef("m_sage",       "시간의 현자",   Rarity.Mythic,    HeroClass.Mage,    "시간을 멈추는 대현자"),
+        new CompanionDef("m_dragon",     "용기사",        Rarity.Mythic,    "용인족",   "용의 계약자", HeroClass.Warrior, Alignment.명예, "용과 계약한 최강의 기사"),
+        new CompanionDef("m_sage",       "시간의 현자",   Rarity.Mythic,    "불명",     "시간의 탑",   HeroClass.Mage,    Alignment.중립, "시간을 멈추는 대현자"),
     };
 
     public const string HeroId = "hero";
