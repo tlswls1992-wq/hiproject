@@ -12,7 +12,7 @@ public class HeroClass
     public float damage;       // 공격력 (사제는 치유량)
     public float range;        // 공격 사거리
     public float cooldown;     // 공격 간격(초)
-    public float speed;        // 이동 속도
+    public float speed;        // (지금은 사용 안 함: 동료는 칸에 고정)
     public float splash;       // 범위 공격 반경 (0이면 한 명만 공격)
     public float size;         // 몸 크기
     public bool ranged;        // 원거리 공격(투사체) 여부
@@ -29,23 +29,31 @@ public class HeroClass
     {
         name = "궁수", letter = "궁", role = "원거리 · 단일 공격", synergyText = "공격 속도 증가",
         color = new Color(0.35f, 0.85f, 0.40f),
-        hp = 60, damage = 10, range = 6.5f, cooldown = 1.0f, speed = 2.6f, size = 0.5f, ranged = true,
+        hp = 60, damage = 10, range = 8f, cooldown = 1.0f, speed = 2.6f, size = 0.5f, ranged = true,
     };
 
     public static readonly HeroClass Mage = new HeroClass
     {
         name = "마법사", letter = "마", role = "원거리 · 범위 공격", synergyText = "폭발 범위 증가",
         color = new Color(0.75f, 0.45f, 1.00f),
-        hp = 50, damage = 8, range = 5.5f, cooldown = 1.6f, speed = 2.4f, size = 0.5f, splash = 1.2f, ranged = true,
+        hp = 50, damage = 8, range = 7f, cooldown = 1.6f, speed = 2.4f, size = 0.5f, splash = 1.2f, ranged = true,
     };
 
     public static readonly HeroClass Priest = new HeroClass
     {
         name = "사제", letter = "사", role = "아군 치유", synergyText = "치유량 증가",
         color = new Color(1.00f, 0.92f, 0.55f),
-        hp = 55, damage = 12, range = 6f, cooldown = 1.4f, speed = 2.4f, size = 0.5f, healer = true,
+        hp = 55, damage = 12, range = 7.5f, cooldown = 1.4f, speed = 2.4f, size = 0.5f, healer = true,
     };
 
-    // 진형 순서: 앞줄부터 전사 → 궁수 → 마법사 → 사제
+    // 용사 전용 직업 (시너지 계산에는 들어가지 않음)
+    public static readonly HeroClass Brave = new HeroClass
+    {
+        name = "용사", letter = "용", role = "근접 · 만능", synergyText = "",
+        color = new Color(1.00f, 0.82f, 0.25f),
+        hp = 150, damage = 14, range = 0.7f, cooldown = 0.8f, speed = 0f, size = 0.7f,
+    };
+
+    // 시너지가 있는 직업들
     public static readonly HeroClass[] All = { Warrior, Archer, Mage, Priest };
 }

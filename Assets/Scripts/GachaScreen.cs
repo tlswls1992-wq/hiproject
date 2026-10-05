@@ -8,7 +8,7 @@ public class GachaScreen
     class Card
     {
         public CompanionDef def;
-        public bool isNew;
+        public string tag;            // "NEW", "각성 +2" 같은 표시 (없으면 null)
         public float flipStart = -1f; // 뒤집기 시작한 시간 (-1이면 아직 안 뒤집음)
     }
 
@@ -35,9 +35,7 @@ public class GachaScreen
 
         foreach (var def in banner.Roll(count))
         {
-            bool isNew = !SaveData.Roster.Contains(def.id);
-            SaveData.Roster.Add(def.id);
-            cards.Add(new Card { def = def, isNew = isNew });
+            cards.Add(new Card { def = def, tag = SaveData.AddPulled(def) });
             if (def.rarity > best) best = def.rarity;
         }
         SaveData.Save();
@@ -164,8 +162,15 @@ public class GachaScreen
         else if (Now > lastFlipEnd + 0.3f)
         {
             int newCount = 0;
-            foreach (var c in cards) if (c.isNew) newCount++;
+            bool awakened = false;
+            foreach (var c in cards)
+            {
+                if (c.tag == "NEW") newCount++;
+                if (c.def.IsHero) awakened = true;
+            }
             string msg = newCount > 0 ? $"새로운 동료 {newCount}명이 합류했어요!" : "동료들이 합류했어요!";
+            if (awakened) msg += "  용사가 각성했어요!";
+            msg += "  (편성에서 배치하세요)";
             UI.Text(new Rect(0, 555, w, 40), msg, 24, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleCenter, true);
             if (UI.Button(new Rect(w / 2f - 110f, 610f, 220f, 60f), "확인", new Color(0.25f, 0.6f, 0.35f)))
                 onClose?.Invoke();
@@ -210,11 +215,11 @@ public class GachaScreen
             return;
         }
 
-        DrawCardFace(rr, card.def, card.isNew, widthScale > 0.85f);
+        DrawCardFace(rr, card.def, card.tag, widthScale > 0.85f);
     }
 
     // 동료 카드 앞면 (동료 목록 화면에서도 사용)
-    public static void DrawCardFace(Rect r, CompanionDef def, bool isNew, bool drawText = true)
+    public static void DrawCardFace(Rect r, CompanionDef def, string tag, bool drawText = true)
     {
         Color rc = RarityInfo.Animated(def.rarity);
         float s = r.height / 300f; // 카드 크기에 맞춰 글자 크기 조절
@@ -242,11 +247,12 @@ public class GachaScreen
         UI.Text(new Rect(r.x + 8f, r.y + 250f * s, r.width - 16f, 44f * s), def.desc, Mathf.RoundToInt(14 * s),
             new Color(1f, 1f, 1f, 0.7f), TextAnchor.UpperCenter, false, false);
 
-        if (isNew)
+        if (!string.IsNullOrEmpty(tag))
         {
-            var tag = new Rect(r.xMax - 64f * s, r.y - 10f * s, 70f * s, 28f * s);
-            UI.Fill(tag, new Color(1f, 0.25f, 0.3f));
-            UI.Text(tag, "NEW", Mathf.RoundToInt(17 * s), Color.white, TextAnchor.MiddleCenter, true, false);
+            float tw = (tag.Length <= 3 ? 70f : 110f) * s;
+            var tagRect = new Rect(r.xMax - tw + 6f * s, r.y - 10f * s, tw, 28f * s);
+            UI.Fill(tagRect, def.IsHero ? new Color(1f, 0.6f, 0.1f) : new Color(1f, 0.25f, 0.3f));
+            UI.Text(tagRect, tag, Mathf.RoundToInt(17 * s), Color.white, TextAnchor.MiddleCenter, true, false);
         }
     }
 }

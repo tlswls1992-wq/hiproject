@@ -49,6 +49,9 @@ public class CompanionDef
     // ★ 새 동료를 추가하려면 이 목록에 한 줄을 추가하세요. (id는 겹치지 않게)
     public static readonly CompanionDef[] All =
     {
+        // 용사 본인도 뽑기에서 나옵니다. 용사가 나오면 '각성'해서 강해져요.
+        new CompanionDef(HeroId,         "용사",          Rarity.Epic,      HeroClass.Brave,   "가챠의 힘을 가진 용사. 뽑으면 각성!"),
+
         new CompanionDef("c_villager",   "마을 청년",     Rarity.Common,    HeroClass.Warrior, "괭이 대신 검을 든 용감한 청년"),
         new CompanionDef("c_hunter",     "사냥꾼",        Rarity.Common,    HeroClass.Archer,  "토끼 사냥이 특기"),
         new CompanionDef("c_apprentice", "견습 마법사",   Rarity.Common,    HeroClass.Mage,    "가끔 주문을 틀린다"),
@@ -72,6 +75,10 @@ public class CompanionDef
         new CompanionDef("m_dragon",     "용기사",        Rarity.Mythic,    HeroClass.Warrior, "용과 계약한 최강의 기사"),
         new CompanionDef("m_sage",       "시간의 현자",   Rarity.Mythic,    HeroClass.Mage,    "시간을 멈추는 대현자"),
     };
+
+    public const string HeroId = "hero";
+    public static CompanionDef Hero => Find(HeroId);
+    public bool IsHero => id == HeroId;
 
     public static CompanionDef Find(string id)
     {

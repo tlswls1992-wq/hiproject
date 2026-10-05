@@ -10,7 +10,7 @@ public class GameManager : MonoBehaviour
 
     const float HalfWorldWidth = 14f; // 전투 화면에서 항상 보이는 가로 반폭
 
-    enum Page { Title, Story, Camp, GachaSelect, Gacha, Roster, Battle, Result }
+    enum Page { Title, Story, Camp, GachaSelect, Gacha, Formation, Roster, Battle, Result }
 
     // 스토리 장면 그림 종류
     enum Art { Kingdom, Darkness, King, Hero, Gacha, Victory }
@@ -28,8 +28,8 @@ public class GameManager : MonoBehaviour
         new StoryLine(Art.Kingdom,  "", "평화로운 아르카 왕국."),
         new StoryLine(Art.Darkness, "", "어느 날, 북쪽 땅에서 마왕이 깨어났다.\n마왕군은 마을을 불태우며 왕국으로 진격해 오고 있다."),
         new StoryLine(Art.King,     "국왕", "용사여, 그대만이 희망이오.\n마왕을 무찌르고 왕국을 구해 주시오!"),
-        new StoryLine(Art.Hero,     "", "하지만 이 용사에게는 검술도, 마법도 없었다."),
-        new StoryLine(Art.Hero,     "용사", "...폐하, 제가 가진 힘은 단 하나뿐입니다."),
+        new StoryLine(Art.Hero,     "", "하지만 용사 혼자서는 마왕군을 당해낼 수 없었다."),
+        new StoryLine(Art.Hero,     "용사", "...폐하, 제게는 특별한 힘이 하나 있습니다."),
         new StoryLine(Art.Gacha,    "", "운명의 동료를 불러내는 힘.\n사람들은 그것을 '가챠'라고 불렀다."),
         new StoryLine(Art.Gacha,    "용사", "좋아, 먼저 함께 떠날 동료 두 명을 불러내자!"),
     };
@@ -52,7 +52,7 @@ public class GameManager : MonoBehaviour
     float storyLineStart;
     System.Action onStoryEnd;
 
-    int selectedStage = 1;
+    int selectedStage = 1; // 고른 판 번호 (1~100)
     bool confirmNewGame;
     Vector2 rosterScroll;
 
@@ -62,6 +62,7 @@ public class GameManager : MonoBehaviour
     int resultKillGold;
     int resultClearGold;
     bool resultFirstClear;
+    bool resultFled;
     string resultUnlock;
 
     string toast;
@@ -130,6 +131,7 @@ public class GameManager : MonoBehaviour
             case Page.Camp: DrawCamp(); break;
             case Page.GachaSelect: DrawGachaSelect(); break;
             case Page.Gacha: gacha.Draw(); break;
+            case Page.Formation: DrawFormation(); break;
             case Page.Roster: DrawRoster(); break;
             case Page.Battle: battle.DrawHUD(); break;
             case Page.Result: DrawResult(); break;
@@ -209,8 +211,10 @@ public class GameManager : MonoBehaviour
         page = Page.Gacha;
         gacha.Start(GachaBanner.Advanced, 2, () =>
         {
+            SaveData.AutoArrange();
+            SaveData.Save();
             page = Page.Camp;
-            ShowToast("동료 2명과 함께 여정을 떠나요! '출격'을 눌러 보세요");
+            ShowToast("동료들과 함께 여정을 떠나요! '편성'을 확인하고 '출격'하세요");
         });
     }
 
@@ -349,60 +353,283 @@ public class GameManager : MonoBehaviour
         UI.Fill(new Rect(0, 560, w, 160), new Color(0.22f, 0.32f, 0.20f));
 
         // 모닥불
-        var fire = new Vector2(w / 2f, 600f);
+        var fire = new Vector2(w / 2f, 620f);
         UI.Glow(fire, 120f + 8f * Mathf.Sin(Now * 7f), new Color(1f, 0.55f, 0.15f, 0.5f));
         UI.Glow(fire, 30f + 4f * Mathf.Sin(Now * 11f), new Color(1f, 0.9f, 0.4f, 0.9f));
 
         DrawTopBar(w, "용사의 캠프");
 
         // 왼쪽: 출격 판
-        var left = new Rect(40, 90, w * 0.5f - 60, 420);
+        var left = new Rect(40, 90, w * 0.5f - 60, 440);
         UI.Panel(left, new Color(0f, 0f, 0f, 0.45f));
-        UI.Text(new Rect(left.x, left.y + 15, left.width, 40), "출격", 30, Color.white, TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(left.x, left.y + 12, left.width, 40), "출격", 30, Color.white, TextAnchor.MiddleCenter, true);
 
-        int maxStage = Mathf.Min(SaveData.ClearedStage + 1, Stages.Count);
-        selectedStage = Mathf.Clamp(selectedStage, 1, maxStage);
+        int maxLevel = Mathf.Min(SaveData.ClearedStage + 1, Stages.Count);
+        selectedStage = Mathf.Clamp(selectedStage, 1, maxLevel);
         float cx = left.center.x;
-        if (UI.Button(new Rect(left.x + 25, left.y + 100, 60, 80), "◀", new Color(0.3f, 0.35f, 0.5f), 26, selectedStage > 1)) selectedStage--;
-        if (UI.Button(new Rect(left.xMax - 85, left.y + 100, 60, 80), "▶", new Color(0.3f, 0.35f, 0.5f), 26, selectedStage < maxStage)) selectedStage++;
-        UI.Text(new Rect(cx - 200, left.y + 80, 400, 60), $"스테이지 {Stages.Label(selectedStage)}", 40, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(cx - 200, left.y + 140, 400, 34), Stages.ChapterName(selectedStage), 22, Color.white);
-        string info = Stages.HasBoss(selectedStage) ? $"보스: {Stages.BossName(selectedStage)}" : $"웨이브 {Stages.WavesPerStage}개";
+        var arrow = new Color(0.3f, 0.35f, 0.5f);
+        // ◀◀ ▶▶ 는 스테이지 단위(10판), ◀ ▶ 는 한 판씩 이동
+        if (UI.Button(new Rect(left.x + 15, left.y + 95, 56, 70), "◀◀", arrow, 20, selectedStage > 1))
+            selectedStage = Mathf.Max(1, selectedStage - Stages.LevelsPerStage);
+        if (UI.Button(new Rect(left.x + 77, left.y + 95, 50, 70), "◀", arrow, 24, selectedStage > 1)) selectedStage--;
+        if (UI.Button(new Rect(left.xMax - 127, left.y + 95, 50, 70), "▶", arrow, 24, selectedStage < maxLevel)) selectedStage++;
+        if (UI.Button(new Rect(left.xMax - 71, left.y + 95, 56, 70), "▶▶", arrow, 20, selectedStage < maxLevel))
+            selectedStage = Mathf.Min(maxLevel, selectedStage + Stages.LevelsPerStage);
+
+        UI.Text(new Rect(cx - 150, left.y + 80, 300, 60), Stages.Label(selectedStage), 48, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(cx - 150, left.y + 138, 300, 34), Stages.StageName(selectedStage), 20, Color.white);
+        string info = Stages.HasBoss(selectedStage) ? $"보스: {Stages.BossName(selectedStage)}" : $"웨이브 {Stages.WavesPerLevel}개";
         UI.Text(new Rect(cx - 200, left.y + 180, 400, 30), info, 20,
-            Stages.HasBoss(selectedStage) ? new Color(1f, 0.45f, 0.45f) : new Color(1f, 1f, 1f, 0.8f));
+            Stages.HasBoss(selectedStage) ? new Color(1f, 0.45f, 0.45f) : new Color(1f, 1f, 1f, 0.8f), TextAnchor.MiddleCenter, true);
         bool firstTime = selectedStage > SaveData.ClearedStage;
         int reward = Stages.ClearReward(selectedStage) * (firstTime ? 2 : 1);
         UI.Text(new Rect(cx - 200, left.y + 212, 400, 30), $"클리어 보상: {reward} 골드" + (firstTime ? " (최초 2배)" : ""), 18, new Color(1f, 0.85f, 0.3f));
 
-        if (UI.Button(new Rect(cx - 140, left.y + 270, 280, 90), "출격!", new Color(0.8f, 0.35f, 0.2f), 34, SaveData.Roster.Count > 0))
+        if (UI.Button(new Rect(cx - 140, left.y + 260, 280, 90), "출격!", new Color(0.8f, 0.35f, 0.2f), 34))
             StartBattle(selectedStage);
-        UI.Text(new Rect(left.x, left.yMax - 45, left.width, 30), $"진행도 {SaveData.ClearedStage} / {Stages.Count}", 18, new Color(1f, 1f, 1f, 0.7f));
+        UI.Text(new Rect(left.x, left.yMax - 75, left.width, 26), $"파티 {SaveData.PlacedCount()} / {SaveData.CellCount}명 배치됨", 18, Color.white);
+        UI.Text(new Rect(left.x, left.yMax - 45, left.width, 30), $"진행도 {SaveData.ClearedStage} / {Stages.Count}판", 18, new Color(1f, 1f, 1f, 0.7f));
 
-        // 오른쪽: 소환 / 동료
-        var right = new Rect(w * 0.5f + 20, 90, w * 0.5f - 60, 420);
+        // 오른쪽: 소환 / 편성 / 도감
+        var right = new Rect(w * 0.5f + 20, 90, w * 0.5f - 60, 440);
         float pulse = 1f + 0.05f * Mathf.Sin(Now * 3f);
-        UI.Glow(new Vector2(right.center.x, right.y + 110), 200f * pulse, new Color(1f, 0.75f, 0.2f, 0.35f));
-        if (UI.Button(new Rect(right.x + 30, right.y + 30, right.width - 60, 160), "소환", new Color(0.85f, 0.55f, 0.15f), 44))
+        UI.Glow(new Vector2(right.center.x, right.y + 90), 190f * pulse, new Color(1f, 0.75f, 0.2f, 0.35f));
+        if (UI.Button(new Rect(right.x + 30, right.y + 20, right.width - 60, 140), "소환", new Color(0.85f, 0.55f, 0.15f), 44))
             page = Page.GachaSelect;
-        UI.Text(new Rect(right.x, right.y + 195, right.width, 30), "골드로 새로운 동료를 뽑아요", 18, new Color(1f, 1f, 1f, 0.8f));
+        UI.Text(new Rect(right.x, right.y + 165, right.width, 26), "골드로 새로운 동료를 뽑아요", 18, new Color(1f, 1f, 1f, 0.8f));
 
-        if (UI.Button(new Rect(right.x + 30, right.y + 250, right.width - 60, 100), $"동료 ({SaveData.Roster.Count}명)", new Color(0.3f, 0.45f, 0.7f), 30))
+        int unplaced = 0;
+        for (int i = 0; i < SaveData.Roster.Count; i++) if (!SaveData.IsPlaced(i)) unplaced++;
+        float half = (right.width - 60 - 20) / 2f;
+        string formLabel = unplaced > 0 && SaveData.PlacedCount() < SaveData.CellCount ? $"편성\n(대기 {unplaced}명)" : "편성";
+        if (UI.Button(new Rect(right.x + 30, right.y + 210, half, 110), formLabel, new Color(0.25f, 0.55f, 0.45f), 28))
+            OpenFormation();
+        if (UI.Button(new Rect(right.x + 50 + half, right.y + 210, half, 110), "도감", new Color(0.3f, 0.45f, 0.7f), 28))
             page = Page.Roster;
+        UI.Text(new Rect(right.x, right.y + 330, right.width, 26), $"용사 각성 +{SaveData.HeroAwaken}  ·  동료 {SaveData.Roster.Count}명", 18, new Color(1f, 0.85f, 0.3f));
         if (UI.Button(new Rect(right.xMax - 160, right.yMax - 50, 130, 44), "타이틀로", new Color(0.3f, 0.3f, 0.4f), 18))
             page = Page.Title;
+    }
 
-        // 아래: 출전할 동료 미리보기
-        var deploy = SaveData.DeployList(BattleManager.MaxDeploy);
-        float px = 40;
-        UI.Text(new Rect(40, 530, 600, 26), $"출전 동료 {deploy.Count}명 (등급 높은 순, 최대 {BattleManager.MaxDeploy}명)", 16, new Color(1f, 1f, 1f, 0.8f), TextAnchor.MiddleLeft);
-        foreach (var def in deploy)
+    // ---------------- 편성 (5줄 x 5칸) ----------------
+    // 오른쪽 목록에서 동료를 끌어다 칸에 놓습니다. 칸끼리 끌면 자리를 바꾸고, 목록으로 끌면 뺍니다.
+
+    const float CellSize = 92f;
+    const float CellGap = 6f;
+    const float GridX = 40f;
+    const float GridY = 110f;
+
+    string dragValue;        // 끌고 있는 것: "H" 또는 Roster 번호 (없으면 null)
+    int dragFromCell = -1;   // 칸에서 끌기 시작했으면 그 칸 번호
+    string inspectValue;     // 정보 창에 보여 줄 동료
+    float listScroll;
+
+    void OpenFormation()
+    {
+        dragValue = null;
+        dragFromCell = -1;
+        listScroll = 0f;
+        page = Page.Formation;
+    }
+
+    // 화면에서 왼쪽이 후미, 오른쪽(적이 오는 쪽)이 선두입니다.
+    Rect CellRect(int column, int row)
+    {
+        int screenCol = SaveData.Columns - 1 - column;
+        return new Rect(GridX + screenCol * (CellSize + CellGap), GridY + row * (CellSize + CellGap), CellSize, CellSize);
+    }
+
+    static CompanionDef DefOf(string value)
+    {
+        if (value == SaveData.HeroMark) return CompanionDef.Hero;
+        if (int.TryParse(value, out int idx) && idx >= 0 && idx < SaveData.Roster.Count) return CompanionDef.Find(SaveData.Roster[idx]);
+        return null;
+    }
+
+    void DrawFormation()
+    {
+        float w = UI.Width;
+        var e = Event.current;
+        UI.Gradient(UI.Full, new Color(0.12f, 0.18f, 0.16f), new Color(0.05f, 0.08f, 0.08f));
+        DrawTopBar(w, $"편성  ({SaveData.PlacedCount()} / {SaveData.CellCount})");
+
+        // ---- 칸 ----
+        int hoverCell = -1;
+        for (int col = 0; col < SaveData.Columns; col++)
         {
-            var p = new Vector2(px + 14, 580);
-            UI.Circle(p, 15f, RarityInfo.Animated(def.rarity));
-            UI.Circle(p, 12f, def.job.color);
-            px += 34;
-            if (px > w - 40) break;
+            var top = CellRect(col, 0);
+            UI.Text(new Rect(top.x, GridY - 30, CellSize, 26), SaveData.ColumnNames[col], 18,
+                col == 0 ? new Color(1f, 0.6f, 0.5f) : Color.white, TextAnchor.MiddleCenter, true);
+            for (int row = 0; row < SaveData.Rows; row++)
+            {
+                int cell = SaveData.CellIndex(col, row);
+                var r = CellRect(col, row);
+                bool hover = r.Contains(e.mousePosition);
+                if (hover) hoverCell = cell;
+                UI.Fill(r, hover && dragValue != null ? new Color(1f, 1f, 1f, 0.25f) : new Color(0f, 0f, 0f, 0.35f));
+                UI.Frame(r, new Color(1f, 1f, 1f, 0.15f), 2f);
+                string v = SaveData.Formation[cell];
+                if (!string.IsNullOrEmpty(v) && !(dragFromCell == cell && dragValue != null))
+                    DrawMiniUnit(r, DefOf(v));
+            }
         }
+        UI.Text(new Rect(GridX, GridY + 5 * (CellSize + CellGap), 5 * (CellSize + CellGap), 26), "적이 오는 방향 →", 16,
+            new Color(1f, 0.6f, 0.5f), TextAnchor.MiddleRight);
+
+        // ---- 대기 중인 동료 목록 (같은 동료끼리 묶어서 표시) ----
+        float listX = GridX + 5 * (CellSize + CellGap) + 30f;
+        var listRect = new Rect(listX, 80, w - listX - 30, 400);
+        UI.Panel(listRect, new Color(0f, 0f, 0f, 0.4f));
+        UI.Text(new Rect(listRect.x + 12, listRect.y + 6, listRect.width - 24, 28), "대기 중인 동료 (끌어서 칸에 놓기)", 18, Color.white, TextAnchor.MiddleLeft, true);
+
+        var groups = new List<KeyValuePair<CompanionDef, List<int>>>();
+        for (int i = 0; i < SaveData.Roster.Count; i++)
+        {
+            if (SaveData.IsPlaced(i)) continue;
+            var def = CompanionDef.Find(SaveData.Roster[i]);
+            var g = groups.Find(x => x.Key == def);
+            if (g.Key == null) groups.Add(new KeyValuePair<CompanionDef, List<int>>(def, new List<int> { i }));
+            else g.Value.Add(i);
+        }
+        groups.Sort((a, b) => b.Key.rarity.CompareTo(a.Key.rarity));
+
+        const float itemW = 96f, itemH = 112f, itemGap = 8f;
+        var inner = new Rect(listRect.x + 10, listRect.y + 40, listRect.width - 20, listRect.height - 50);
+        int perRow = Mathf.Max(1, Mathf.FloorToInt((inner.width + itemGap) / (itemW + itemGap)));
+        int rowsTotal = Mathf.CeilToInt(groups.Count / (float)perRow);
+        float maxScroll = Mathf.Max(0f, rowsTotal * (itemH + itemGap) - inner.height);
+        if (e.type == EventType.ScrollWheel && inner.Contains(e.mousePosition))
+        {
+            listScroll = Mathf.Clamp(listScroll + e.delta.y * 20f, 0f, maxScroll);
+            e.Use();
+        }
+        listScroll = Mathf.Clamp(listScroll, 0f, maxScroll);
+
+        int hoverGroup = -1;
+        Vector2 mouse = e.mousePosition; // 그룹 안에서는 마우스 좌표가 달라지므로 미리 저장
+        GUI.BeginGroup(inner);
+        for (int i = 0; i < groups.Count; i++)
+        {
+            var r = new Rect((i % perRow) * (itemW + itemGap), (i / perRow) * (itemH + itemGap) - listScroll, itemW, itemH);
+            if (r.yMax < 0 || r.y > inner.height) continue;
+            var screenRect = new Rect(r.x + inner.x, r.y + inner.y, r.width, r.height);
+            if (screenRect.Contains(mouse) && inner.Contains(mouse)) hoverGroup = i;
+            DrawMiniUnit(r, groups[i].Key);
+            if (groups[i].Value.Count > 1)
+            {
+                var tag = new Rect(r.xMax - 34, r.y + 2, 32, 22);
+                UI.Fill(tag, new Color(0f, 0f, 0f, 0.7f));
+                UI.Text(tag, "x" + groups[i].Value.Count, 14, Color.white, TextAnchor.MiddleCenter, true, false);
+            }
+        }
+        GUI.EndGroup();
+        if (groups.Count == 0)
+            UI.Text(inner, SaveData.Roster.Count == 0 ? "아직 동료가 없어요.\n소환에서 뽑아 보세요!" : "모든 동료가 배치되었어요", 18, new Color(1f, 1f, 1f, 0.6f));
+        if (maxScroll > 0f)
+            UI.Text(new Rect(listRect.x, listRect.yMax - 24, listRect.width - 12, 22), "마우스 휠로 스크롤", 13, new Color(1f, 1f, 1f, 0.5f), TextAnchor.MiddleRight);
+
+        // ---- 정보 창 ----
+        var infoRect = new Rect(listX, 495, w - listX - 30, 120);
+        UI.Panel(infoRect, new Color(0f, 0f, 0f, 0.4f));
+        var info = DefOf(inspectValue);
+        if (info != null)
+        {
+            float m = RarityInfo.StatMultiplier(info.rarity) * (info.IsHero ? 1f + 0.1f * SaveData.HeroAwaken : 1f);
+            string title = info.IsHero ? $"{info.name}  (각성 +{SaveData.HeroAwaken})" : info.name;
+            UI.Text(new Rect(infoRect.x + 15, infoRect.y + 8, infoRect.width - 30, 30), title, 22, RarityInfo.Animated(info.rarity), TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(infoRect.x + 15, infoRect.y + 40, infoRect.width - 30, 26),
+                $"{RarityInfo.Name(info.rarity)} · {info.job.name} ({info.job.role})", 17, Color.white, TextAnchor.MiddleLeft);
+            string power = info.job.healer ? $"치유 {info.job.damage * m:0}" : $"공격 {info.job.damage * m:0}";
+            UI.Text(new Rect(infoRect.x + 15, infoRect.y + 68, infoRect.width - 30, 26),
+                $"체력 {info.job.hp * m:0}   {power}   사거리 {info.job.range:0.#}", 17, new Color(1f, 0.9f, 0.6f), TextAnchor.MiddleLeft);
+            UI.Text(new Rect(infoRect.x + 15, infoRect.y + 92, infoRect.width - 30, 24), info.desc, 14, new Color(1f, 1f, 1f, 0.6f), TextAnchor.MiddleLeft);
+        }
+        else
+        {
+            UI.Text(infoRect, "동료를 누르면 정보가 나와요\n근접 동료는 앞줄, 원거리 동료는 뒷줄이 좋아요", 17, new Color(1f, 1f, 1f, 0.6f));
+        }
+
+        // ---- 버튼 ----
+        if (UI.Button(new Rect(GridX, 640, 170, 56), "◀ 저장 후 나가기", new Color(0.3f, 0.3f, 0.4f), 18))
+        {
+            SaveData.Save();
+            page = Page.Camp;
+        }
+        if (UI.Button(new Rect(GridX + 185, 640, 150, 56), "자동 배치", new Color(0.25f, 0.55f, 0.45f), 20))
+            SaveData.AutoArrange();
+        if (UI.Button(new Rect(GridX + 350, 640, 150, 56), "모두 빼기", new Color(0.6f, 0.3f, 0.3f), 20))
+        {
+            SaveData.ClearFormation();
+            SaveData.EnsureHeroPlaced();
+        }
+        UI.Text(new Rect(listX, 630, w - listX - 30, 70), "용사는 항상 파티에 있어야 해요 (자리만 옮길 수 있어요)", 15, new Color(1f, 0.85f, 0.3f));
+
+        // ---- 끌어서 놓기 ----
+        if (e.type == EventType.MouseDown && e.button == 0 && dragValue == null)
+        {
+            if (hoverCell >= 0 && !string.IsNullOrEmpty(SaveData.Formation[hoverCell]))
+            {
+                dragValue = SaveData.Formation[hoverCell];
+                dragFromCell = hoverCell;
+                inspectValue = dragValue;
+                e.Use();
+            }
+            else if (hoverGroup >= 0)
+            {
+                dragValue = groups[hoverGroup].Value[0].ToString();
+                dragFromCell = -1;
+                inspectValue = dragValue;
+                e.Use();
+            }
+        }
+        else if (e.type == EventType.MouseUp && dragValue != null)
+        {
+            if (hoverCell >= 0) DropOnCell(hoverCell);
+            else if (dragFromCell >= 0 && listRect.Contains(e.mousePosition) && dragValue != SaveData.HeroMark)
+                SaveData.Formation[dragFromCell] = ""; // 목록으로 끌어 놓으면 빼기
+            dragValue = null;
+            dragFromCell = -1;
+            e.Use();
+        }
+
+        // 끌고 있는 동료를 마우스 위치에 그림
+        if (dragValue != null)
+        {
+            var def = DefOf(dragValue);
+            if (def != null) DrawMiniUnit(new Rect(e.mousePosition.x - 46, e.mousePosition.y - 46, 92, 92), def);
+        }
+    }
+
+    void DropOnCell(int target)
+    {
+        string displaced = SaveData.Formation[target];
+        if (dragFromCell >= 0)
+        {
+            // 칸 ↔ 칸: 자리 바꾸기
+            SaveData.Formation[dragFromCell] = displaced;
+            SaveData.Formation[target] = dragValue;
+        }
+        else
+        {
+            // 목록 → 칸: 원래 있던 동료는 목록으로 (용사는 뺄 수 없음)
+            if (displaced == SaveData.HeroMark) return;
+            SaveData.Formation[target] = dragValue;
+        }
+    }
+
+    // 편성 화면의 작은 동료 칸
+    static void DrawMiniUnit(Rect r, CompanionDef def)
+    {
+        if (def == null) return;
+        Color rc = RarityInfo.Animated(def.rarity);
+        UI.Fill(r, UI.Darken(rc, 0.35f));
+        UI.Frame(r, def.IsHero ? new Color(1f, 0.85f, 0.3f) : rc, def.IsHero ? 4f : 3f);
+        var c = new Vector2(r.center.x, r.y + r.height * 0.4f);
+        float rad = r.width * 0.26f;
+        UI.Circle(c, rad + 3f, rc);
+        UI.Circle(c, rad, def.job.color);
+        UI.Text(new Rect(c.x - rad, c.y - rad, rad * 2, rad * 2), def.job.letter, Mathf.RoundToInt(rad * 1.1f), Color.white, TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(r.x + 2, r.yMax - 28, r.width - 4, 24), def.name, 13, Color.white, TextAnchor.MiddleCenter, true);
     }
 
     void DrawTopBar(float w, string title)
@@ -501,7 +728,8 @@ public class GameManager : MonoBehaviour
             int owned = SaveData.CountOwned(def);
             if (owned > 0)
             {
-                GachaScreen.DrawCardFace(r, def, false);
+                string cardTag = def.IsHero && SaveData.HeroAwaken > 0 ? "각성 +" + SaveData.HeroAwaken : null;
+                GachaScreen.DrawCardFace(r, def, cardTag);
                 if (owned > 1)
                 {
                     var tag = new Rect(r.xMax - 44, r.yMax - 30, 40, 26);
@@ -527,7 +755,7 @@ public class GameManager : MonoBehaviour
     int CountUnique()
     {
         int n = 0;
-        foreach (var def in CompanionDef.All) if (SaveData.Roster.Contains(def.id)) n++;
+        foreach (var def in CompanionDef.All) if (SaveData.CountOwned(def) > 0) n++;
         return n;
     }
 
@@ -542,7 +770,8 @@ public class GameManager : MonoBehaviour
     void OnBattleEnded(bool victory)
     {
         resultVictory = victory;
-        resultStage = battle.Stage;
+        resultStage = battle.Level;
+        resultFled = battle.Fled;
         resultKillGold = battle.GoldEarned;
         resultFirstClear = victory && resultStage > SaveData.ClearedStage;
         resultClearGold = victory ? Stages.ClearReward(resultStage) * (resultFirstClear ? 2 : 1) : 0;
@@ -567,9 +796,9 @@ public class GameManager : MonoBehaviour
         UI.Gradient(UI.Full, resultVictory ? new Color(0.35f, 0.25f, 0.10f) : new Color(0.20f, 0.08f, 0.10f), new Color(0.05f, 0.05f, 0.08f));
         if (resultVictory) UI.Glow(new Vector2(w / 2f, 160f), 300f, new Color(1f, 0.8f, 0.3f, 0.35f));
 
-        UI.Text(new Rect(0, 100, w, 90), resultVictory ? "승리!" : "패배...", 72,
+        UI.Text(new Rect(0, 100, w, 90), resultVictory ? "승리!" : resultFled ? "도망쳤다!" : "패배...", 72,
             resultVictory ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(0, 190, w, 36), $"스테이지 {Stages.Label(resultStage)}  ·  {Stages.ChapterName(resultStage)}", 24, Color.white);
+        UI.Text(new Rect(0, 190, w, 36), $"{Stages.Label(resultStage)}  ·  {Stages.StageName(resultStage)}", 24, Color.white);
 
         float y = 260;
         UI.Text(new Rect(0, y, w, 32), $"처치 보상  +{resultKillGold} 골드", 24, new Color(1f, 0.85f, 0.3f));
@@ -587,7 +816,7 @@ public class GameManager : MonoBehaviour
         if (!resultVictory)
         {
             y += 50;
-            UI.Text(new Rect(0, y, w, 60), "골드로 동료를 더 뽑아서 다시 도전해 보세요!", 22, new Color(1f, 1f, 1f, 0.8f));
+            UI.Text(new Rect(0, y, w, 60), "골드로 동료를 더 뽑거나 편성을 바꿔서 다시 도전해 보세요!", 22, new Color(1f, 1f, 1f, 0.8f));
         }
 
         bool beatDemonKing = resultVictory && resultFirstClear && resultStage >= Stages.Count;

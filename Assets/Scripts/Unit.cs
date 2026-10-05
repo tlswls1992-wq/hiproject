@@ -2,7 +2,7 @@ using UnityEngine;
 
 public enum Team { Hero, Enemy }
 
-// 영웅과 적 모두 이 스크립트로 움직이고 싸웁니다.
+// 동료(용사 포함)와 적 모두 이 스크립트로 싸웁니다.
 public class Unit : MonoBehaviour
 {
     public Team team;
@@ -12,13 +12,13 @@ public class Unit : MonoBehaviour
     public float damage;
     public float attackRange;
     public float attackCooldown;
-    public float moveSpeed;
+    public float moveSpeed;          // 적만 움직입니다 (동료는 칸에 고정)
     public float splashRadius;
     public float size;
     public bool ranged;
     public int goldReward;           // 적을 잡았을 때 얻는 골드
-    public Vector2 formationSlot;    // 영웅이 진을 치고 서 있을 자리
     public bool isBoss;
+    public bool isLeader;            // 용사
 
     const float BarWidth = 0.8f;
 
@@ -109,72 +109,56 @@ public class Unit : MonoBehaviour
         }
 
         Vector2 pos = transform.position;
-        Unit target = battle.FindNearestOpponent(this);
-        Vector2 moveDir = team == Team.Hero ? HeroThink(pos, target) : EnemyThink(pos, target, battle);
+        if (team == Team.Hero)
+        {
+            // 동료: 편성한 칸에서 움직이지 않고 싸웁니다.
+            HeroThink(pos, battle);
+            return;
+        }
 
-        Vector2 velocity = moveDir * moveSpeed * battle.MoveMultiplier(this) + battle.SeparationFor(this);
+        Vector2 moveDir = EnemyThink(pos, battle);
+        Vector2 velocity = moveDir * moveSpeed + battle.SeparationFor(this);
         Vector2 next = pos + velocity * dt;
         next.y = Mathf.Clamp(next.y, BattleManager.LaneBottom, BattleManager.LaneTop);
         transform.position = next;
         UpdateSorting();
     }
 
-    // 영웅: 자기 자리를 지키며 싸웁니다. 근접 영웅만 가까이 온 적에게 돌격했다가 돌아옵니다.
-    Vector2 HeroThink(Vector2 pos, Unit target)
+    // 동료: 사거리 안에 들어온 가장 가까운 적을 공격합니다. 사제는 다친 아군을 치유합니다.
+    void HeroThink(Vector2 pos, BattleManager battle)
     {
-        if (heroClass != null && heroClass.healer) return HealerThink(pos);
+        if (cooldownTimer > 0f) return;
 
-        bool tooFar = Vector2.Distance(pos, formationSlot) > BattleManager.HeroLeash + 1.5f;
-        if (target != null && !tooFar)
+        if (heroClass != null && heroClass.healer)
         {
-            if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
-            if (!ranged && Vector2.Distance(target.transform.position, formationSlot) <= BattleManager.HeroLeash)
-                return DirectionTo(pos, target.transform.position);
+            Unit ally = battle.FindMostHurtAlly(this, attackRange * battle.RangeMultiplier(this));
+            if (ally == null) return;
+            cooldownTimer = attackCooldown * battle.CooldownMultiplier(this);
+            ally.Heal(damage * battle.HealMultiplier(this));
+            battle.SpawnEffect(ally.transform.position, ally.size + 0.6f, new Color(0.5f, 1f, 0.5f, 0.5f));
+            return;
         }
-        return Vector2.Distance(pos, formationSlot) > 0.1f ? DirectionTo(pos, formationSlot) : Vector2.zero;
+
+        Unit target = battle.FindNearestOpponent(this);
+        if (target != null && InRange(pos, target)) TryAttack(target);
     }
 
-    // 사제: 자리를 지키며 사거리 안에서 가장 많이 다친 아군을 치유합니다.
-    Vector2 HealerThink(Vector2 pos)
+    // 적: 자기 줄을 따라 왼쪽으로 행군하다가, 가장 가까운 동료에게 다가가 공격합니다.
+    Vector2 EnemyThink(Vector2 pos, BattleManager battle)
     {
-        var battle = BattleManager.Instance;
-        if (cooldownTimer <= 0f)
-        {
-            Unit ally = battle.FindMostHurtAlly(this, attackRange);
-            if (ally != null)
-            {
-                cooldownTimer = attackCooldown * battle.CooldownMultiplier(this);
-                ally.Heal(damage * battle.HealMultiplier(this));
-                battle.SpawnEffect(ally.transform.position, ally.size + 0.6f, new Color(0.5f, 1f, 0.5f, 0.5f));
-            }
-        }
-        return Vector2.Distance(pos, formationSlot) > 0.1f ? DirectionTo(pos, formationSlot) : Vector2.zero;
-    }
+        Unit target = battle.FindNearestOpponent(this);
+        if (target == null) return Vector2.zero;
+        if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
 
-    // 적: 오른쪽에서 왼쪽으로 행군하다가, 가까운 동료가 있으면 싸우고, 용사에게 닿으면 용사를 공격합니다.
-    Vector2 EnemyThink(Vector2 pos, Unit target, BattleManager battle)
-    {
-        if (target != null)
-        {
-            if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
-            float aggro = attackRange + size * 0.5f + 1.5f;
-            if (Vector2.Distance(pos, target.transform.position) <= aggro)
-                return DirectionTo(pos, target.transform.position);
-        }
-
-        if (pos.x - size * 0.5f > BattleManager.LeaderFrontX + attackRange) return Vector2.left;
-
-        if (cooldownTimer <= 0f)
-        {
-            cooldownTimer = attackCooldown;
-            battle.DamageLeader(damage);
-        }
-        return Vector2.zero;
+        Vector2 tpos = target.transform.position;
+        if (pos.x - tpos.x > 2.5f + attackRange) return Vector2.left;
+        return DirectionTo(pos, tpos);
     }
 
     bool InRange(Vector2 pos, Unit target)
     {
-        return Vector2.Distance(pos, target.transform.position) <= attackRange + (size + target.size) * 0.5f;
+        float range = attackRange * BattleManager.Instance.RangeMultiplier(this);
+        return Vector2.Distance(pos, target.transform.position) <= range + (size + target.size) * 0.5f;
     }
 
     static Vector2 DirectionTo(Vector2 from, Vector2 to) => (to - from).normalized;
