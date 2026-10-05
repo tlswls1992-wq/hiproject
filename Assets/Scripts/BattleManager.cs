@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 전투 한 판을 진행합니다: 전장, 편성대로 동료 배치, 웨이브, 강화 카드, 전투 화면 UI.
+// 전투 한 판을 진행합니다: 전장, 편성대로 동료 배치, 웨이브, 전투 보너스, 전투 화면 UI.
 // 파티원(용사 포함)이 모두 쓰러지면 패배, 모든 웨이브를 물리치면 승리입니다.
 public class BattleManager : MonoBehaviour
 {
@@ -32,7 +32,7 @@ public class BattleManager : MonoBehaviour
     public bool IsPaused => World == null || finished || upgradeChoices != null;
     public bool HasEnemies => enemies.Count > 0;
 
-    // 강화 카드로 올라가는 보너스 (이번 판에서만 유지)
+    // 전투 보너스로 올라가는 보너스 (이번 판에서만 유지)
     float damageBonus = 1f;
     float attackSpeedBonus = 1f;
     float rangeBonus = 1f;
@@ -295,6 +295,7 @@ public class BattleManager : MonoBehaviour
         var c = def.job;
         float m = RarityInfo.StatMultiplier(def.rarity);
         if (def.IsHero) m *= 1f + AwakenBonus * SaveData.HeroAwaken;
+        m *= SaveData.LevelMultiplier(def); // 강화 레벨
 
         var u = CreateUnit(def.name, Team.Hero, pos);
         u.heroClass = c;
@@ -480,7 +481,7 @@ public class BattleManager : MonoBehaviour
         Finish(false);
     }
 
-    // ================= 강화 카드 (로그라이크 요소: 이번 판에서만 유지) =================
+    // ================= 전투 보너스 (로그라이크 요소: 이번 판에서만 유지) =================
 
     void OfferUpgrades()
     {
@@ -527,93 +528,104 @@ public class BattleManager : MonoBehaviour
         if (World == null) return;
         float w = UI.Width;
 
-        // 위쪽 정보 막대
-        UI.Fill(new Rect(0, 0, w, 52), new Color(0f, 0f, 0f, 0.45f));
-        UI.Text(new Rect(20, 0, 600, 52), $"{Stages.Label(Level)}  ·  {Stages.StageName(Level)}", 22, Color.white, TextAnchor.MiddleLeft, true);
-        UI.Text(new Rect(w / 2 - 150, 0, 300, 52), $"웨이브 {Mathf.Max(Wave, 1)} / {Stages.WavesPerLevel}", 24, Color.white, TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(w - 560, 0, 220, 52), $"골드 +{GoldEarned}", 22, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleRight, true);
-
-        if (UI.Button(new Rect(w - 320, 8, 100, 36), fastForward ? "x2 속도" : "x1 속도", new Color(0.3f, 0.45f, 0.65f), 18, !finished))
+        // 위쪽 정보 막대: 왼쪽 판 정보 / 가운데 웨이브 / 오른쪽 골드와 버튼
+        UI.Fill(new Rect(0, 0, w, 56), new Color(0.03f, 0.03f, 0.06f, 0.7f));
+        UI.Fill(new Rect(0, 55, w, 1), UI.WithAlpha(UI.Gold, 0.35f));
+        UI.Text(new Rect(20, 0, w * 0.36f, 56), $"{Stages.Label(Level)}  ·  {Stages.StageName(Level)}", 19, UI.TextMain, TextAnchor.MiddleLeft, true);
+        UI.Chip(new Rect(w / 2 - 80, 12, 160, 32), $"웨이브 {Mathf.Max(Wave, 1)} / {Stages.WavesPerLevel}", UI.Neutral, 18);
+        UI.Text(new Rect(w - 470, 0, 140, 56), $"+{GoldEarned} 골드", 18, UI.Gold, TextAnchor.MiddleRight, true);
+        if (UI.Button(new Rect(w - 316, 10, 96, 36), fastForward ? "x2 속도" : "x1 속도", UI.Blue, 16, !finished))
         {
             fastForward = !fastForward;
             Time.timeScale = fastForward ? 2f : 1f;
         }
-        if (UI.Button(new Rect(w - 205, 8, 185, 36), "도망쳐 용사!", new Color(0.65f, 0.25f, 0.25f), 18, !finished))
+        if (UI.Button(new Rect(w - 210, 10, 190, 36), "도망쳐 용사!", UI.Red, 17, !finished))
             Flee();
 
-        // 파티 상태
-        UI.Text(new Rect(20, 58, 400, 28), $"파티 생존 {heroes.Count} / {partySize}", 20, Color.white, TextAnchor.MiddleLeft, true);
+        // 왼쪽: 파티 상태
+        var party = new Rect(16, 66, 300, 78);
+        UI.Panel(party, new Color(0.05f, 0.06f, 0.10f, 0.7f));
+        UI.Text(new Rect(party.x + 16, party.y + 8, party.width - 32, 26), $"파티 생존  {heroes.Count} / {partySize}", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
         if (leader != null && leader.IsAlive)
         {
-            UI.Text(new Rect(20, 86, 60, 24), "용사", 18, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleLeft, true);
-            UI.Bar(new Rect(70, 89, 200, 18), leader.hp / leader.maxHp, new Color(1f, 0.75f, 0.2f));
+            UI.Text(new Rect(party.x + 16, party.y + 42, 50, 24), "용사", 15, UI.Gold, TextAnchor.MiddleLeft, true);
+            UI.Bar(new Rect(party.x + 64, party.y + 46, party.width - 82, 16), leader.hp / leader.maxHp, new Color(1f, 0.75f, 0.2f));
         }
-        else if (leader != null || partySize > 0)
+        else
         {
-            UI.Text(new Rect(20, 86, 300, 24), "용사가 쓰러졌다!", 18, new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(party.x + 16, party.y + 42, party.width - 32, 24), "용사가 쓰러졌다!", 15, new Color(1f, 0.5f, 0.5f), TextAnchor.MiddleLeft, true);
+        }
+
+        // 오른쪽: 시너지
+        var syn = new Rect(w - 316, 66, 300, 40 + HeroClass.All.Length * 24);
+        UI.Panel(syn, new Color(0.05f, 0.06f, 0.10f, 0.7f));
+        UI.Text(new Rect(syn.x + 16, syn.y + 6, syn.width - 32, 26), "시너지  (3명 / 6명)", 15, UI.TextSub, TextAnchor.MiddleLeft, true);
+        float y = syn.y + 32;
+        foreach (var c in HeroClass.All)
+        {
+            int tier = SynergyTier(c);
+            string stars = tier == 2 ? "★★" : tier == 1 ? "★" : "";
+            Color col = tier > 0 ? c.color : UI.WithAlpha(UI.TextSub, 0.7f);
+            UI.Text(new Rect(syn.x + 16, y, 150, 24), $"{c.name} {CountOf(c)} {stars}", 15, col, TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(syn.x + 150, y, syn.width - 166, 24), c.synergyText, 14, col, TextAnchor.MiddleRight);
+            y += 24;
         }
 
         // 줄 이름 (선두 ~ 후미)
         for (int col = 0; col < SaveData.Columns; col++)
         {
             var p = UI.WorldToUI(cam, new Vector2(ColumnCenterX(col), LaneTop + 1.2f));
-            UI.Text(new Rect(p.x - 40, p.y - 26, 80, 24), SaveData.ColumnNames[col], 16, new Color(1f, 1f, 1f, 0.75f), TextAnchor.MiddleCenter, true);
+            UI.Text(new Rect(p.x - 40, p.y - 26, 80, 24), SaveData.ColumnNames[col], 15, UI.WithAlpha(UI.TextMain, 0.7f), TextAnchor.MiddleCenter, true);
         }
 
-        // 시너지 (오른쪽)
-        float y = 60;
-        UI.Text(new Rect(w - 420, y, 400, 24), "시너지 (3명 / 6명)", 16, new Color(1f, 1f, 1f, 0.8f), TextAnchor.MiddleRight);
-        foreach (var c in HeroClass.All)
-        {
-            y += 24;
-            int tier = SynergyTier(c);
-            string stars = tier == 2 ? " ★★" : tier == 1 ? " ★" : "";
-            UI.Text(new Rect(w - 420, y, 400, 24), $"{c.name} {CountOf(c)}명{stars} - {c.synergyText}", 16,
-                tier > 0 ? c.color : new Color(0.8f, 0.8f, 0.8f), TextAnchor.MiddleRight);
-        }
-
-        // 보스 체력
+        // 보스 체력 (가운데)
         if (boss != null && boss.IsAlive)
         {
-            UI.Text(new Rect(w / 2 - 250, 58, 500, 28), Stages.BossName(Level), 22, new Color(1f, 0.4f, 0.4f), TextAnchor.MiddleCenter, true);
-            UI.Bar(new Rect(w / 2 - 250, 88, 500, 20), boss.hp / boss.maxHp, new Color(0.8f, 0.15f, 0.2f));
+            float bw = Mathf.Min(420f, w - 680f);
+            UI.Text(new Rect(w / 2 - bw / 2, 64, bw, 26), Stages.BossName(Level), 19, new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleCenter, true);
+            UI.Bar(new Rect(w / 2 - bw / 2, 92, bw, 18), boss.hp / boss.maxHp, new Color(0.85f, 0.18f, 0.22f));
         }
 
         // 다음 웨이브 안내
         if (!waveInProgress && !IsPaused)
-            UI.Text(new Rect(0, 300, w, 50), $"웨이브 {Wave + 1} 시작까지 {waveBreakTimer:0.0}초", 26, Color.white, TextAnchor.MiddleCenter, true);
+        {
+            var r = new Rect(w / 2 - 200, 290, 400, 54);
+            UI.Round(r, new Color(0f, 0f, 0f, 0.55f));
+            UI.Text(r, $"웨이브 {Wave + 1} 시작까지 {waveBreakTimer:0.0}초", 22, UI.TextMain, TextAnchor.MiddleCenter, true);
+        }
 
         if (upgradeChoices != null) DrawUpgradeChoices(w);
 
         if (finished)
         {
-            UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.4f));
+            UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.45f));
             string text = victory ? "클리어!" : Fled ? "후다닥! 도망쳤다..." : "파티 전멸...";
-            UI.Text(new Rect(0, 280, w, 80), text, 56,
-                victory ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.4f, 0.4f), TextAnchor.MiddleCenter, true);
+            UI.Text(new Rect(0, 280, w, 80), text, 56, victory ? UI.Gold : new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleCenter, true);
         }
     }
 
+    // 웨이브 사이에 고르는 전투 보너스 (캠프의 '강화'와는 다른, 이번 판에서만 유지되는 효과)
     void DrawUpgradeChoices(float w)
     {
-        UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.6f));
-        UI.Text(new Rect(0, 150, w, 50), $"웨이브 {Wave} 클리어! 강화를 하나 고르세요", 32, Color.white, TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(0, 195, w, 30), "(이번 판 동안만 유지됩니다)", 18, new Color(1f, 1f, 1f, 0.7f));
+        UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.65f));
+        UI.Text(new Rect(0, 140, w, 50), $"웨이브 {Wave} 클리어!", 34, UI.Gold, TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(0, 188, w, 30), "전투 보너스를 하나 고르세요  (이번 판 동안만 유지)", 18, UI.TextSub);
 
-        const float cw = 260, ch = 180, gap = 28;
+        const float cw = 260, ch = 190, gap = 28;
         float x0 = (w - (cw * upgradeChoices.Count + gap * (upgradeChoices.Count - 1))) / 2f;
         for (int i = 0; i < upgradeChoices.Count; i++)
         {
             var u = upgradeChoices[i];
-            var r = new Rect(x0 + i * (cw + gap), 250, cw, ch);
-            if (UI.Button(r, "", new Color(0.25f, 0.3f, 0.5f)))
+            var r = new Rect(x0 + i * (cw + gap), 245, cw, ch);
+            if (UI.Button(r, "", new Color(0.18f, 0.22f, 0.36f)))
             {
                 u.apply();
                 upgradeChoices = null;
                 return;
             }
-            UI.Text(new Rect(r.x + 10, r.y + 20, r.width - 20, 40), u.title, 24, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleCenter, true);
-            UI.Text(new Rect(r.x + 15, r.y + 70, r.width - 30, 90), u.desc, 19, Color.white);
+            UI.Text(new Rect(r.x + 12, r.y + 24, r.width - 24, 36), u.title, 22, UI.Gold, TextAnchor.MiddleCenter, true);
+            UI.Fill(new Rect(r.x + 40, r.y + 70, r.width - 80, 1), UI.WithAlpha(UI.Gold, 0.3f));
+            UI.Text(new Rect(r.x + 18, r.y + 84, r.width - 36, 80), u.desc, 18, UI.TextMain);
         }
     }
 }

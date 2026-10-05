@@ -208,9 +208,9 @@ public class GachaScreen
         if (!showFront)
         {
             Color frame = rarity >= Rarity.SuperRare ? rc : new Color(0.75f, 0.75f, 0.85f);
-            UI.Fill(rr, new Color(0.10f, 0.12f, 0.30f, alpha));
-            UI.Fill(new Rect(rr.x + 8f, rr.y + 8f, rr.width - 16f, rr.height - 16f), new Color(0.16f, 0.18f, 0.42f, alpha));
-            UI.Frame(rr, UI.WithAlpha(frame, alpha), 4f);
+            UI.Round(rr, new Color(0.10f, 0.12f, 0.30f, alpha));
+            if (rr.width > 24f) UI.Round(new Rect(rr.x + 8f, rr.y + 8f, rr.width - 16f, rr.height - 16f), new Color(0.16f, 0.18f, 0.42f, alpha));
+            UI.RoundFrame(rr, UI.WithAlpha(frame, alpha));
             if (widthScale > 0.5f) UI.Text(rr, "?", Mathf.RoundToInt(r.width * 0.4f), UI.WithAlpha(frame, alpha), TextAnchor.MiddleCenter, true);
             return;
         }
@@ -224,9 +224,9 @@ public class GachaScreen
         Color rc = RarityInfo.Animated(def.rarity);
         float s = r.height / 300f; // 카드 크기에 맞춰 글자 크기 조절
 
-        UI.Fill(r, UI.Darken(rc, 0.3f));
-        UI.Gradient(new Rect(r.x + 6f, r.y + 6f, r.width - 12f, r.height - 12f), UI.Darken(rc, 0.55f), new Color(0.08f, 0.08f, 0.12f), 12);
-        UI.Frame(r, rc, Mathf.Max(3f, 5f * s));
+        UI.Round(r, new Color(0.08f, 0.08f, 0.12f));
+        if (r.width > 24f) UI.Round(new Rect(r.x + 5f, r.y + 5f, r.width - 10f, r.height * 0.55f), UI.WithAlpha(UI.Darken(rc, 0.6f), 0.8f));
+        UI.RoundFrame(r, rc);
         if (!drawText) return;
 
         // 별 (등급)
@@ -242,20 +242,29 @@ public class GachaScreen
             Mathf.RoundToInt(40 * s), Color.white, TextAnchor.MiddleCenter, true);
 
         UI.Text(new Rect(r.x + 4f, r.y + 185f * s, r.width - 8f, 36f * s), def.name, Mathf.RoundToInt(26 * s), Color.white, TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(r.x + 4f, r.y + 222f * s, r.width - 8f, 26f * s), $"{RarityInfo.Name(def.rarity)} · {def.job.name}",
+        UI.Text(new Rect(r.x + 4f, r.y + 220f * s, r.width - 8f, 26f * s), $"{RarityInfo.Name(def.rarity)} · {def.job.name}",
             Mathf.RoundToInt(18 * s), rc, TextAnchor.MiddleCenter, true);
+
         // 기본 설정 [종족 / 소속 / 직업 / 성향]
-        UI.Text(new Rect(r.x + 6f, r.y + 248f * s, r.width - 12f, 22f * s), def.Profile, Mathf.RoundToInt(13 * s),
-            new Color(1f, 0.92f, 0.7f), TextAnchor.MiddleCenter, false, false);
-        UI.Text(new Rect(r.x + 8f, r.y + 270f * s, r.width - 16f, 28f * s), def.desc, Mathf.RoundToInt(12 * s),
-            new Color(1f, 1f, 1f, 0.65f), TextAnchor.UpperCenter, false, false);
+        var profileColor = new Color(1f, 0.92f, 0.7f);
+        if (s >= 0.9f)
+        {
+            UI.Text(new Rect(r.x + 6f, r.y + 248f * s, r.width - 12f, 22f * s), def.Profile, Mathf.RoundToInt(13 * s), profileColor);
+            UI.Text(new Rect(r.x + 8f, r.y + 270f * s, r.width - 16f, 26f * s), def.desc, Mathf.RoundToInt(12 * s), UI.TextSub);
+        }
+        else
+        {
+            // 작은 카드에서는 두 줄로 나눠서 겹치지 않게 (설명은 생략)
+            int size = Mathf.Max(10, Mathf.RoundToInt(15 * s));
+            UI.Text(new Rect(r.x + 4f, r.y + 248f * s, r.width - 8f, size + 4), $"{def.race} · {def.faction}", size, profileColor);
+            UI.Text(new Rect(r.x + 4f, r.y + 248f * s + size + 4, r.width - 8f, size + 4), $"{def.job.name} · {def.alignment}", size, profileColor);
+        }
 
         if (!string.IsNullOrEmpty(tag))
         {
-            float tw = (tag.Length <= 3 ? 70f : 110f) * s;
-            var tagRect = new Rect(r.xMax - tw + 6f * s, r.y - 10f * s, tw, 28f * s);
-            UI.Fill(tagRect, def.IsHero ? new Color(1f, 0.6f, 0.1f) : new Color(1f, 0.25f, 0.3f));
-            UI.Text(tagRect, tag, Mathf.RoundToInt(17 * s), Color.white, TextAnchor.MiddleCenter, true, false);
+            float tw = (tag.Length <= 3 ? 64f : 104f) * s;
+            var tagRect = new Rect(r.xMax - tw - 6f * s, r.y + 8f * s, tw, 26f * s);
+            UI.Chip(tagRect, tag, def.IsHero ? new Color(0.95f, 0.55f, 0.1f) : new Color(0.9f, 0.25f, 0.3f), Mathf.Max(10, Mathf.RoundToInt(15 * s)));
         }
     }
 }

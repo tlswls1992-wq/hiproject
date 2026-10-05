@@ -53,8 +53,7 @@ public class FormationScreen
         var e = Event.current;
         Vector2 mouse = e.mousePosition;
         UI.Gradient(UI.Full, new Color(0.12f, 0.18f, 0.16f), new Color(0.05f, 0.08f, 0.08f));
-        UI.Fill(new Rect(0, 0, w, 64), new Color(0f, 0f, 0f, 0.5f));
-        UI.Text(new Rect(24, 0, 700, 64), $"편성  ({SaveData.Party.Count}명)", 28, Color.white, TextAnchor.MiddleLeft, true);
+        UI.TopBar($"편성   파티 {SaveData.Party.Count}명", false);
 
         // ---- 줄 (선두 ~ 후미) ----
         int hoverZone = -1;
@@ -64,8 +63,8 @@ public class FormationScreen
             bool hover = z.Contains(mouse);
             if (hover) hoverZone = col;
             int count = SaveData.CountInColumn(col);
-            UI.Fill(z, hover && dragValue != null ? new Color(1f, 1f, 1f, 0.18f) : new Color(0f, 0f, 0f, col % 2 == 0 ? 0.35f : 0.25f));
-            UI.Frame(z, new Color(1f, 1f, 1f, 0.15f), 2f);
+            UI.Round(z, hover && dragValue != null ? new Color(1f, 1f, 1f, 0.16f) : new Color(0f, 0f, 0f, col % 2 == 0 ? 0.35f : 0.25f));
+            UI.RoundFrame(z, hover && dragValue != null ? UI.WithAlpha(UI.Gold, 0.6f) : new Color(1f, 1f, 1f, 0.10f));
             UI.Text(new Rect(z.x, GridY - 32, ZoneW, 28), $"{SaveData.ColumnNames[col]} {count}/{SaveData.MaxPerColumn}", 17,
                 col == 0 ? new Color(1f, 0.6f, 0.5f) : Color.white, TextAnchor.MiddleCenter, true);
         }
@@ -86,7 +85,7 @@ public class FormationScreen
         // ---- 대기 중인 동료 목록 (같은 동료끼리 묶어서 표시) ----
         float listX = GridX + 5 * (ZoneW + ZoneGap) + 22f;
         var listRect = new Rect(listX, 80, w - listX - 30, 400);
-        UI.Panel(listRect, new Color(0f, 0f, 0f, 0.4f));
+        UI.Panel(listRect);
         UI.Text(new Rect(listRect.x + 12, listRect.y + 6, listRect.width - 24, 28), "대기 중인 동료 (끌어서 줄에 놓기)", 18, Color.white, TextAnchor.MiddleLeft, true);
 
         var groups = new List<KeyValuePair<CompanionDef, List<int>>>();
@@ -123,9 +122,7 @@ public class FormationScreen
             DrawMiniUnit(r, groups[i].Key);
             if (groups[i].Value.Count > 1)
             {
-                var tag = new Rect(r.xMax - 34, r.y + 2, 32, 22);
-                UI.Fill(tag, new Color(0f, 0f, 0f, 0.7f));
-                UI.Text(tag, "x" + groups[i].Value.Count, 14, Color.white, TextAnchor.MiddleCenter, true, false);
+                UI.Chip(new Rect(r.xMax - 36, r.y + 4, 32, 22), "x" + groups[i].Value.Count, new Color(0f, 0f, 0f, 0.75f), 13);
             }
         }
         GUI.EndGroup();
@@ -136,7 +133,7 @@ public class FormationScreen
 
         // ---- 정보 창 ----
         var infoRect = new Rect(listX, 492, w - listX - 30, 128);
-        UI.Panel(infoRect, new Color(0f, 0f, 0f, 0.4f));
+        UI.Panel(infoRect);
         var info = SaveData.DefOf(inspectValue);
         if (info != null)
         {
@@ -157,14 +154,14 @@ public class FormationScreen
 
         // ---- 버튼 ----
         float by = GridY + ZoneH + 36;
-        if (UI.Button(new Rect(GridX, by, 170, 54), "◀ 저장 후 나가기", new Color(0.3f, 0.3f, 0.4f), 18))
+        if (UI.Button(new Rect(GridX, by, 170, 54), "◀ 저장 후 나가기", UI.Neutral, 18))
         {
             SaveData.Save();
             onExit();
         }
-        if (UI.Button(new Rect(GridX + 185, by, 150, 54), "자동 배치", new Color(0.25f, 0.55f, 0.45f), 20))
+        if (UI.Button(new Rect(GridX + 185, by, 150, 54), "자동 배치", UI.Green, 19))
             SaveData.AutoArrange();
-        if (UI.Button(new Rect(GridX + 350, by, 150, 54), "모두 빼기", new Color(0.6f, 0.3f, 0.3f), 20))
+        if (UI.Button(new Rect(GridX + 350, by, 150, 54), "모두 빼기", UI.Red, 19))
             SaveData.ClearParty();
         UI.Text(new Rect(listX, 630, w - listX - 30, 60), "용사는 항상 파티에 있어야 해요 (위치만 옮길 수 있어요)", 15, new Color(1f, 0.85f, 0.3f));
 
@@ -225,8 +222,8 @@ public class FormationScreen
     {
         if (def == null) return;
         Color rc = RarityInfo.Animated(def.rarity);
-        UI.Fill(r, UI.Darken(rc, 0.35f));
-        UI.Frame(r, rc, 3f);
+        UI.Round(r, UI.Darken(rc, 0.35f));
+        UI.RoundFrame(r, rc);
         var c = new Vector2(r.center.x, r.y + r.height * 0.4f);
         float rad = r.width * 0.26f;
         UI.Circle(c, rad + 3f, rc);

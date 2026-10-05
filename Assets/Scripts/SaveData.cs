@@ -15,6 +15,9 @@ public static class SaveData
     public static readonly string[] ColumnNames = { "선두", "전열", "중열", "후열", "후미" }; // 0 = 맨 앞
     public const string HeroMark = "H";  // 편성에서 용사를 나타내는 표시
     public const int MaxAwaken = 10;     // 용사 최대 각성 단계
+    public const int MaxLevel = 20;      // 강화 최대 레벨
+    public const float LevelBonus = 0.08f; // 강화 1레벨마다 능력치 +8%
+    const int DuplicateRefund = 100;     // 예전 저장의 중복 캐릭터를 정리할 때 돌려주는 골드
 
     // 편성된 동료 한 명의 자리
     public class Placement
@@ -29,6 +32,7 @@ public static class SaveData
     public static int HeroAwaken;                                    // 용사 각성 단계 (용사를 뽑을 때마다 +1)
     public static readonly List<string> Roster = new List<string>(); // 가진 동료 id (중복 = 같은 동료 여러 명, 용사 제외)
     public static readonly List<Placement> Party = new List<Placement>();
+    public static readonly Dictionary<string, int> Levels = new Dictionary<string, int>(); // 캐릭터별 강화 레벨 (없으면 1)
 
     static string Key(int slot, string name) => (slot == 0 ? Prefix : Prefix + "Slot" + slot + ".") + name;
 
@@ -45,10 +49,23 @@ public static class SaveData
         Gold = PlayerPrefs.GetInt(Key(slot, "Gold"), 0);
         ClearedStage = PlayerPrefs.GetInt(Key(slot, "ClearedStage"), 0);
         HeroAwaken = PlayerPrefs.GetInt(Key(slot, "HeroAwaken"), 0);
-        foreach (var id in PlayerPrefs.GetString(Key(slot, "Roster"), "").Split(','))
+        // 동료 목록. 이름이 있는 캐릭터가 두 명 이상 있으면(예전 저장) 한 명만 남기고 골드로 돌려줍니다.
+        var oldToNew = new Dictionary<int, int>();
+        var rawRoster = PlayerPrefs.GetString(Key(slot, "Roster"), "").Split(',');
+        for (int i = 0; i < rawRoster.Length; i++)
         {
-            var def = CompanionDef.Find(id);
-            if (def != null && !def.IsHero) Roster.Add(id);
+            var def = CompanionDef.Find(rawRoster[i]);
+            if (def == null || def.IsHero) continue;
+            if (def.IsNamed && Roster.Contains(def.id)) { Gold += DuplicateRefund; continue; }
+            oldToNew[i] = Roster.Count;
+            Roster.Add(def.id);
+        }
+
+        foreach (var entry in PlayerPrefs.GetString(Key(slot, "Levels"), "").Split(','))
+        {
+            var f = entry.Split(':');
+            if (f.Length == 2 && CompanionDef.Find(f[0]) != null && int.TryParse(f[1], out int lv))
+                Levels[f[0]] = Mathf.Clamp(lv, 1, MaxLevel);
         }
 
         string party = PlayerPrefs.GetString(Key(slot, "Party"), null);
@@ -58,7 +75,14 @@ public static class SaveData
             foreach (var entry in party.Split(';'))
             {
                 var f = entry.Split(':');
-                if (f.Length != 4 || !IsValidValue(f[0])) continue;
+                if (f.Length != 4) continue;
+                if (f[0] != HeroMark)
+                {
+                    // 중복 정리로 목록 번호가 바뀌었을 수 있으니 새 번호로 바꿔 줍니다.
+                    if (!int.TryParse(f[0], out int oldIdx) || !oldToNew.TryGetValue(oldIdx, out int newIdx)) continue;
+                    f[0] = newIdx.ToString();
+                }
+                if (!IsValidValue(f[0]) || Find(f[0]) != null) continue;
                 if (!int.TryParse(f[1], out int col) || col < 0 || col >= Columns) continue;
                 Party.Add(new Placement
                 {
@@ -84,6 +108,9 @@ public static class SaveData
         foreach (var p in Party)
             parts.Add($"{p.value}:{p.column}:{p.fx.ToString("0.###", CultureInfo.InvariantCulture)}:{p.fy.ToString("0.###", CultureInfo.InvariantCulture)}");
         PlayerPrefs.SetString(Key(slot, "Party"), string.Join(";", parts));
+        var levels = new List<string>();
+        foreach (var kv in Levels) levels.Add(kv.Key + ":" + kv.Value);
+        PlayerPrefs.SetString(Key(slot, "Levels"), string.Join(",", levels));
         PlayerPrefs.SetString(Key(slot, "SavedAt"), System.DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
         PlayerPrefs.Save();
     }
@@ -105,7 +132,7 @@ public static class SaveData
     public static void ResetAll()
     {
         ResetMemory();
-        foreach (var name in new[] { "Started", "Gold", "ClearedStage", "HeroAwaken", "Roster", "Party", "Formation", "SavedAt" })
+        foreach (var name in new[] { "Started", "Gold", "ClearedStage", "HeroAwaken", "Roster", "Party", "Formation", "Levels", "SavedAt" })
             PlayerPrefs.DeleteKey(Key(0, name));
         PlayerPrefs.Save();
     }
@@ -117,6 +144,7 @@ public static class SaveData
         HeroAwaken = 0;
         Roster.Clear();
         Party.Clear();
+        Levels.Clear();
         EnsureHeroPlaced();
     }
 
@@ -159,8 +187,48 @@ public static class SaveData
             return "골드 +300";
         }
         bool isNew = !Roster.Contains(def.id);
+        if (def.IsNamed && !isNew)
+        {
+            Gold += DuplicateRefund; // (뽑기에서 막고 있지만, 혹시 중복이 나오면 골드로)
+            return "골드 +" + DuplicateRefund;
+        }
         Roster.Add(def.id);
         return isNew ? "NEW" : null;
+    }
+
+    // ---------------- 강화 ----------------
+
+    public static int LevelOf(CompanionDef def) => Levels.TryGetValue(def.id, out int lv) ? lv : 1;
+
+    // 강화 레벨에 따른 능력치 배수
+    public static float LevelMultiplier(CompanionDef def) => 1f + LevelBonus * (LevelOf(def) - 1);
+
+    // 다음 레벨로 강화하는 데 드는 골드
+    public static int EnhanceCost(CompanionDef def) => (50 + 30 * (int)def.rarity) * LevelOf(def);
+
+    public static bool Enhance(CompanionDef def)
+    {
+        int lv = LevelOf(def);
+        int cost = EnhanceCost(def);
+        if (lv >= MaxLevel || Gold < cost) return false;
+        Gold -= cost;
+        Levels[def.id] = lv + 1;
+        Save();
+        return true;
+    }
+
+    // 캠프에서 보여 줄 '가진 캐릭터' 목록 (용사 먼저, 같은 캐릭터는 한 번만, 등급 높은 순)
+    public static List<CompanionDef> OwnedCharacters()
+    {
+        var list = new List<CompanionDef>();
+        foreach (var id in Roster)
+        {
+            var def = CompanionDef.Find(id);
+            if (!list.Contains(def)) list.Add(def);
+        }
+        list.Sort((a, b) => b.rarity.CompareTo(a.rarity));
+        list.Insert(0, CompanionDef.Hero);
+        return list;
     }
 
     public static int CountOwned(CompanionDef def)

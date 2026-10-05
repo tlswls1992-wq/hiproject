@@ -175,8 +175,8 @@ public static class StoryArt
         UI.Fill(new Rect(c.x - 70, c.y - 70, 140, 34), hair);
         for (int i = 0; i < 5; i++) UI.Circle(new Vector2(c.x - 56 + i * 28, c.y - 66), 20f, hair);
         // 헤헤 웃는 눈 (^ ^)
-        UI.Text(new Rect(c.x - 52, c.y - 30, 40, 40), "^", 40, new Color(0.2f, 0.1f, 0.05f), TextAnchor.MiddleCenter, true, false);
-        UI.Text(new Rect(c.x + 12, c.y - 30, 40, 40), "^", 40, new Color(0.2f, 0.1f, 0.05f), TextAnchor.MiddleCenter, true, false);
+        UI.Text(new Rect(c.x - 52, c.y - 38, 40, 56), "^", 40, new Color(0.2f, 0.1f, 0.05f), TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(c.x + 12, c.y - 38, 40, 56), "^", 40, new Color(0.2f, 0.1f, 0.05f), TextAnchor.MiddleCenter, true);
         // 볼 터치
         UI.Glow(c + new Vector2(-42, 18), 18f, new Color(1f, 0.45f, 0.5f, 0.7f));
         UI.Glow(c + new Vector2(42, 18), 18f, new Color(1f, 0.45f, 0.5f, 0.7f));
@@ -190,14 +190,14 @@ public static class StoryArt
         var bubble = new Rect(c.x - 190, c.y - 150 - 6f * Mathf.Abs(Mathf.Sin(Now * 5f)), 120 * pop, 60 * pop);
         UI.Fill(bubble, Color.white);
         UI.Fill(new Rect(bubble.xMax - 30, bubble.yMax - 2, 16, 18), Color.white);
-        UI.Text(bubble, "헤헤", 30, new Color(0.3f, 0.15f, 0.1f), TextAnchor.MiddleCenter, true, false);
+        UI.Text(bubble, "헤헤", 30, new Color(0.3f, 0.15f, 0.1f), TextAnchor.MiddleCenter, true);
     }
 
     static void DrawCardBack(Rect r)
     {
         UI.Fill(r, new Color(0.85f, 0.75f, 0.45f));
         UI.Fill(new Rect(r.x + 3, r.y + 3, Mathf.Max(0, r.width - 6), r.height - 6), new Color(0.15f, 0.18f, 0.45f));
-        if (r.width > 20) UI.Text(r, "?", Mathf.RoundToInt(r.height * 0.4f), new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleCenter, true, false);
+        if (r.width > 20) UI.Text(r, "?", Mathf.RoundToInt(r.height * 0.4f), new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleCenter, true);
     }
 
     // ---------------- 승리 / 왕국 ----------------

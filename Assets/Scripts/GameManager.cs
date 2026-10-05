@@ -10,7 +10,7 @@ public class GameManager : MonoBehaviour
 
     const float HalfWorldWidth = 14f; // 전투 화면에서 항상 보이는 가로 반폭
 
-    enum Page { Title, Story, Camp, GachaSelect, Gacha, Formation, Roster, Battle, Result, SaveLoad, Settings }
+    enum Page { Title, Story, Camp, GachaSelect, Gacha, Formation, Enhance, Talk, Roster, Battle, Result, SaveLoad, Settings }
     enum Modal { None, ConfirmNewGame, ConfirmQuit }
 
     // 스토리 장면 그림 종류 (StoryArt.cs)
@@ -53,6 +53,8 @@ public class GameManager : MonoBehaviour
     BattleManager battle;
     readonly GachaScreen gacha = new GachaScreen();
     readonly FormationScreen formation = new FormationScreen();
+    readonly EnhanceScreen enhance = new EnhanceScreen();
+    readonly TalkScreen talk = new TalkScreen();
     Camera cam;
 
     StoryLine[] story;
@@ -142,6 +144,8 @@ public class GameManager : MonoBehaviour
             case Page.GachaSelect: DrawGachaSelect(); break;
             case Page.Gacha: gacha.Draw(); break;
             case Page.Formation: formation.Draw(() => page = Page.Camp, ShowToast); break;
+            case Page.Enhance: enhance.Draw(() => page = Page.Camp, ShowToast); break;
+            case Page.Talk: talk.Draw(() => page = Page.Camp, TextSpeeds[Mathf.Clamp(SaveData.TextSpeed, 0, 2)]); break;
             case Page.Roster: DrawRoster(); break;
             case Page.Battle: battle.DrawHUD(); break;
             case Page.Result: DrawResult(); break;
@@ -152,9 +156,10 @@ public class GameManager : MonoBehaviour
         if (toast != null && Now < toastUntil)
         {
             float w = UI.Width;
-            var r = new Rect(w / 2f - 320f, 90f, 640f, 50f);
-            UI.Fill(r, new Color(0f, 0f, 0f, 0.8f));
-            UI.Text(r, toast, 20, Color.white, TextAnchor.MiddleCenter, true);
+            var r = new Rect(w / 2f - 320f, 80f, 640f, 48f);
+            UI.Round(r, new Color(0.02f, 0.02f, 0.05f, 0.88f));
+            UI.RoundFrame(r, UI.WithAlpha(UI.Gold, 0.5f));
+            UI.Text(r, toast, 19, UI.TextMain, TextAnchor.MiddleCenter, true);
         }
     }
 
@@ -181,22 +186,22 @@ public class GameManager : MonoBehaviour
         // 메뉴 (확인 창이 떠 있을 때는 눌리지 않게 막습니다)
         bool active = modal == Modal.None;
         float bx = w / 2f - 150f, by = 290f;
-        const float bh = 62f, gap = 12f;
-        if (UI.Button(new Rect(bx, by, 300, bh), "새로 시작", new Color(0.85f, 0.55f, 0.15f), 26, active))
+        const float bh = 58f, gap = 14f;
+        if (UI.Button(new Rect(bx, by, 300, bh), "새로 시작", UI.Primary, 24, active))
         {
             if (SaveData.HasSave) modal = Modal.ConfirmNewGame;
             else NewGame();
         }
-        if (UI.Button(new Rect(bx, by + (bh + gap), 300, bh), "이어하기", new Color(0.3f, 0.5f, 0.75f), 24, active && SaveData.HasSave))
+        if (UI.Button(new Rect(bx, by + (bh + gap), 300, bh), "이어하기", UI.Blue, 22, active && SaveData.HasSave))
             ContinueGame();
-        if (UI.Button(new Rect(bx, by + (bh + gap) * 2, 300, bh), "불러오기", new Color(0.3f, 0.5f, 0.75f), 24, active))
+        if (UI.Button(new Rect(bx, by + (bh + gap) * 2, 300, bh), "불러오기", UI.Blue, 22, active))
             OpenSaveLoad(true, Page.Title);
-        if (UI.Button(new Rect(bx, by + (bh + gap) * 3, 300, bh), "설정", new Color(0.35f, 0.4f, 0.5f), 24, active))
+        if (UI.Button(new Rect(bx, by + (bh + gap) * 3, 300, bh), "설정", UI.Neutral, 22, active))
         {
             returnPage = Page.Title;
             page = Page.Settings;
         }
-        if (UI.Button(new Rect(bx, by + (bh + gap) * 4, 300, bh), "끝내기", new Color(0.45f, 0.25f, 0.3f), 24, active))
+        if (UI.Button(new Rect(bx, by + (bh + gap) * 4, 300, bh), "끝내기", UI.Neutral, 22, active))
             modal = Modal.ConfirmQuit;
 
         if (modal == Modal.ConfirmNewGame)
@@ -217,10 +222,10 @@ public class GameManager : MonoBehaviour
         float w = UI.Width;
         UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.7f));
         var box = new Rect(w / 2f - 280f, 230f, 560f, 260f);
-        UI.Panel(box, new Color(0.15f, 0.15f, 0.25f));
-        UI.Text(new Rect(box.x + 20, box.y + 20, box.width - 40, 130), message, 22, Color.white);
-        bool yes = UI.Button(new Rect(box.x + 50, box.y + 170, 210, 64), yesLabel, new Color(0.7f, 0.3f, 0.25f));
-        bool no = UI.Button(new Rect(box.xMax - 260, box.y + 170, 210, 64), "취소", new Color(0.35f, 0.4f, 0.6f));
+        UI.Panel(box, new Color(0.10f, 0.11f, 0.18f, 0.97f));
+        UI.Text(new Rect(box.x + 30, box.y + 24, box.width - 60, 120), message, 21, UI.TextMain);
+        bool yes = UI.Button(new Rect(box.x + 50, box.y + 170, 210, 60), yesLabel, UI.Red);
+        bool no = UI.Button(new Rect(box.xMax - 260, box.y + 170, 210, 60), "취소", UI.Neutral);
         if (yes || no) modal = Modal.None;
         return yes;
     }
@@ -277,23 +282,22 @@ public class GameManager : MonoBehaviour
     {
         float w = UI.Width;
         UI.Gradient(UI.Full, new Color(0.10f, 0.12f, 0.22f), new Color(0.05f, 0.05f, 0.10f));
-        UI.Fill(new Rect(0, 0, w, 64), new Color(0f, 0f, 0f, 0.5f));
-        UI.Text(new Rect(24, 0, 700, 64), saveLoadIsLoad ? "불러오기" : "저장하기", 28, Color.white, TextAnchor.MiddleLeft, true);
+        UI.TopBar(saveLoadIsLoad ? "불러오기" : "저장하기", false);
 
         for (int slot = 0; slot < SaveData.SlotCount; slot++)
         {
-            var r = new Rect(80, 100 + slot * 120, w - 160, 105);
+            var r = new Rect(80, 90 + slot * 124, w - 160, 108);
             bool has = SaveData.HasSlot(slot);
-            UI.Panel(r, new Color(0f, 0f, 0f, 0.45f));
+            UI.Panel(r);
             string label = slot == 0 ? "자동 저장 (이어하기)" : $"슬롯 {slot}";
-            UI.Text(new Rect(r.x + 24, r.y + 10, 400, 34), label, 24, slot == 0 ? new Color(1f, 0.85f, 0.3f) : Color.white, TextAnchor.MiddleLeft, true);
-            UI.Text(new Rect(r.x + 24, r.y + 44, r.width - 300, 56), SaveData.SlotSummary(slot), 17,
-                has ? new Color(1f, 1f, 1f, 0.85f) : new Color(1f, 1f, 1f, 0.4f), TextAnchor.UpperLeft);
+            UI.Text(new Rect(r.x + 28, r.y + 12, 400, 32), label, 22, slot == 0 ? UI.Gold : UI.TextMain, TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(r.x + 28, r.y + 48, r.width - 300, 52), SaveData.SlotSummary(slot), 16,
+                has ? UI.TextSub : UI.WithAlpha(UI.TextSub, 0.5f), TextAnchor.UpperLeft);
 
             var btn = new Rect(r.xMax - 230, r.y + 22, 200, 60);
             if (saveLoadIsLoad)
             {
-                if (UI.Button(btn, "불러오기", new Color(0.3f, 0.5f, 0.75f), 22, has))
+                if (UI.Button(btn, "불러오기", UI.Blue, 20, has))
                 {
                     SaveData.Load(slot);
                     SaveData.Save(); // 불러온 기록으로 이어하기
@@ -302,14 +306,14 @@ public class GameManager : MonoBehaviour
                     ShowToast(slot == 0 ? "자동 저장을 불러왔어요" : $"슬롯 {slot}을 불러왔어요");
                 }
             }
-            else if (slot > 0 && UI.Button(btn, has ? "덮어쓰기" : "여기에 저장", new Color(0.25f, 0.55f, 0.45f), 22))
+            else if (slot > 0 && UI.Button(btn, has ? "덮어쓰기" : "여기에 저장", UI.Green, 20))
             {
                 SaveData.SaveToSlot(slot);
                 ShowToast($"슬롯 {slot}에 저장했어요");
             }
         }
 
-        if (UI.Button(new Rect(80, 600, 180, 56), "◀ 돌아가기", new Color(0.3f, 0.3f, 0.4f), 20))
+        if (UI.Button(new Rect(32, 636, 170, 50), "◀ 돌아가기", UI.Neutral, 18))
             page = returnPage;
     }
 
@@ -319,12 +323,12 @@ public class GameManager : MonoBehaviour
     {
         float w = UI.Width;
         UI.Gradient(UI.Full, new Color(0.12f, 0.12f, 0.18f), new Color(0.05f, 0.05f, 0.08f));
-        UI.Fill(new Rect(0, 0, w, 64), new Color(0f, 0f, 0f, 0.5f));
-        UI.Text(new Rect(24, 0, 700, 64), "설정", 28, Color.white, TextAnchor.MiddleLeft, true);
+        UI.TopBar("설정", false);
+        UI.Panel(new Rect(w / 2f - 420f, 96f, 840f, 400f));
 
         float x = w / 2f - 380f, y = 120f;
-        var on = new Color(0.85f, 0.55f, 0.15f);
-        var off = new Color(0.3f, 0.32f, 0.4f);
+        var on = UI.Primary;
+        var off = UI.Neutral;
 
         UI.Text(new Rect(x, y, 260, 56), "대사 속도", 24, Color.white, TextAnchor.MiddleLeft, true);
         for (int i = 0; i < TextSpeedNames.Length; i++)
@@ -346,7 +350,7 @@ public class GameManager : MonoBehaviour
         UI.Text(new Rect(x + 280, y, 460, 56), SaveData.OpeningSeen ? "사용 가능 (오프닝을 본 적이 있어요)" : "오프닝을 한 번 보면 사용할 수 있어요", 18,
             new Color(1f, 1f, 1f, 0.7f), TextAnchor.MiddleLeft);
 
-        if (UI.Button(new Rect(80, 600, 180, 56), "◀ 돌아가기", new Color(0.3f, 0.3f, 0.4f), 20))
+        if (UI.Button(new Rect(32, 636, 170, 50), "◀ 돌아가기", UI.Neutral, 18))
             page = returnPage;
     }
 
@@ -378,23 +382,19 @@ public class GameManager : MonoBehaviour
         }
 
         // 대사 상자
-        var box = new Rect(40, 480, w - 80, 200);
-        UI.Panel(box, new Color(0.05f, 0.05f, 0.12f, 0.88f));
+        var box = new Rect(40, 486, w - 80, 196);
+        UI.Panel(box, new Color(0.04f, 0.04f, 0.09f, 0.90f));
         if (line.speaker != "")
-        {
-            var nameTag = new Rect(box.x + 20, box.y - 22, 160, 44);
-            UI.Fill(nameTag, new Color(0.75f, 0.5f, 0.15f));
-            UI.Text(nameTag, line.speaker, 22, Color.white, TextAnchor.MiddleCenter, true);
-        }
+            UI.Chip(new Rect(box.x + 24, box.y - 20, 150, 40), line.speaker, UI.Darken(UI.Primary, 0.9f), 20);
 
         // 한 글자씩 나타나는 효과
-        UI.Text(new Rect(box.x + 40, box.y + 35, box.width - 80, box.height - 60), line.text.Substring(0, shown), 26,
-            Color.white, TextAnchor.UpperLeft);
+        UI.Text(new Rect(box.x + 40, box.y + 38, box.width - 100, box.height - 60), line.text.Substring(0, shown), 25,
+            UI.TextMain, TextAnchor.UpperLeft);
         if (!talking && Mathf.Repeat(Now, 1f) < 0.6f)
             UI.Text(new Rect(box.xMax - 80, box.yMax - 50, 50, 40), "▼", 22, Color.white);
 
         // 오른쪽 위 건너뛰기 (오프닝은 본 적이 있을 때만)
-        if (storySkippable && UI.Button(new Rect(w - 170, 20, 150, 46), "건너뛰기 ▶▶", new Color(0.3f, 0.3f, 0.4f), 18))
+        if (storySkippable && UI.Button(new Rect(w - 176, 20, 150, 44), "건너뛰기 ▶▶", UI.WithAlpha(UI.Neutral, 0.9f), 17))
         {
             onStoryEnd?.Invoke();
             return;
@@ -417,92 +417,102 @@ public class GameManager : MonoBehaviour
     void DrawCamp()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.15f, 0.20f, 0.35f), new Color(0.30f, 0.22f, 0.20f));
-        UI.Fill(new Rect(0, 560, w, 160), new Color(0.22f, 0.32f, 0.20f));
+        UI.Gradient(UI.Full, new Color(0.12f, 0.15f, 0.28f), new Color(0.24f, 0.17f, 0.15f));
+        UI.Fill(new Rect(0, 600, w, 120), new Color(0.16f, 0.22f, 0.15f));
+        var fire = new Vector2(w / 2f, 650f);
+        UI.Glow(fire, 160f + 10f * Mathf.Sin(Now * 7f), new Color(1f, 0.5f, 0.15f, 0.35f));
+        UI.Glow(fire, 26f + 4f * Mathf.Sin(Now * 11f), new Color(1f, 0.85f, 0.4f, 0.9f));
 
-        // 모닥불
-        var fire = new Vector2(w / 2f, 620f);
-        UI.Glow(fire, 120f + 8f * Mathf.Sin(Now * 7f), new Color(1f, 0.55f, 0.15f, 0.5f));
-        UI.Glow(fire, 30f + 4f * Mathf.Sin(Now * 11f), new Color(1f, 0.9f, 0.4f, 0.9f));
+        UI.TopBar("용사의 캠프");
 
-        DrawTopBar(w, "용사의 캠프");
-
-        // 왼쪽: 출격 판
-        var left = new Rect(40, 90, w * 0.5f - 60, 440);
-        UI.Panel(left, new Color(0f, 0f, 0f, 0.45f));
-        UI.Text(new Rect(left.x, left.y + 12, left.width, 40), "출격", 30, Color.white, TextAnchor.MiddleCenter, true);
+        // ---- 왼쪽: 출격 ----
+        var left = new Rect(32, 84, w * 0.46f - 32, 500);
+        UI.Panel(left);
+        UI.Text(new Rect(left.x + 24, left.y + 14, left.width - 48, 32), "출격", 22, UI.TextSub, TextAnchor.MiddleLeft, true);
 
         int maxLevel = Mathf.Min(SaveData.ClearedStage + 1, Stages.Count);
         selectedStage = Mathf.Clamp(selectedStage, 1, maxLevel);
         float cx = left.center.x;
-        var arrow = new Color(0.3f, 0.35f, 0.5f);
+        var arrow = UI.Neutral;
         // ◀◀ ▶▶ 는 스테이지 단위(10판), ◀ ▶ 는 한 판씩 이동
-        if (UI.Button(new Rect(left.x + 15, left.y + 95, 56, 70), "◀◀", arrow, 20, selectedStage > 1))
+        float ay = left.y + 78;
+        if (UI.Button(new Rect(left.x + 20, ay, 52, 60), "◀◀", arrow, 18, selectedStage > 1))
             selectedStage = Mathf.Max(1, selectedStage - Stages.LevelsPerStage);
-        if (UI.Button(new Rect(left.x + 77, left.y + 95, 50, 70), "◀", arrow, 24, selectedStage > 1)) selectedStage--;
-        if (UI.Button(new Rect(left.xMax - 127, left.y + 95, 50, 70), "▶", arrow, 24, selectedStage < maxLevel)) selectedStage++;
-        if (UI.Button(new Rect(left.xMax - 71, left.y + 95, 56, 70), "▶▶", arrow, 20, selectedStage < maxLevel))
+        if (UI.Button(new Rect(left.x + 78, ay, 46, 60), "◀", arrow, 20, selectedStage > 1)) selectedStage--;
+        if (UI.Button(new Rect(left.xMax - 124, ay, 46, 60), "▶", arrow, 20, selectedStage < maxLevel)) selectedStage++;
+        if (UI.Button(new Rect(left.xMax - 72, ay, 52, 60), "▶▶", arrow, 18, selectedStage < maxLevel))
             selectedStage = Mathf.Min(maxLevel, selectedStage + Stages.LevelsPerStage);
+        UI.Text(new Rect(cx - 110, ay - 4, 220, 68), Stages.Label(selectedStage), 52, UI.Gold, TextAnchor.MiddleCenter, true);
 
-        UI.Text(new Rect(cx - 150, left.y + 80, 300, 60), Stages.Label(selectedStage), 48, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(cx - 150, left.y + 138, 300, 34), Stages.StageName(selectedStage), 20, Color.white);
-        string info = Stages.HasBoss(selectedStage) ? $"보스: {Stages.BossName(selectedStage)}" : $"웨이브 {Stages.WavesPerLevel}개";
-        UI.Text(new Rect(cx - 200, left.y + 180, 400, 30), info, 20,
-            Stages.HasBoss(selectedStage) ? new Color(1f, 0.45f, 0.45f) : new Color(1f, 1f, 1f, 0.8f), TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(left.x, left.y + 150, left.width, 30), Stages.StageName(selectedStage), 21, UI.TextMain);
+        bool boss = Stages.HasBoss(selectedStage);
+        var chip = new Rect(cx - 110, left.y + 190, 220, 32);
+        UI.Chip(chip, boss ? $"보스  {Stages.BossName(selectedStage)}" : $"웨이브 {Stages.WavesPerLevel}개", boss ? UI.Red : UI.Neutral, 16);
         bool firstTime = selectedStage > SaveData.ClearedStage;
         int reward = Stages.ClearReward(selectedStage) * (firstTime ? 2 : 1);
-        UI.Text(new Rect(cx - 200, left.y + 212, 400, 30), $"클리어 보상: {reward} 골드" + (firstTime ? " (최초 2배)" : ""), 18, new Color(1f, 0.85f, 0.3f));
+        UI.Text(new Rect(left.x, left.y + 232, left.width, 28), $"클리어 보상  {reward:N0} 골드" + (firstTime ? "  (최초 2배)" : ""), 17, UI.Gold);
 
-        if (UI.Button(new Rect(cx - 140, left.y + 260, 280, 90), "출격!", new Color(0.8f, 0.35f, 0.2f), 34))
+        if (UI.Button(new Rect(cx - 150, left.y + 290, 300, 86), "출격!", UI.Primary, 34))
             StartBattle(selectedStage);
-        UI.Text(new Rect(left.x, left.yMax - 75, left.width, 26), $"파티 {SaveData.Party.Count}명 편성됨", 18, Color.white);
-        UI.Text(new Rect(left.x, left.yMax - 45, left.width, 30), $"진행도 {SaveData.ClearedStage} / {Stages.Count}판", 18, new Color(1f, 1f, 1f, 0.7f));
 
-        // 오른쪽: 소환 / 편성 / 도감
-        var right = new Rect(w * 0.5f + 20, 90, w * 0.5f - 60, 440);
-        float pulse = 1f + 0.05f * Mathf.Sin(Now * 3f);
-        UI.Glow(new Vector2(right.center.x, right.y + 90), 190f * pulse, new Color(1f, 0.75f, 0.2f, 0.35f));
-        if (UI.Button(new Rect(right.x + 30, right.y + 20, right.width - 60, 140), "소환", new Color(0.85f, 0.55f, 0.15f), 44))
-            page = Page.GachaSelect;
-        UI.Text(new Rect(right.x, right.y + 165, right.width, 26), "골드로 새로운 동료를 뽑아요", 18, new Color(1f, 1f, 1f, 0.8f));
+        // 진행도 막대
+        var prog = new Rect(left.x + 24, left.yMax - 70, left.width - 48, 14);
+        UI.Bar(prog, SaveData.ClearedStage / (float)Stages.Count, UI.Gold);
+        UI.Text(new Rect(left.x + 24, left.yMax - 50, left.width - 48, 26),
+            $"진행도 {SaveData.ClearedStage} / {Stages.Count}판   ·   파티 {SaveData.Party.Count}명", 15, UI.TextSub, TextAnchor.MiddleLeft);
+
+        // ---- 오른쪽: 메뉴 ----
+        float rx = left.xMax + 24, rw = w - rx - 32;
+        var summon = new Rect(rx, 84, rw, 150);
+        UI.Glow(summon.center, 200f * (1f + 0.04f * Mathf.Sin(Now * 3f)), new Color(1f, 0.7f, 0.2f, 0.25f));
+        if (Tile(summon, "소환", "골드로 새로운 동료를 뽑아요", UI.Primary, 40)) page = Page.GachaSelect;
 
         int unplaced = 0;
         for (int i = 0; i < SaveData.Roster.Count; i++) if (!SaveData.IsPlaced(i)) unplaced++;
-        float half = (right.width - 60 - 20) / 2f;
-        string formLabel = unplaced > 0 ? $"편성\n(대기 {unplaced}명)" : "편성";
-        if (UI.Button(new Rect(right.x + 30, right.y + 210, half, 110), formLabel, new Color(0.25f, 0.55f, 0.45f), 28))
+        float tw = (rw - 16) / 2f, th = 160f, ty = summon.yMax + 16;
+        if (Tile(new Rect(rx, ty, tw, th), "편성", unplaced > 0 ? $"대기 중 {unplaced}명" : $"파티 {SaveData.Party.Count}명", UI.Green, 30))
         {
             formation.Open();
             page = Page.Formation;
         }
-        if (UI.Button(new Rect(right.x + 50 + half, right.y + 210, half, 110), "도감", new Color(0.3f, 0.45f, 0.7f), 28))
+        if (Tile(new Rect(rx + tw + 16, ty, tw, th), "강화", "골드로 레벨 올리기", new Color(0.50f, 0.36f, 0.72f), 30))
+        {
+            enhance.Open();
+            page = Page.Enhance;
+        }
+        ty += th + 16;
+        if (Tile(new Rect(rx, ty, tw, th), "대화", "동료와 이야기하기", new Color(0.62f, 0.40f, 0.26f), 30))
+        {
+            talk.Open();
+            page = Page.Talk;
+        }
+        if (Tile(new Rect(rx + tw + 16, ty, tw, th), "도감", $"{CountUnique()} / {CompanionDef.All.Length} 종류", UI.Blue, 30))
             page = Page.Roster;
-        UI.Text(new Rect(right.x, right.y + 330, right.width, 26), $"용사 각성 +{SaveData.HeroAwaken}  ·  동료 {SaveData.Roster.Count}명", 18, new Color(1f, 0.85f, 0.3f));
 
-        // 아래쪽 작은 버튼들
-        var small = new Color(0.3f, 0.3f, 0.4f);
-        if (UI.Button(new Rect(right.x + 30, right.yMax - 50, 120, 44), "저장", small, 18)) OpenSaveLoad(false, Page.Camp);
-        if (UI.Button(new Rect(right.x + 160, right.yMax - 50, 120, 44), "설정", small, 18))
+        // ---- 아래: 상태와 작은 버튼 ----
+        UI.Text(new Rect(32, 640, 500, 40), $"용사 Lv.{SaveData.LevelOf(CompanionDef.Hero)}  ·  각성 +{SaveData.HeroAwaken}  ·  동료 {SaveData.Roster.Count}명",
+            17, UI.TextSub, TextAnchor.MiddleLeft);
+        float bx = w - 32 - 3 * 130 - 2 * 10;
+        if (UI.Button(new Rect(bx, 636, 130, 48), "저장", UI.Neutral, 18)) OpenSaveLoad(false, Page.Camp);
+        if (UI.Button(new Rect(bx + 140, 636, 130, 48), "설정", UI.Neutral, 18))
         {
             returnPage = Page.Camp;
             page = Page.Settings;
         }
-        if (UI.Button(new Rect(right.xMax - 150, right.yMax - 50, 120, 44), "타이틀로", small, 18))
+        if (UI.Button(new Rect(bx + 280, 636, 130, 48), "타이틀로", UI.Neutral, 18))
         {
             SaveData.Save();
             page = Page.Title;
         }
     }
 
-    void DrawTopBar(float w, string title)
+    // 큰 메뉴 버튼 (제목 + 작은 설명)
+    static bool Tile(Rect r, string title, string sub, Color color, int titleSize)
     {
-        UI.Fill(new Rect(0, 0, w, 64), new Color(0f, 0f, 0f, 0.5f));
-        UI.Text(new Rect(24, 0, 700, 64), title, 28, Color.white, TextAnchor.MiddleLeft, true);
-        var goldBox = new Rect(w - 260, 12, 236, 40);
-        UI.Fill(goldBox, new Color(0f, 0f, 0f, 0.5f));
-        UI.Circle(new Vector2(goldBox.x + 22, goldBox.center.y), 12f, new Color(1f, 0.8f, 0.2f));
-        UI.Text(new Rect(goldBox.x + 40, goldBox.y, goldBox.width - 52, goldBox.height), $"{SaveData.Gold:N0} 골드", 22,
-            new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleRight, true);
+        bool clicked = UI.Button(r, "", color);
+        UI.Text(new Rect(r.x, r.y + r.height * 0.5f - titleSize - 2, r.width, titleSize + 12), title, titleSize, Color.white, TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(r.x + 10, r.y + r.height * 0.5f + 14, r.width - 20, 24), sub, 16, new Color(1f, 1f, 1f, 0.8f));
+        return clicked;
     }
 
     // ---------------- 소환 선택 ----------------
@@ -510,50 +520,53 @@ public class GameManager : MonoBehaviour
     void DrawGachaSelect()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.10f, 0.05f, 0.20f), new Color(0.25f, 0.10f, 0.25f));
-        DrawTopBar(w, "소환");
+        UI.Gradient(UI.Full, new Color(0.09f, 0.05f, 0.18f), new Color(0.20f, 0.08f, 0.22f));
+        UI.TopBar("소환");
 
         var banners = GachaBanner.All;
-        const float gap = 20f;
-        float pw = (w - 80f - gap * (banners.Length - 1)) / banners.Length;
+        const float gap = 18f;
+        float pw = (w - 64f - gap * (banners.Length - 1)) / banners.Length;
         for (int i = 0; i < banners.Length; i++)
         {
             var b = banners[i];
-            var r = new Rect(40 + i * (pw + gap), 90, pw, 520);
-            UI.Panel(r, new Color(0f, 0f, 0f, 0.5f));
-            UI.Fill(new Rect(r.x, r.y, r.width, 90), b.color);
-            UI.Text(new Rect(r.x, r.y + 8, r.width, 44), b.name, 30, Color.white, TextAnchor.MiddleCenter, true);
-            UI.Text(new Rect(r.x + 8, r.y + 50, r.width - 16, 30), b.desc, 15, new Color(1f, 1f, 1f, 0.85f));
+            var r = new Rect(32 + i * (pw + gap), 84, pw, 530);
+            UI.Panel(r);
+            var head = new Rect(r.x + 8, r.y + 8, r.width - 16, 88);
+            UI.Round(head, b.color);
+            UI.Text(new Rect(head.x, head.y + 10, head.width, 38), b.name, 28, Color.white, TextAnchor.MiddleCenter, true);
+            UI.Text(new Rect(head.x + 8, head.y + 50, head.width - 16, 26), b.desc, 14, new Color(1f, 1f, 1f, 0.85f));
 
             // 확률표
-            float y = r.y + 110;
-            UI.Text(new Rect(r.x, y, r.width, 26), "등장 확률", 18, new Color(1f, 1f, 1f, 0.7f));
+            float y = r.y + 112;
+            UI.Text(new Rect(r.x + 24, y, r.width - 48, 24), "등장 확률", 15, UI.TextSub, TextAnchor.MiddleLeft, true);
             for (int k = 0; k < b.rates.Length; k++)
             {
                 if (b.rates[k] <= 0f) continue;
                 y += 30;
                 var rarity = (Rarity)k;
-                UI.Text(new Rect(r.x + 30, y, r.width - 60, 28), RarityInfo.Name(rarity), 20, RarityInfo.Animated(rarity), TextAnchor.MiddleLeft, true);
-                UI.Text(new Rect(r.x + 30, y, r.width - 60, 28), b.rates[k] + "%", 20, Color.white, TextAnchor.MiddleRight);
+                UI.Round(new Rect(r.x + 16, y, r.width - 32, 26), new Color(1f, 1f, 1f, 0.04f));
+                UI.Text(new Rect(r.x + 28, y, r.width - 56, 26), RarityInfo.Name(rarity), 17, RarityInfo.Animated(rarity), TextAnchor.MiddleLeft, true);
+                UI.Text(new Rect(r.x + 28, y, r.width - 56, 26), b.rates[k] + "%", 17, UI.TextMain, TextAnchor.MiddleRight);
             }
-            UI.Text(new Rect(r.x + 8, r.y + 300, r.width - 16, 30), $"10회 뽑기 시 {RarityInfo.Name(b.guarantee)} 이상 1명 보장", 14,
-                new Color(1f, 0.85f, 0.3f));
+            UI.Text(new Rect(r.x + 12, r.y + 320, r.width - 24, 40), $"10회 뽑기 시\n{RarityInfo.Name(b.guarantee)} 이상 1명 보장", 14, UI.Gold);
 
             if (!b.IsUnlocked)
             {
-                UI.Fill(r, new Color(0f, 0f, 0f, 0.7f));
-                UI.Text(new Rect(r.x, r.y + 200, r.width, 100), $"잠김\n\n스테이지 {Stages.Label(b.unlockAfterStage)}\n클리어 시 열림", 22, new Color(1f, 1f, 1f, 0.8f), TextAnchor.MiddleCenter, true);
+                UI.Round(r, new Color(0f, 0f, 0f, 0.72f));
+                UI.Text(new Rect(r.x, r.y + 210, r.width, 40), "잠김", 28, UI.TextMain, TextAnchor.MiddleCenter, true);
+                UI.Text(new Rect(r.x, r.y + 255, r.width, 50), $"{Stages.Label(b.unlockAfterStage)} 클리어 시 열림", 17, UI.TextSub);
                 continue;
             }
 
-            if (UI.Button(new Rect(r.x + 15, r.y + 350, r.width - 30, 70), $"1회 뽑기\n{b.cost:N0} 골드", b.color, 19, SaveData.Gold >= b.cost))
+            if (UI.Button(new Rect(r.x + 16, r.y + 378, r.width - 32, 64), $"1회  ·  {b.cost:N0} 골드", b.color, 18, SaveData.Gold >= b.cost))
                 Summon(b, 1, b.cost);
-            if (UI.Button(new Rect(r.x + 15, r.y + 435, r.width - 30, 70), $"10회 뽑기\n{b.TenCost:N0} 골드", UI.Darken(b.color, 0.8f), 19, SaveData.Gold >= b.TenCost))
+            if (UI.Button(new Rect(r.x + 16, r.y + 452, r.width - 32, 64), $"10회  ·  {b.TenCost:N0} 골드", UI.Darken(b.color, 0.8f), 18, SaveData.Gold >= b.TenCost))
                 Summon(b, 10, b.TenCost);
         }
 
-        if (UI.Button(new Rect(40, 640, 160, 56), "◀ 돌아가기", new Color(0.3f, 0.3f, 0.4f), 20))
+        if (UI.Button(new Rect(32, 636, 170, 50), "◀ 돌아가기", UI.Neutral, 18))
             page = Page.Camp;
+        UI.Text(new Rect(220, 636, w - 260, 50), "이름이 있는 동료는 한 번만 나와요 · 용사 카드는 각성으로 바뀌어요", 15, UI.TextSub, TextAnchor.MiddleLeft);
     }
 
     void Summon(GachaBanner banner, int count, int cost)
@@ -570,7 +583,7 @@ public class GameManager : MonoBehaviour
     {
         float w = UI.Width;
         UI.Gradient(UI.Full, new Color(0.10f, 0.12f, 0.22f), new Color(0.05f, 0.05f, 0.10f));
-        DrawTopBar(w, $"동료 도감  ({CountUnique()}/{CompanionDef.All.Length} 종류 · 총 {SaveData.Roster.Count}명)");
+        UI.TopBar($"도감   {CountUnique()} / {CompanionDef.All.Length} 종류  ·  총 {SaveData.Roster.Count}명");
 
         // 높은 등급이 먼저 오도록 정렬
         var defs = new List<CompanionDef>(CompanionDef.All);
@@ -594,23 +607,21 @@ public class GameManager : MonoBehaviour
                 GachaScreen.DrawCardFace(r, def, cardTag);
                 if (owned > 1)
                 {
-                    var tag = new Rect(r.xMax - 44, r.yMax - 30, 40, 26);
-                    UI.Fill(tag, new Color(0f, 0f, 0f, 0.7f));
-                    UI.Text(tag, "x" + owned, 16, Color.white, TextAnchor.MiddleCenter, true, false);
+                    UI.Chip(new Rect(r.xMax - 46, r.yMax - 32, 40, 24), "x" + owned, new Color(0f, 0f, 0f, 0.75f), 14);
                 }
             }
             else
             {
                 // 아직 못 뽑은 동료는 ??? 로 표시
-                UI.Fill(r, new Color(0.15f, 0.15f, 0.2f));
-                UI.Frame(r, UI.Darken(RarityInfo.GetColor(def.rarity), 0.6f), 3f);
-                UI.Text(r, "?", 54, new Color(1f, 1f, 1f, 0.2f), TextAnchor.MiddleCenter, true, false);
+                UI.Round(r, new Color(0.13f, 0.14f, 0.19f));
+                UI.RoundFrame(r, UI.Darken(RarityInfo.GetColor(def.rarity), 0.6f));
+                UI.Text(r, "?", 54, new Color(1f, 1f, 1f, 0.2f), TextAnchor.MiddleCenter, true);
                 UI.Text(new Rect(r.x, r.yMax - 36, r.width, 30), RarityInfo.Name(def.rarity), 15, UI.Darken(RarityInfo.GetColor(def.rarity), 0.8f));
             }
         }
         GUI.EndScrollView();
 
-        if (UI.Button(new Rect(40, 640, 160, 56), "◀ 돌아가기", new Color(0.3f, 0.3f, 0.4f), 20))
+        if (UI.Button(new Rect(32, 636, 170, 50), "◀ 돌아가기", UI.Neutral, 18))
             page = Page.Camp;
     }
 
@@ -683,7 +694,7 @@ public class GameManager : MonoBehaviour
 
         bool beatDemonKing = resultVictory && resultFirstClear && resultStage >= Stages.Count;
         float bx = w / 2f;
-        if (UI.Button(new Rect(bx - 290, 560, 270, 76), "캠프로", new Color(0.3f, 0.45f, 0.7f), 26))
+        if (UI.Button(new Rect(bx - 290, 560, 270, 72), "캠프로", UI.Blue, 24))
         {
             selectedStage = Mathf.Min(SaveData.ClearedStage + 1, Stages.Count);
             if (beatDemonKing) PlayStory(EndingStory, true, () => page = Page.Camp);
@@ -692,7 +703,7 @@ public class GameManager : MonoBehaviour
 
         bool hasNext = resultVictory && resultStage < Stages.Count;
         string again = hasNext ? "다음 스테이지 ▶" : "다시 도전";
-        if (!beatDemonKing && UI.Button(new Rect(bx + 20, 560, 270, 76), again, new Color(0.8f, 0.35f, 0.2f), 26))
+        if (!beatDemonKing && UI.Button(new Rect(bx + 20, 560, 270, 72), again, UI.Primary, 24))
             StartBattle(hasNext ? resultStage + 1 : resultStage);
     }
 }
