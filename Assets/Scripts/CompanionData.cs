@@ -64,8 +64,8 @@ public class CompanionDef
     //   순서: id, 이름, 등급, 종족, 소속, 직업, 성향, 한 줄 설명
     public static readonly CompanionDef[] All =
     {
-        // 용사 본인도 뽑기에서 나옵니다. 용사가 나오면 '각성'해서 강해져요.
-        new CompanionDef(HeroId, "용사", Rarity.Unique, "인간", "용사 파티", HeroClass.Brave, Alignment.중립, "가챠의 힘을 가진 용사. 뽑으면 각성!"),
+        // 용사 본인도 뽑기에서 나옵니다. 용사 카드가 나오면 용사의 성급이 올라가요.
+        new CompanionDef(HeroId, "용사", Rarity.Unique, "인간", "용사 파티", HeroClass.Brave, Alignment.중립, "가챠의 힘을 가진 용사. 뽑으면 성급 상승!"),
 
         new CompanionDef("n_balo",       "발로",          Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Soldier, Alignment.선,   "정의감 하나는 누구에게도 지지 않는 신참 병사"),
         new CompanionDef("n_deboram",    "드보람",        Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Soldier, Alignment.실리, "받은 만큼만 일하는 현실적인 병사"),

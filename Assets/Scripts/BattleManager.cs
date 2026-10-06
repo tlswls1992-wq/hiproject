@@ -8,8 +8,8 @@ public class BattleManager : MonoBehaviour
     public static BattleManager Instance { get; private set; }
 
     // ---- 밸런스 숫자 (자유롭게 바꿔 보세요) ----
-    const float SpawnInterval = 0.6f;
-    const float WaveBreak = 2f;
+    const float PartySpeedScale = 0.9f;  // 용사 파티 이동 속도 (1 = 직업 기본 속도). 0.9 = 10% 느리게
+    const float EnemyStartGap = 6f;      // 웨이브가 시작될 때 파티 맨 앞과 적 진형 사이의 거리
 
     // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
     public const float LaneTop = 2.5f;       // 유닛이 다닐 수 있는 가장 위쪽
@@ -28,7 +28,8 @@ public class BattleManager : MonoBehaviour
     public int Wave { get; private set; }
     public int GoldEarned { get; private set; }
     public readonly List<int> DeployedUids = new List<int>(); // 이번 전투에 나간 동료 (경험치 지급용)
-    public bool IsPaused => World == null || finished || upgradeChoices != null;
+    public bool IsPaused => World == null || finished || upgradeChoices != null || userPaused;
+    bool userPaused; // 스페이스 바로 일시정지
     public bool HasEnemies => enemies.Count > 0;
 
     // 전투 보너스로 올라가는 보너스 (이번 판에서만 유지)
@@ -42,10 +43,7 @@ public class BattleManager : MonoBehaviour
     Unit boss;
     string bossName;
     int partySize;
-    readonly List<EnemyKind> spawnQueue = new List<EnemyKind>();
     bool waveInProgress;
-    float spawnTimer;
-    float waveBreakTimer;
     int speed = 1; // 전투 배속 1~4
     bool finished;
     bool victory;
@@ -97,7 +95,6 @@ public class BattleManager : MonoBehaviour
         finished = false;
         upgradeChoices = null;
         waveInProgress = false;
-        waveBreakTimer = 2f;
         boss = null;
         damageBonus = attackSpeedBonus = rangeBonus = hpBonus = 1f;
 
@@ -117,6 +114,7 @@ public class BattleManager : MonoBehaviour
         }
         partySize = heroes.Count;
 
+        userPaused = false;
         speed = SaveData.BattleSpeed;
         Time.timeScale = speed;
     }
@@ -127,7 +125,6 @@ public class BattleManager : MonoBehaviour
         World = null;
         heroes.Clear();
         enemies.Clear();
-        spawnQueue.Clear();
         leader = null;
         speed = 1;
         Time.timeScale = 1f;
@@ -191,6 +188,7 @@ public class BattleManager : MonoBehaviour
     void Update()
     {
         if (World == null) return;
+        HandleKeys();
 
         if (finished)
         {
@@ -202,68 +200,91 @@ public class BattleManager : MonoBehaviour
         UpdateWaves();
     }
 
+    // 키보드: 숫자 1~4 = 배속, 스페이스 = 일시정지/계속
+    void HandleKeys()
+    {
+        if (finished) return;
+        int key = GameInput.SpeedKeyPressed();
+        if (key > 0) SetSpeed(key);
+        if (GameInput.PausePressed() && upgradeChoices == null)
+        {
+            userPaused = !userPaused;
+            Time.timeScale = userPaused ? 0f : speed;
+        }
+    }
+
+    void SetSpeed(int value)
+    {
+        speed = Mathf.Clamp(value, 1, 4);
+        if (!userPaused) Time.timeScale = speed;
+    }
+
     // ================= 웨이브 =================
 
     void UpdateWaves()
     {
-        if (waveInProgress)
+        // 웨이브는 기다리지 않고 바로 시작 (전투 보너스를 고르면 곧바로 다음 웨이브)
+        if (!waveInProgress)
         {
-            if (spawnQueue.Count > 0)
-            {
-                spawnTimer -= Time.deltaTime;
-                if (spawnTimer <= 0f)
-                {
-                    SpawnEnemy(spawnQueue[0]);
-                    spawnQueue.RemoveAt(0);
-                    spawnTimer = SpawnInterval;
-                }
-            }
-            else if (enemies.Count == 0)
-            {
-                waveInProgress = false;
-                if (Wave >= Stages.WavesPerLevel) Finish(true);
-                else
-                {
-                    waveBreakTimer = WaveBreak;
-                    OfferUpgrades();
-                }
-            }
+            StartNextWave();
+            return;
         }
-        else
-        {
-            waveBreakTimer -= Time.deltaTime;
-            if (waveBreakTimer <= 0f) StartNextWave();
-        }
+        if (enemies.Count > 0) return;
+
+        waveInProgress = false;
+        if (Wave >= Stages.WavesPerLevel) Finish(true);
+        else OfferUpgrades();
     }
 
+    // 웨이브의 적들을 처음부터 오른쪽에 진을 친 채로 한꺼번에 배치합니다.
+    // 적은 용사 파티가 가까이 오면(접근 거리 안) 그때부터 싸워요.
     void StartNextWave()
     {
         Wave++;
         waveInProgress = true;
-        spawnTimer = 0f;
-        spawnQueue.Clear();
 
+        var kinds = new List<EnemyKind>();
         int count = 4 + Mathf.Min(Level / 5, 12) + Wave * 2;
         for (int i = 0; i < count; i++)
         {
             float r = Random.value;
-            if (Level >= 5 && r < 0.25f) spawnQueue.Add(EnemyKind.Archer);
-            else if (Level >= 8 && r < 0.37f) spawnQueue.Add(EnemyKind.Brute);
-            else spawnQueue.Add(EnemyKind.Grunt);
+            if (Level >= 5 && r < 0.25f) kinds.Add(EnemyKind.Archer);
+            else if (Level >= 8 && r < 0.37f) kinds.Add(EnemyKind.Brute);
+            else kinds.Add(EnemyKind.Grunt);
         }
+        // 앞줄은 근접, 뒷줄은 궁수
+        kinds.Sort((x, y) => (x == EnemyKind.Archer ? 1 : 0).CompareTo(y == EnemyKind.Archer ? 1 : 0));
+
+        // 배치할 공간: 파티보다 충분히 오른쪽 ~ 화면 오른쪽 끝
+        float rightmostHero = -99f;
+        foreach (var h in heroes) if (h != null) rightmostHero = Mathf.Max(rightmostHero, h.transform.position.x);
+        float maxX = HalfScreenWidth - 0.8f;
+        float minX = Mathf.Max(1.5f, rightmostHero + EnemyStartGap);
+        if (maxX - minX < 3f) minX = maxX - 3f;
+
+        const int rows = 5;
+        int columns = Mathf.CeilToInt(kinds.Count / (float)rows);
+        float colGap = columns > 1 ? Mathf.Min(1.4f, (maxX - minX) / (columns - 1)) : 0f;
+        for (int i = 0; i < kinds.Count; i++)
+        {
+            int col = i / rows, row = i % rows;
+            float x = minX + col * colGap + Random.Range(-0.25f, 0.25f);
+            float y = LaneTop - (row + 0.5f) * (LaneTop - LaneBottom) / rows + Random.Range(-0.35f, 0.35f);
+            SpawnEnemy(kinds[i], new Vector2(Mathf.Min(x, maxX), y));
+        }
+
+        // 마지막 웨이브: 5라운드는 중간 보스, 10라운드는 스테이지 보스가 진형 맨 뒤 가운데에
         if (Wave == Stages.WavesPerLevel)
         {
-            if (Stages.HasBoss(Level)) spawnQueue.Add(EnemyKind.Boss);           // 10라운드: 스테이지 보스
-            else if (Stages.HasMidBoss(Level)) spawnQueue.Add(EnemyKind.MidBoss); // 5라운드: 중간 보스
+            var bossPos = new Vector2(maxX - 0.4f, (LaneTop + LaneBottom) / 2f);
+            if (Stages.HasBoss(Level)) SpawnEnemy(EnemyKind.Boss, bossPos);
+            else if (Stages.HasMidBoss(Level)) SpawnEnemy(EnemyKind.MidBoss, bossPos);
         }
     }
 
-    void SpawnEnemy(EnemyKind kind)
+    void SpawnEnemy(EnemyKind kind, Vector2 pos)
     {
-        // 화면 오른쪽 바깥에서 등장
         bool isBoss = kind == EnemyKind.Boss || kind == EnemyKind.MidBoss;
-        float y = isBoss ? (LaneTop + LaneBottom) / 2f : Random.Range(LaneBottom, LaneTop);
-        var pos = new Vector2(HalfScreenWidth + 1f, y);
 
         float hpMul = 1f + 0.12f * (Level - 1) + 0.1f * (Wave - 1);
         float dmgMul = 1f + 0.05f * (Level - 1);
@@ -332,13 +353,13 @@ public class BattleManager : MonoBehaviour
     {
         var def = member.Def;
         var c = def.job;
-        float m = SaveData.StatMultiplier(member); // 등급 × 레벨 × 성급 × 각성/호감도
+        float m = SaveData.StatMultiplier(member); // 등급 × 레벨 × 성급 × 호감도
 
         var u = CreateUnit(def.name, Team.Hero, pos);
         u.heroClass = c;
         u.isLeader = def.IsHero;
         u.homePosition = pos;
-        u.moveSpeed = c.speed;
+        u.moveSpeed = c.speed * PartySpeedScale;
         u.maxHp = c.hp * m * hpBonus;
         u.damage = c.damage * m;
         u.attackRange = c.range;
@@ -568,10 +589,7 @@ public class BattleManager : MonoBehaviour
         UI.Text(new Rect(w - 470, 0, 140, 56), $"+{GoldEarned} 골드", 18, UI.Gold, TextAnchor.MiddleRight, true);
         // 배속: 누를 때마다 x1 → x2 → x3 → x4 → x1
         if (UI.Button(new Rect(w - 316, 10, 296, 36), $"전투 속도  x{speed}   (눌러서 변경)", UI.Blue, 16, !finished))
-        {
-            speed = speed % 4 + 1;
-            Time.timeScale = speed;
-        }
+            SetSpeed(speed % 4 + 1);
 
         // 왼쪽: 파티 상태
         var party = new Rect(16, 66, 300, 78);
@@ -617,12 +635,17 @@ public class BattleManager : MonoBehaviour
             UI.Bar(new Rect(w / 2 - bw / 2, 92, bw, 18), boss.hp / boss.maxHp, new Color(0.85f, 0.18f, 0.22f));
         }
 
-        // 다음 웨이브 안내
-        if (!waveInProgress && !IsPaused)
+        // 키 안내 (화면 아래)
+        UI.Text(new Rect(16, UI.Height - 30, 600, 24), "1~4: 배속   ·   Space: 일시정지", 14, UI.WithAlpha(UI.TextMain, 0.7f), TextAnchor.MiddleLeft);
+
+        // 일시정지
+        if (userPaused && !finished)
         {
-            var r = new Rect(w / 2 - 200, 290, 400, 54);
-            UI.Round(r, new Color(0f, 0f, 0f, 0.55f));
-            UI.Text(r, $"웨이브 {Wave + 1} 시작까지 {waveBreakTimer:0.0}초", 22, UI.TextMain, TextAnchor.MiddleCenter, true);
+            UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.45f));
+            var r = new Rect(w / 2 - 220, 270, 440, 110);
+            UI.Panel(r);
+            UI.Text(new Rect(r.x, r.y + 14, r.width, 50), "일시정지", 34, UI.Gold, TextAnchor.MiddleCenter, true);
+            UI.Text(new Rect(r.x, r.y + 64, r.width, 30), "Space를 누르면 계속해요", 17, UI.TextSub);
         }
 
         if (upgradeChoices != null) DrawUpgradeChoices(w);

@@ -5,9 +5,10 @@
   portrait.*  초상화 (도감, 대화)
   full.*      전신 (뽑기 카드)
   preview.*   대기 모습 (야영지, 전투 대기) - 움직이는 이미지면 여러 장면
+  run.*       달리는 모습 (전투 중 이동) - 한 장이면 코드로 위아래 흔들림을 줌
   attack.*    공격 모습 (전투) - 움직이는 이미지
 출력 (Assets/Resources/Characters/<캐릭터 id>/):
-  portrait.png, full.png, idle/idle_00.png..., attack/attack_00.png..., anim.txt (장면별 시간)
+  portrait.png, full.png, idle/idle_00.png..., run/run_00.png..., attack/attack_00.png..., anim.txt (장면별 시간)
 
 - Unity는 webp를 읽지 못하고 gif는 첫 장면만 읽기 때문에 png로 바꿉니다.
 - 단색 배경은 가장자리에서부터 지워서 투명하게 만듭니다.
@@ -88,6 +89,21 @@ def fit(img: Image.Image, max_size: int) -> Image.Image:
     return img
 
 
+FEET_LINE = 0.94  # 모든 동작(대기/달리기/공격)의 발 높이를 그림 아래 6% 지점으로 맞춤 (게임의 CharacterArt.FeetPivot과 같게)
+
+
+def align_feet(frames):
+    """동작마다 발 위치가 다르면 바꿀 때 캐릭터가 들썩이므로, 장면들의 발 높이를 같은 선에 맞춥니다."""
+    bottom = max(f.getbbox()[3] for f in frames if f.getbbox())
+    shift = round(frames[0].height * FEET_LINE) - bottom
+    out = []
+    for f in frames:
+        moved = Image.new("RGBA", f.size, (0, 0, 0, 0))
+        moved.paste(f, (0, shift), f)
+        out.append(moved)
+    return out
+
+
 def convert(char_id: str):
     src = ROOT / "Art" / "originals" / char_id
     out = ROOT / "Assets" / "Resources" / "Characters" / char_id
@@ -100,7 +116,7 @@ def convert(char_id: str):
             fit(remove_background(Image.open(p)), size).save(out / f"{name}.png", optimize=True)
             print("saved", name)
 
-    for name, folder in (("preview", "idle"), ("attack", "attack")):
+    for name, folder in (("preview", "idle"), ("run", "run"), ("attack", "attack")):
         p = find(src, name)
         if not p:
             continue
@@ -108,8 +124,9 @@ def convert(char_id: str):
         for old in (out / folder).glob("*.png"):
             old.unlink()
         frames, durations = frames_of(p)
+        frames = align_feet([fit(remove_background(f), 512) for f in frames])
         for i, f in enumerate(frames):
-            fit(remove_background(f), 512).save(out / folder / f"{folder}_{i:02d}.png", optimize=True)
+            f.save(out / folder / f"{folder}_{i:02d}.png", optimize=True)
         anim_lines.append(f"{folder}=" + ",".join(str(d) for d in durations))
         print("saved", folder, len(frames), "frames")
 

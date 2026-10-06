@@ -80,6 +80,7 @@ public class Unit : MonoBehaviour
             baseColor = color = Color.white;
             body.color = Color.white;
             lastX = transform.position.x;
+            lastY = transform.position.y;
             barY = -size * 0.5f + CharacterArt.BattleCanvasHeight * (1f - CharacterArt.FeetPivot) * 0.92f;
         }
         else
@@ -186,11 +187,21 @@ public class Unit : MonoBehaviour
 
     Vector2 ToHome(Vector2 pos) => Vector2.Distance(pos, homePosition) > 0.1f ? DirectionTo(pos, homePosition) : Vector2.zero;
 
-    // 적: 가장 가까운 파티원에게 다가가서 공격합니다.
+    // 적: 처음에는 제자리에 진을 치고 있다가, 파티원이 접근 거리 안에 들어오면 싸우기 시작합니다.
+    //     (한 번 싸우기 시작하거나 공격을 받으면 끝까지 쫓아가요)
+    public const float EnemyAggroRange = 4.5f;
+    bool engaged;
+
     Vector2 EnemyThink(Vector2 pos, BattleManager battle)
     {
         Unit target = battle.FindNearestOpponent(this);
         if (target == null) return Vector2.zero;
+        if (!engaged)
+        {
+            float aggro = Mathf.Max(EnemyAggroRange, attackRange + 1.5f) + size * 0.5f;
+            if (Vector2.Distance(pos, target.transform.position) > aggro) return Vector2.zero; // 아직 대기
+            engaged = true;
+        }
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
         return DirectionTo(pos, target.transform.position);
     }
@@ -203,22 +214,68 @@ public class Unit : MonoBehaviour
 
     static Vector2 DirectionTo(Vector2 from, Vector2 to) => (to - from).normalized;
 
-    // 그림이 있는 캐릭터: 공격 중이면 공격 그림, 아니면 대기 그림. 움직이는 방향을 바라봄
+    // 그림이 있는 캐릭터의 동작: 공격 > 달리기 > 대기 순서로 정해서 자연스럽게 바꿈. 움직이는 방향을 바라봄
     void Animate(float dt)
     {
         animClock += dt;
         Vector2 now = transform.position;
-        if (now.x - lastX > 0.002f) facingRight = true;
-        else if (now.x - lastX < -0.002f) facingRight = false;
+        float vx = dt > 0f ? (now.x - lastX) / dt : 0f;
+        float moved = dt > 0f ? Mathf.Abs(vx) + Mathf.Abs(now.y - lastY) / dt : 0f;
+        // 살짝 밀리는 정도로는 방향을 바꾸지 않음
+        if (vx > 0.5f) facingRight = true;
+        else if (vx < -0.5f) facingRight = false;
         lastX = now.x;
+        lastY = now.y;
+
+        // 잠깐 멈췄다 움직이는 걸 반복해도 깜빡이지 않게, 멈춘 뒤 0.12초 동안은 달리기 유지
+        runHold = moved > moveSpeed * 0.3f ? 0.12f : runHold - dt;
+        bool running = runHold > 0f;
+        if (running) runClock += dt;
 
         // 공격 그림이 공격 간격보다 길면 빨리 재생해서 다음 공격 전에 끝나게 함
         float cd = Mathf.Max(0.2f, attackCooldown * 0.9f);
         float speed = Mathf.Max(1f, art.AttackLength / cd);
         var atk = art.AttackSprite(Time.time - attackAnimStart, speed);
-        body.sprite = atk != null ? atk : art.IdleSprite(animClock);
+
+        var bodyT = body.transform;
+        Vector3 basePos = new Vector3(0f, -size * 0.5f, 0f);
+        Vector3 scale = Vector3.one;
+        Quaternion rot = Quaternion.identity;
+        if (atk != null)
+        {
+            body.sprite = atk;
+        }
+        else if (running && art.HasRun)
+        {
+            body.sprite = art.RunSprite(runClock);
+            if (art.RunIsStill)
+            {
+                // 달리기 그림이 한 장이면: 발걸음에 맞춰 통통 튀고 살짝 앞으로 기울임
+                float step = Mathf.Abs(Mathf.Sin(runClock * 13f));
+                basePos.y += step * 0.12f;
+                scale = new Vector3(1f + (1f - step) * 0.03f, 1f - (1f - step) * 0.03f, 1f);
+                rot = Quaternion.Euler(0f, 0f, facingRight ? -3f : 3f);
+            }
+        }
+        else
+        {
+            body.sprite = art.IdleSprite(animClock);
+            if (art.IdleIsStill)
+            {
+                // 대기 그림이 한 장이면: 숨 쉬듯 아주 살짝 커졌다 작아짐 (발 위치는 그대로)
+                float breath = Mathf.Sin(animClock * 2.4f);
+                scale = new Vector3(1f - breath * 0.006f, 1f + breath * 0.014f, 1f);
+            }
+        }
+        bodyT.localPosition = basePos;
+        bodyT.localScale = scale;
+        bodyT.localRotation = rot;
         body.flipX = !facingRight;
     }
+
+    float lastY;
+    float runHold;
+    float runClock;
 
     float lastX;
 
@@ -248,6 +305,7 @@ public class Unit : MonoBehaviour
         if (!IsAlive) return;
         var battle = BattleManager.Instance;
         hp -= amount * (battle != null ? battle.DamageTakenMultiplier(this) : 1f);
+        engaged = true; // 맞으면 바로 싸우기 시작
         flashTimer = 0.08f;
         if (hp <= 0f)
         {

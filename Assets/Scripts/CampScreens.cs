@@ -77,7 +77,7 @@ public static class Portrait
 // ---------------- 동료 화면: 성급 강화 · 판매 ----------------
 public class MemberScreen
 {
-    enum Confirm { None, Merge, Sell }
+    enum Confirm { None, Merge, Sell, BulkMerge }
 
     SaveData.Member selected;
     SaveData.Member material;
@@ -138,7 +138,7 @@ public class MemberScreen
         var card = new Rect(rx, 90, 220, 320);
         float f = 1f - (Now - flashStart) / 0.7f;
         if (f > 0f) UI.Glow(card.center, 280f, UI.WithAlpha(UI.Gold, 0.7f * f));
-        GachaScreen.DrawCardFace(card, def, def.IsHero && SaveData.HeroAwaken > 0 ? "각성 +" + SaveData.HeroAwaken : null, true, selected.star, selected.level);
+        GachaScreen.DrawCardFace(card, def, null, true, selected.star, selected.level, true); // 동료 화면은 초상화
 
         var info = new Rect(card.xMax + 20, 84, rx + rw - card.xMax - 20, 330);
         UI.Panel(info);
@@ -157,7 +157,7 @@ public class MemberScreen
             $"체력 {def.job.hp * mul:0}    {powerName} {def.job.damage * mul:0}    사거리 {def.job.range:0.#}", 18, UI.TextMain, TextAnchor.MiddleLeft, true);
         UI.Text(new Rect(info.x + 20, info.y + 162, info.width - 40, 22),
             $"성급 +{SaveData.StarBonus * 100 * (selected.star - 1):0}%  ·  레벨 +{SaveData.LevelBonus * 100 * (selected.level - 1):0}%" +
-            (def.IsHero ? $"  ·  각성 +{SaveData.AwakenBonus * 100 * SaveData.HeroAwaken:0}%" : $"  ·  호감도 +{SaveData.AffinityBonus * 100 * SaveData.AffinityOf(def):0}%"),
+            (def.IsHero ? "" : $"  ·  호감도 +{SaveData.AffinityBonus * 100 * SaveData.AffinityOf(def):0}%"),
             14, UI.TextSub, TextAnchor.MiddleLeft);
 
         // 판매
@@ -172,7 +172,7 @@ public class MemberScreen
         if (def.IsHero)
         {
             UI.Text(new Rect(mergeBox.x + 20, mergeBox.y + 50, mergeBox.width - 40, 60),
-                $"용사는 뽑기에서 용사 카드가 나오면 각성해요. (현재 각성 +{SaveData.HeroAwaken} / {SaveData.MaxAwaken})", 16, UI.TextSub, TextAnchor.UpperLeft);
+                selected.star >= SaveData.MaxStar ? $"최대 성급 ({SaveData.MaxStar}성)이에요!" : "용사는 뽑기에서 용사 카드가 나오면 성급이 올라가요.", 16, UI.TextSub, TextAnchor.UpperLeft);
         }
         else if (selected.star >= SaveData.MaxStar)
         {
@@ -206,6 +206,12 @@ public class MemberScreen
         if (UI.Button(new Rect(24, 640, 170, 50), "◀ 돌아가기", UI.Neutral, 18, active))
             onExit();
 
+        // 오른쪽 아래: 일괄 합성
+        int bulk = SaveData.BulkMergeCount();
+        if (UI.Button(new Rect(w - 244, 640, 220, 50), bulk > 0 ? $"일괄 합성 ({bulk})" : "일괄 합성", UI.Plum, 18, active && bulk > 0))
+            confirm = Confirm.BulkMerge;
+        UI.Text(new Rect(w - 700, 640, 440, 50), "성급·레벨이 가장 높은 동료를 기준으로 자동 합성 (출진 중인 동료는 재료 제외)", 13, UI.TextSub, TextAnchor.MiddleRight);
+
         // ---- 확인 창 ----
         if (confirm == Confirm.Merge && material != null)
         {
@@ -215,6 +221,16 @@ public class MemberScreen
                 flashStart = Now;
                 toast($"{def.name} {selected.star}성 달성!");
                 material = null;
+            }
+        }
+        else if (confirm == Confirm.BulkMerge)
+        {
+            int result = ConfirmBox($"일괄 합성을 할까요?\n\n캐릭터마다 성급·레벨이 가장 높은 동료를 기준으로\n총 {bulk}번 합성하고, 재료로 쓴 동료 {bulk}명은 사라져요.", "일괄 합성");
+            if (result == 1)
+            {
+                int done = SaveData.BulkMerge();
+                flashStart = Now;
+                toast($"일괄 합성 완료! ({done}번 합성)");
             }
         }
         else if (confirm == Confirm.Sell)
@@ -302,7 +318,7 @@ public class DexScreen
             int count = SaveData.CountOwned(def);
             if (count > 0)
             {
-                GachaScreen.DrawCardFace(r, def, def.IsHero && SaveData.HeroAwaken > 0 ? "각성 +" + SaveData.HeroAwaken : null, true, 1, 0, true);
+                GachaScreen.DrawCardFace(r, def, null, true, 1, 0, true);
                 if (count > 1) UI.Chip(new Rect(r.xMax - 46, r.yMax - 32, 40, 24), "x" + count, new Color(0f, 0f, 0f, 0.75f), 14);
             }
             else

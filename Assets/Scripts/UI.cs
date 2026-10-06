@@ -226,7 +226,7 @@ public static class UI
         RoundFrame(r, WithAlpha(Bronze, 0.8f));
     }
 
-    // 작은 이름표 (NEW, 각성 등)
+    // 작은 이름표 (NEW, 성급 등)
     public static void Chip(Rect r, string text, Color color, int size = 15)
     {
         Round(r, color);

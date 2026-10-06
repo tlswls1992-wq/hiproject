@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
 
-// 진행 상황(골드, 클리어한 판, 동료, 편성, 용사 각성, 호감도, 회차)을 컴퓨터에 저장합니다.
+// 진행 상황(골드, 클리어한 판, 동료, 편성, 호감도, 회차)을 컴퓨터에 저장합니다.
 // 저장 칸: 0번 = 자동 저장('이어하기'), 1~3번 = 직접 저장하는 슬롯('불러오기')
 public static class SaveData
 {
@@ -14,8 +14,6 @@ public static class SaveData
     public const float LevelBonus = 0.02f;   // 레벨 1마다 능력치 +2%
     public const int MaxStar = 5;            // 최대 성급
     public const float StarBonus = 0.30f;    // 성급 1마다 능력치 +30% (성급 강화가 레벨보다 효과가 큼)
-    public const int MaxAwaken = 10;         // 용사 최대 각성 단계
-    public const float AwakenBonus = 0.10f;  // 용사 각성 1단계마다 능력치 +10%
     public const float AffinityBonus = 0.05f; // 호감도 1마다 능력치 +5%
     public const int BaseDeploy = 7;         // 처음 출진 가능 인원 (용사 포함). 스테이지를 클리어할 때마다 +1
     static readonly int[] sellPrices = { 30, 60, 120, 250, 500, 1000 }; // 등급별 판매 가격 (성급만큼 곱함)
@@ -46,7 +44,6 @@ public static class SaveData
 
     public static int Gold;
     public static int ClearedStage;     // 이번 회차에서 클리어한 가장 먼 판 번호 (0~100)
-    public static int HeroAwaken;       // 용사 각성 단계 (뽑기에서 용사 카드가 나올 때마다 +1)
     public static int Cycle = 1;        // 회차
     public static bool RunCleared;      // 이번 회차에서 마왕을 쓰러뜨렸는지 (전승 특전이 열림)
     public static readonly List<Member> Roster = new List<Member>();     // 용사 포함
@@ -75,7 +72,7 @@ public static class SaveData
 
         Gold = PlayerPrefs.GetInt(Key(slot, "Gold"), 0);
         ClearedStage = PlayerPrefs.GetInt(Key(slot, "ClearedStage"), 0);
-        HeroAwaken = PlayerPrefs.GetInt(Key(slot, "HeroAwaken"), 0);
+        int oldAwaken = PlayerPrefs.GetInt(Key(slot, "HeroAwaken"), 0); // 예전 '각성'은 성급으로 바꿔 줌
         Cycle = Mathf.Max(1, PlayerPrefs.GetInt(Key(slot, "Cycle"), 1));
         RunCleared = PlayerPrefs.GetInt(Key(slot, "RunCleared"), 0) == 1;
         ReadCounts(PlayerPrefs.GetString(Key(slot, "Affinity"), ""), Affinity);
@@ -88,6 +85,7 @@ public static class SaveData
         else LoadOldFormat(slot);
 
         EnsureHeroMember();
+        if (oldAwaken > 0) HeroMember.star = Mathf.Min(MaxStar, HeroMember.star + oldAwaken);
         EnsureHeroPlaced();
         // 예전 저장처럼 출진 가능 인원보다 많이 배치되어 있으면 넘치는 동료를 뺍니다 (용사는 남김)
         int heroUid = HeroMember.uid;
@@ -157,7 +155,7 @@ public static class SaveData
         PlayerPrefs.SetInt(Key(slot, "Started"), 1);
         PlayerPrefs.SetInt(Key(slot, "Gold"), Gold);
         PlayerPrefs.SetInt(Key(slot, "ClearedStage"), ClearedStage);
-        PlayerPrefs.SetInt(Key(slot, "HeroAwaken"), HeroAwaken);
+        PlayerPrefs.SetInt(Key(slot, "HeroAwaken"), 0); // 예전 '각성'은 이미 성급으로 바뀜
         PlayerPrefs.SetInt(Key(slot, "Cycle"), Cycle);
         PlayerPrefs.SetInt(Key(slot, "RunCleared"), RunCleared ? 1 : 0);
 
@@ -216,7 +214,6 @@ public static class SaveData
     {
         Gold = 0;
         ClearedStage = 0;
-        HeroAwaken = 0;
         Cycle = 1;
         RunCleared = false;
         Roster.Clear();
@@ -290,17 +287,19 @@ public static class SaveData
     // 용사를 뺀 동료 수
     public static int CompanionCount => Roster.Count - 1;
 
-    // 뽑기 결과를 반영합니다. 카드에 붙일 표시("NEW", "각성 +3" 등)를 돌려줍니다.
+    // 뽑기 결과를 반영합니다. 카드에 붙일 표시("NEW", "★3" 등)를 돌려줍니다.
     public static string AddPulled(CompanionDef def)
     {
         if (def.IsHero)
         {
-            if (HeroAwaken < MaxAwaken)
+            // 용사 카드가 나오면 용사의 성급이 1 올라가요
+            var hero = HeroMember;
+            if (hero.star < MaxStar)
             {
-                HeroAwaken++;
-                return "각성 +" + HeroAwaken;
+                hero.star++;
+                return "성급 ★" + hero.star;
             }
-            Gold += 300; // 최대 각성이면 골드로 돌려받음
+            Gold += 300; // 최대 성급이면 골드로 돌려받음
             return "골드 +300";
         }
         bool isNew = CountOwned(def) == 0;
@@ -342,15 +341,14 @@ public static class SaveData
         return list;
     }
 
-    // 능력치 배수 = 등급 × 레벨 × 성급 × 각성(용사) × 호감도
+    // 능력치 배수 = 등급 × 레벨 × 성급 × 호감도(용사 제외)
     public static float StatMultiplier(Member m)
     {
         var def = m.Def;
         float mul = RarityInfo.StatMultiplier(def.rarity);
         mul *= 1f + LevelBonus * (m.level - 1);
         mul *= 1f + StarBonus * (m.star - 1);
-        if (def.IsHero) mul *= 1f + AwakenBonus * HeroAwaken;
-        else mul *= 1f + AffinityBonus * AffinityOf(def);
+        if (!def.IsHero) mul *= 1f + AffinityBonus * AffinityOf(def);
         return mul;
     }
 
@@ -387,6 +385,63 @@ public static class SaveData
         main.star++;
         Save();
         return true;
+    }
+
+    // ---------------- 일괄 합성 ----------------
+    // 캐릭터마다 성급 → 레벨이 가장 높은 동료를 기준으로, 나머지(성급·레벨 낮은 것부터)를 재료로 합칩니다.
+    // 기준이 최대 성급이 되면 그다음으로 높은 동료가 새 기준이 돼요. 출진 중인 동료는 재료로 쓰지 않아요.
+
+    // (기준, 재료) 순서대로의 합성 계획 (아직 합성하지는 않음)
+    static List<KeyValuePair<Member, Member>> BulkMergePlan()
+    {
+        var plan = new List<KeyValuePair<Member, Member>>();
+        var groups = new Dictionary<string, List<Member>>();
+        foreach (var m in Roster)
+        {
+            if (m.Def.IsHero) continue;
+            if (!groups.TryGetValue(m.id, out var g)) groups[m.id] = g = new List<Member>();
+            g.Add(m);
+        }
+        foreach (var g in groups.Values)
+        {
+            if (g.Count < 2) continue;
+            // 기준 후보: 성급 높은 순 → 레벨 높은 순
+            g.Sort((x, y) => y.star != x.star ? y.star.CompareTo(x.star) : y.level.CompareTo(x.level));
+            var stars = new Dictionary<Member, int>();
+            foreach (var m in g) stars[m] = m.star;
+            var used = new HashSet<Member>();
+            foreach (var main in g)
+            {
+                if (used.Contains(main)) continue;
+                // 재료: 출진 중이 아닌 동료 중 성급·레벨 낮은 것부터
+                for (int i = g.Count - 1; i >= 0 && stars[main] < MaxStar; i--)
+                {
+                    var mat = g[i];
+                    if (mat == main || used.Contains(mat) || IsPlaced(mat)) continue;
+                    used.Add(mat);
+                    stars[main]++;
+                    plan.Add(new KeyValuePair<Member, Member>(main, mat));
+                }
+                used.Add(main);
+            }
+        }
+        return plan;
+    }
+
+    // 일괄 합성을 하면 몇 번 합성되는지 (확인 문구용)
+    public static int BulkMergeCount() => BulkMergePlan().Count;
+
+    // 일괄 합성 실행. 합성한 횟수를 돌려줍니다.
+    public static int BulkMerge()
+    {
+        var plan = BulkMergePlan();
+        foreach (var step in plan)
+        {
+            RemoveMember(step.Value);
+            step.Key.star++;
+        }
+        if (plan.Count > 0) Save();
+        return plan.Count;
     }
 
     // ---------------- 판매 ----------------

@@ -7,6 +7,7 @@ using UnityEngine;
 //   portrait.png        초상화 (도감, 대화)
 //   full.png            전신 (뽑기 카드, 동료 카드)
 //   idle/idle_00.png... 대기 모습 (야영지, 편성, 전투 중 대기) - 여러 장이면 움직여요
+//   run/run_00.png...   달리는 모습 (전투 중 이동) - 한 장이면 위아래로 흔들어서 달리는 느낌을 냄
 //   attack/attack_00... 공격 모습 (전투)
 //   anim.txt            장면마다 보여 줄 시간(밀리초). 예) attack=450,160,90,80,140,220
 public class CharacterArt
@@ -14,20 +15,25 @@ public class CharacterArt
     public Texture2D portrait;
     public Texture2D full;
     public Texture2D[] idle;
+    public Texture2D[] run;
     public Texture2D[] attack;
     float[] idleTimes;   // 장면마다 보여 줄 시간(초)
+    float[] runTimes;
     float[] attackTimes;
     Sprite[] idleSprites;
+    Sprite[] runSprites;
     Sprite[] attackSprites;
 
     // 전투에서 그림 한 장(정사각형 캔버스)의 높이 (게임 세계 단위). 캐릭터가 커 보이면 줄이세요.
     public const float BattleCanvasHeight = 2.6f;
     // 캔버스 아래에서 발이 있는 높이 비율 (그림의 이 지점이 유닛의 발 위치가 됨)
-    public const float FeetPivot = 0.08f;
+    // (변환 스크립트가 모든 동작의 발을 그림 아래 6% 지점에 맞춰 둠)
+    public const float FeetPivot = 0.065f;
 
     static readonly Dictionary<string, CharacterArt> cache = new Dictionary<string, CharacterArt>();
 
     public bool HasBattleSprites => idle.Length > 0;
+    public bool HasRun => run.Length > 0;
     public float AttackLength => Sum(attackTimes);
 
     // 캐릭터 그림 (없으면 null)
@@ -40,9 +46,10 @@ public class CharacterArt
             portrait = Resources.Load<Texture2D>(path + "portrait"),
             full = Resources.Load<Texture2D>(path + "full"),
             idle = LoadFrames(path + "idle"),
+            run = LoadFrames(path + "run"),
             attack = LoadFrames(path + "attack"),
         };
-        if (art.portrait == null && art.full == null && art.idle.Length == 0 && art.attack.Length == 0) art = null;
+        if (art.portrait == null && art.full == null && art.idle.Length == 0 && art.run.Length == 0 && art.attack.Length == 0) art = null;
         else art.ReadTimes(Resources.Load<TextAsset>(path + "anim"));
         cache[id] = art;
         return art;
@@ -58,6 +65,7 @@ public class CharacterArt
     void ReadTimes(TextAsset anim)
     {
         idleTimes = DefaultTimes(idle.Length, 0.12f);
+        runTimes = DefaultTimes(run.Length, 0.08f);
         attackTimes = DefaultTimes(attack.Length, 0.1f);
         if (anim == null) return;
         foreach (var raw in anim.text.Split('\n'))
@@ -71,6 +79,7 @@ public class CharacterArt
                 times[i] = (int.TryParse(parts[i].Trim(), out int ms) ? Mathf.Max(ms, 20) : 100) / 1000f;
             string key = line.Substring(0, eq).Trim();
             if (key == "idle" && times.Length == idle.Length) idleTimes = times;
+            if (key == "run" && times.Length == run.Length) runTimes = times;
             if (key == "attack" && times.Length == attack.Length) attackTimes = times;
         }
     }
@@ -121,6 +130,17 @@ public class CharacterArt
         return i >= 0 ? idleSprites[i] : null;
     }
 
+    public Sprite RunSprite(float t)
+    {
+        if (run.Length == 0) return null;
+        if (runSprites == null) runSprites = MakeSprites(run);
+        return runSprites[Mathf.Max(0, FrameAt(runTimes, t, true))];
+    }
+
+    // 장면이 한 장뿐인 동작은 코드로 움직임을 줘야 하는지
+    public bool RunIsStill => run.Length <= 1;
+    public bool IdleIsStill => idle.Length <= 1;
+
     // 공격을 시작하고 t초 지났을 때의 장면 (공격이 끝났으면 null). speed가 크면 빨리 재생
     public Sprite AttackSprite(float t, float speed)
     {
@@ -140,6 +160,24 @@ public class CharacterArt
             sprites[i] = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, FeetPivot), ppu);
         }
         return sprites;
+    }
+
+    // 서 있는 캐릭터 그리기 (야영지, 편성 화면용): 발 위치 feet에 맞추고, 한 장짜리 대기 그림이면 숨 쉬듯 움직임.
+    // faceLeft면 좌우를 뒤집어 그려요. (화면 회전/뒤집기 대신 그림 좌표를 뒤집는 방식이라 항상 제대로 보여요)
+    public void DrawStanding(Vector2 feet, float height, float time, bool faceLeft)
+    {
+        var tex = IdleTexture(time);
+        if (tex == null) return;
+        float sx = 1f, sy = 1f;
+        if (IdleIsStill)
+        {
+            float breath = Mathf.Sin(time * 2.4f);
+            sx = 1f - breath * 0.006f;
+            sy = 1f + breath * 0.014f;
+        }
+        float w = height * sx, h = height * sy;
+        var r = new Rect(feet.x - w / 2f, feet.y - h * (1f - FeetPivot), w, h);
+        GUI.DrawTextureWithTexCoords(r, tex, faceLeft ? new Rect(1f, 0f, -1f, 1f) : new Rect(0f, 0f, 1f, 1f));
     }
 
     // 사각형 안에 그림을 그립니다. crop이면 사각형을 꽉 채우도록 잘라서, 아니면 비율을 유지해서 맞춰 그려요.

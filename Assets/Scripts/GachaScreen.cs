@@ -8,7 +8,7 @@ public class GachaScreen
     class Card
     {
         public CompanionDef def;
-        public string tag;            // "NEW", "각성 +2" 같은 표시 (없으면 null)
+        public string tag;            // "NEW", "성급 ★2" 같은 표시 (없으면 null)
         public float flipStart = -1f; // 뒤집기 시작한 시간 (-1이면 아직 안 뒤집음)
     }
 
@@ -169,7 +169,7 @@ public class GachaScreen
                 if (c.def.IsHero) awakened = true;
             }
             string msg = newCount > 0 ? $"새로운 동료 {newCount}명이 합류했어요!" : "동료들이 합류했어요!";
-            if (awakened) msg += "  용사가 각성했어요!";
+            if (awakened) msg += "  용사의 성급이 올랐어요!";
             msg += "  (편성에서 배치하세요)";
             UI.Text(new Rect(0, 555, w, 40), msg, 24, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleCenter, true);
             if (UI.Button(new Rect(w / 2f - 110f, 610f, 220f, 60f), "확인", new Color(0.25f, 0.6f, 0.35f)))
@@ -233,7 +233,7 @@ public class GachaScreen
 
         // 성급 (★) 과 레벨
         UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), new string('★', star),
-            Mathf.RoundToInt(20 * s), UI.Gold, level > 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, true);
+            Mathf.RoundToInt(20 * s), UI.Gold, level > 0 || !string.IsNullOrEmpty(tag) ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, true);
         if (level > 0)
             UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), "Lv." + level,
                 Mathf.RoundToInt(18 * s), UI.TextMain, TextAnchor.MiddleRight, true);
@@ -283,7 +283,7 @@ public class GachaScreen
         if (!string.IsNullOrEmpty(tag))
         {
             float tw = (tag.Length <= 3 ? 64f : 104f) * s;
-            var tagRect = new Rect(r.xMax - tw - 6f * s, r.y + 44f * s, tw, 26f * s); // 성급 줄 아래
+            var tagRect = new Rect(r.xMax - tw - 8f * s, r.y + 12f * s, tw, 26f * s); // 맨 윗줄 오른쪽 (그림을 가리지 않게)
             UI.Chip(tagRect, tag, def.IsHero ? new Color(0.95f, 0.55f, 0.1f) : new Color(0.9f, 0.25f, 0.3f), Mathf.Max(10, Mathf.RoundToInt(15 * s)));
         }
     }

@@ -123,6 +123,7 @@ public class GameManager : MonoBehaviour
     {
         // 화면 비율이 달라도 전장 전체가 보이도록 맞춥니다.
         cam.orthographicSize = Mathf.Max(8f, HalfWorldWidth / cam.aspect);
+        FastForwardDialogue();
     }
 
     void ShowToast(string text)
@@ -132,7 +133,6 @@ public class GameManager : MonoBehaviour
     }
 
     static float Now => Time.unscaledTime;
-    static float UIScale => Screen.height / UI.Height; // 화면 좌표 → 실제 픽셀 배율
 
     // ================= 화면 그리기 =================
 
@@ -426,15 +426,53 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        if (UI.ClickedAnywhere())
+        UI.Text(new Rect(box.x + 40, box.yMax - 30, 400, 22), "클릭: 다음   ·   왼쪽 Ctrl: 빨리 감기", 13, UI.WithAlpha(UI.TextSub, 0.8f), TextAnchor.MiddleLeft);
+        if (UI.ClickedAnywhere()) AdvanceStory();
+    }
+
+    // 다음 대사로 (글자가 다 안 나왔으면 먼저 다 보여 줌)
+    void AdvanceStory()
+    {
+        var line = story[storyIndex];
+        bool talking = Mathf.FloorToInt((Now - storyLineStart) * TextSpeeds[Mathf.Clamp(SaveData.TextSpeed, 0, 2)]) < line.text.Length;
+        if (talking) storyLineStart = -1000f; // 글자를 한 번에 다 보여 줌
+        else if (storyIndex + 1 < story.Length)
         {
-            if (talking) storyLineStart = -1000f; // 글자를 한 번에 다 보여 줌
-            else if (storyIndex + 1 < story.Length)
-            {
-                storyIndex++;
-                storyLineStart = Now;
-            }
-            else onStoryEnd?.Invoke();
+            storyIndex++;
+            storyLineStart = Now;
+        }
+        else onStoryEnd?.Invoke();
+    }
+
+    // 야영지 대화의 다음 대사 (마지막 대사 뒤에는 닫힘)
+    void AdvanceTalk()
+    {
+        if (talkMember == null) return;
+        var lines = CampTalk.LinesOf(talkMember.Def);
+        string line = lines[talkIndex % lines.Length];
+        int shown = Mathf.FloorToInt((Now - talkStart) * TextSpeeds[Mathf.Clamp(SaveData.TextSpeed, 0, 2)]);
+        if (shown < line.Length) talkStart = -1000f;
+        else if (talkIndex + 1 < lines.Length) { talkIndex++; talkStart = Now; }
+        else talkMember = null;
+    }
+
+    // 왼쪽 Ctrl을 누르고 있으면 대사를 빠르게 넘김 (0.12초마다 한 줄)
+    float nextFastForward;
+
+    void FastForwardDialogue()
+    {
+        if (!GameInput.FastForwardHeld() || Now < nextFastForward) return;
+        if (page == Page.Story && story != null)
+        {
+            nextFastForward = Now + 0.12f;
+            storyLineStart = -1000f;
+            AdvanceStory();
+        }
+        else if (page == Page.Camp && talkMember != null)
+        {
+            nextFastForward = Now + 0.12f;
+            talkStart = -1000f;
+            AdvanceTalk();
         }
     }
 
@@ -497,19 +535,11 @@ public class GameManager : MonoBehaviour
             var art = CharacterArt.For(def.id);
             if (art != null && art.idle.Length > 0)
             {
-                // 대기 그림 (발이 자리 위치에 오도록)
+                // 대기 그림 (발이 자리 위치에 오도록, 모닥불 쪽을 바라봄, 캐릭터마다 숨 쉬는 박자가 조금씩 다름)
                 float h = 150f * scale;
-                var idleTex = art.IdleTexture(Now);
-                var pic = new Rect(pos.x - h / 2f, pos.y + radius - h * (1f - CharacterArt.FeetPivot), h, h);
-                bool faceLeft = pos.x > fire.x; // 모닥불 쪽을 바라봄
-                if (faceLeft)
-                {
-                    var saved = GUI.matrix;
-                    GUIUtility.ScaleAroundPivot(new Vector2(-1f, 1f), pos * UIScale);
-                    CharacterArt.DrawTexture(pic, idleTex, false);
-                    GUI.matrix = saved;
-                }
-                else CharacterArt.DrawTexture(pic, idleTex, false);
+                var feet = new Vector2(pos.x, pos.y + radius);
+                art.DrawStanding(feet, h, Now + pos.x * 0.37f, pos.x > fire.x);
+                var pic = new Rect(pos.x - h / 2f, feet.y - h * (1f - CharacterArt.FeetPivot), h, h);
                 hit = new Rect(pos.x - h * 0.3f, pic.y + h * 0.1f, h * 0.6f, h * 0.9f);
                 hover = hit.Contains(e.mousePosition);
             }
@@ -561,7 +591,7 @@ public class GameManager : MonoBehaviour
         UI.Text(new Rect(left.x + 20, left.y + 376, left.width - 40, 40), "스테이지를 클리어할 때마다 출진 인원이 1명 늘어요", 13, UI.TextSub, TextAnchor.UpperLeft);
         UI.Text(new Rect(left.x + 20, left.y + 430, left.width - 40, 24), $"진행도  {SaveData.ClearedStage} / {Stages.Count}", 15, UI.TextSub, TextAnchor.MiddleLeft);
         UI.Bar(new Rect(left.x + 20, left.y + 458, left.width - 40, 14), SaveData.ClearedStage / (float)Stages.Count, UI.Gold);
-        UI.Text(new Rect(left.x + 20, left.y + 484, left.width - 40, 40), $"용사 각성 +{SaveData.HeroAwaken}  ·  동료 {SaveData.CompanionCount}명", 14, UI.TextSub, TextAnchor.MiddleLeft);
+        UI.Text(new Rect(left.x + 20, left.y + 484, left.width - 40, 40), $"용사 {FormationScreen.Stars(SaveData.HeroMember.star)}  ·  동료 {SaveData.CompanionCount}명", 14, UI.TextSub, TextAnchor.MiddleLeft);
 
         // ---- 오른쪽: 메뉴 ----
         float mx = w - 250f, mw = 230f, my = 80f;
@@ -610,13 +640,7 @@ public class GameManager : MonoBehaviour
             UI.Chip(new Rect(textX - 4, box.y - 16, 150, 32), talkMember.Def.name, UI.Darken(UI.Primary, 0.9f), 16);
             UI.Text(new Rect(textX, box.y + 26, box.xMax - textX - 60, box.height - 34), line.Substring(0, shown), 19, UI.TextMain, TextAnchor.UpperLeft);
             if (UI.Button(new Rect(box.xMax - 44, box.y + 8, 34, 30), "X", UI.Neutral, 14)) talkMember = null;
-            else if (UI.ClickedAnywhere())
-            {
-                // 아무 곳이나 누르면 다음 대사, 마지막 대사 뒤에는 닫힘
-                if (shown < line.Length) talkStart = -1000f;
-                else if (talkIndex + 1 < lines.Length) { talkIndex++; talkStart = Now; }
-                else talkMember = null;
-            }
+            else if (UI.ClickedAnywhere()) AdvanceTalk(); // 아무 곳이나 누르면 다음 대사
         }
         else
         {
@@ -690,7 +714,7 @@ public class GameManager : MonoBehaviour
 
         if (UI.Button(new Rect(32, 636, 170, 50), "◀ 돌아가기", UI.Neutral, 18))
             page = Page.Camp;
-        UI.Text(new Rect(220, 636, w - 260, 50), "같은 동료가 또 나오면 동료 화면에서 합쳐 성급을 올릴 수 있어요 · 용사 카드는 각성으로 바뀌어요", 15, UI.TextSub, TextAnchor.MiddleLeft);
+        UI.Text(new Rect(220, 636, w - 260, 50), "같은 동료가 또 나오면 동료 화면에서 합쳐 성급을 올릴 수 있어요 · 용사 카드가 나오면 용사의 성급이 올라가요", 15, UI.TextSub, TextAnchor.MiddleLeft);
     }
 
     void Summon(GachaBanner banner, int count, int cost)

@@ -200,9 +200,7 @@ public class FormationScreen
         {
             // 대기 그림: 발밑에 등급 색 원, 발이 동그라미 아래쪽에 오도록
             UI.Glow(center + new Vector2(0, radius * 0.7f), radius * 1.2f, UI.WithAlpha(rc, 0.7f));
-            float h = radius * 3.6f;
-            CharacterArt.DrawTexture(new Rect(center.x - h / 2f, center.y + radius - h * (1f - CharacterArt.FeetPivot), h, h),
-                art.IdleTexture(Time.unscaledTime), false);
+            art.DrawStanding(new Vector2(center.x, center.y + radius), radius * 3.6f, Time.unscaledTime + center.x * 0.37f, false);
         }
         else
         {
