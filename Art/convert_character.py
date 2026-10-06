@@ -6,6 +6,7 @@
   full.*      전신 (뽑기 카드)
   preview.*   대기 모습 (야영지, 전투 대기) - 움직이는 이미지면 여러 장면
   run.*       달리는 모습 (전투 중 이동) - 한 장이면 코드로 위아래 흔들림을 줌
+  run_sheet_4x2.*  달리기 장면표 (가로 4칸 x 세로 2칸처럼 여러 장면을 한 그림에 모은 것). 있으면 run.* 대신 사용
   attack.*    공격 모습 (전투) - 움직이는 이미지
 출력 (Assets/Resources/Characters/<캐릭터 id>/):
   portrait.png, full.png, idle/idle_00.png..., run/run_00.png..., attack/attack_00.png..., anim.txt (장면별 시간)
@@ -82,6 +83,38 @@ def frames_of(path: Path):
     return frames, durations
 
 
+def frames_of_sheet(path: Path, cols: int, rows: int, frame_ms: int = 90):
+    """장면표(여러 장면을 격자로 모은 그림)를 칸별로 잘라 장면 목록으로 만듭니다.
+    칸마다 캐릭터 위치가 조금씩 다르므로, 상체(윗부분)가 같은 자리에 오도록 맞춥니다."""
+    sheet = remove_background(Image.open(path))
+    cw, ch = sheet.width // cols, sheet.height // rows
+    cells = [sheet.crop((c * cw, r * ch, c * cw + cw, r * ch + ch)) for r in range(rows) for c in range(cols)]
+    # 다른 동작 그림(512칸)과 캐릭터 크기가 같도록 칸 크기를 512로 맞춤
+    cells = [c.resize((512, round(512 * ch / cw)), Image.LANCZOS) for c in cells]
+
+    def upper_alpha(img):
+        a = np.array(img)[..., 3].astype(np.float32) / 255.0
+        bb = img.getbbox()
+        a[bb[1] + int((bb[3] - bb[1]) * 0.45):, :] = 0  # 허리 아래(다리)는 비교하지 않음
+        return a
+
+    ref = upper_alpha(cells[0])
+    out = [cells[0]]
+    for cell in cells[1:]:
+        cur = upper_alpha(cell)
+        best, best_d = None, (0, 0)
+        for dy in range(-30, 31):
+            for dx in range(-30, 31):
+                diff = np.abs(np.roll(np.roll(cur, dy, axis=0), dx, axis=1) - ref).sum()
+                if best is None or diff < best:
+                    best, best_d = diff, (dx, dy)
+        moved = Image.new("RGBA", cell.size, (0, 0, 0, 0))
+        moved.paste(cell, best_d, cell)
+        out.append(moved)
+        print("  sheet frame offset", best_d)
+    return out, [frame_ms] * len(out)
+
+
 def fit(img: Image.Image, max_size: int) -> Image.Image:
     scale = min(1.0, max_size / max(img.size))
     if scale < 1.0:
@@ -117,13 +150,18 @@ def convert(char_id: str):
             print("saved", name)
 
     for name, folder in (("preview", "idle"), ("run", "run"), ("attack", "attack")):
+        sheet = next(iter(src.glob(name + "_sheet_*x*.*")), None)
         p = find(src, name)
-        if not p:
+        if not p and not sheet:
             continue
         (out / folder).mkdir(exist_ok=True)
         for old in (out / folder).glob("*.png"):
             old.unlink()
-        frames, durations = frames_of(p)
+        if sheet:
+            cols, rows = (int(v) for v in sheet.stem.split("_sheet_")[1].split("x"))
+            frames, durations = frames_of_sheet(sheet, cols, rows)
+        else:
+            frames, durations = frames_of(p)
         frames = align_feet([fit(remove_background(f), 512) for f in frames])
         for i, f in enumerate(frames):
             f.save(out / folder / f"{folder}_{i:02d}.png", optimize=True)
