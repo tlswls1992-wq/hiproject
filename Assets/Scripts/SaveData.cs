@@ -46,6 +46,8 @@ public static class SaveData
     public static int ClearedStage;     // 이번 회차에서 클리어한 가장 먼 판 번호 (0~100)
     public static int Cycle = 1;        // 회차
     public static bool RunCleared;      // 이번 회차에서 마왕을 쓰러뜨렸는지 (전승 특전이 열림)
+    // 지금까지 게임(10-10)을 끝까지 클리어한 횟수
+    public static int CompletedRuns => (Cycle - 1) + (RunCleared ? 1 : 0);
     public static readonly List<Member> Roster = new List<Member>();     // 용사 포함
     public static readonly List<Placement> Party = new List<Placement>();
     public static readonly Dictionary<string, int> Affinity = new Dictionary<string, int>();    // 호감도 (회차가 바뀌어도 유지)
@@ -93,13 +95,17 @@ public static class SaveData
             if (Party[i].uid != heroUid) Party.RemoveAt(i);
     }
 
+    const int RemovedCharacterRefund = 100;
+
     static void LoadMembers(int slot, string members)
     {
         Roster.Clear();
         foreach (var entry in members.Split(','))
         {
             var f = entry.Split(':');
-            if (f.Length != 5 || CompanionDef.Find(f[1]) == null) continue;
+            if (f.Length != 5) continue;
+            // 이제 게임에 없는 캐릭터(예전 임시 캐릭터)는 골드로 돌려줍니다.
+            if (CompanionDef.Find(f[1]) == null) { Gold += RemovedCharacterRefund; continue; }
             int.TryParse(f[0], out int uid);
             int.TryParse(f[2], out int star);
             int.TryParse(f[3], out int level);
@@ -566,12 +572,7 @@ public static class SaveData
         foreach (var m in order)
         {
             if (Party.Count >= DeployCap) break;
-            var job = m.Def.job;
-            int[] columns =
-                job == HeroClass.Warrior || job == HeroClass.Soldier ? new[] { 0, 1, 2, 3, 4 } :
-                job == HeroClass.Archer ? new[] { 2, 1, 3, 4, 0 } :
-                job == HeroClass.Mage ? new[] { 3, 2, 4, 1, 0 } :
-                new[] { 4, 3, 2, 1, 0 }; // 사제
+            int[] columns = m.Def.job.preferredColumns; // 근접은 앞, 원거리는 가운데/뒤, 치유는 맨 뒤
             foreach (int col in columns)
                 if (Place(m, col, 0.5f, 0.5f) == null) break;
         }

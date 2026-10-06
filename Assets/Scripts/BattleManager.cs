@@ -357,6 +357,7 @@ public class BattleManager : MonoBehaviour
 
         var u = CreateUnit(def.name, Team.Hero, pos);
         u.heroClass = c;
+        u.faction = def.faction;
         u.isLeader = def.IsHero;
         u.homePosition = pos;
         u.moveSpeed = c.speed * PartySpeedScale;
@@ -373,28 +374,43 @@ public class BattleManager : MonoBehaviour
         if (def.IsHero) leader = u;
     }
 
-    public int CountOf(HeroClass c)
+    // ================= 시너지 & 보너스 =================
+    // 같은 소속 동료가 2명 → 1단계, 4명 → 2단계 (용사는 숫자에 안 들어가지만 '용사 파티' 효과는 받음)
+    // 효과는 그 소속 동료들에게만 적용됩니다.
+
+    public class Synergy
+    {
+        public string faction;
+        public string effect;
+        public Color color;
+    }
+
+    public static readonly Synergy[] Synergies =
+    {
+        new Synergy { faction = "용사 파티", effect = "공격력·치유량 증가", color = new Color(1.00f, 0.80f, 0.35f) },
+        new Synergy { faction = "올 왕국",   effect = "받는 피해 감소",     color = new Color(0.45f, 0.65f, 1.00f) },
+        new Synergy { faction = "자유 용병", effect = "공격 속도 증가",     color = new Color(0.55f, 0.90f, 0.50f) },
+    };
+
+    public int CountOf(string faction)
     {
         int n = 0;
-        foreach (var h in heroes) if (h.heroClass == c) n++;
+        foreach (var h in heroes) if (!h.isLeader && h.faction == faction) n++;
         return n;
     }
 
-    // ================= 시너지 & 보너스 =================
-
-    // 같은 직업 3명 → 1단계, 6명 → 2단계
-    public int SynergyTier(HeroClass c)
+    public int SynergyTier(string faction)
     {
-        int n = CountOf(c);
-        return n >= 6 ? 2 : n >= 3 ? 1 : 0;
+        int n = CountOf(faction);
+        return n >= 4 ? 2 : n >= 2 ? 1 : 0;
     }
+
+    int TierFor(Unit u, string faction) => u.team == Team.Hero && u.faction == faction ? SynergyTier(faction) : 0;
 
     public float DamageMultiplier(Unit u)
     {
         if (u.team != Team.Hero) return 1f;
-        float m = damageBonus;
-        if (u.heroClass == HeroClass.Soldier) m *= 1f + 0.2f * SynergyTier(HeroClass.Soldier);
-        return m;
+        return damageBonus * (1f + 0.15f * TierFor(u, "용사 파티"));
     }
 
     public float RangeMultiplier(Unit u) => u.team == Team.Hero && (u.ranged || u.heroClass.healer) ? rangeBonus : 1f;
@@ -402,27 +418,15 @@ public class BattleManager : MonoBehaviour
     public float CooldownMultiplier(Unit u)
     {
         if (u.team != Team.Hero) return 1f;
-        float speed = attackSpeedBonus;
-        if (u.heroClass == HeroClass.Archer) speed *= 1f + 0.3f * SynergyTier(HeroClass.Archer);
+        float speed = attackSpeedBonus * (1f + 0.15f * TierFor(u, "자유 용병"));
         return 1f / speed;
     }
 
-    public float SplashMultiplier(Unit u)
-    {
-        if (u.heroClass != HeroClass.Mage) return 1f;
-        return 1f + 0.4f * SynergyTier(HeroClass.Mage);
-    }
+    public float SplashMultiplier(Unit u) => 1f;
 
-    public float HealMultiplier(Unit u)
-    {
-        return 1f + 0.3f * SynergyTier(HeroClass.Priest);
-    }
+    public float HealMultiplier(Unit u) => 1f + 0.15f * TierFor(u, "용사 파티");
 
-    public float DamageTakenMultiplier(Unit u)
-    {
-        if (u.heroClass != HeroClass.Warrior) return 1f;
-        return 1f - 0.2f * SynergyTier(HeroClass.Warrior);
-    }
+    public float DamageTakenMultiplier(Unit u) => 1f - 0.12f * TierFor(u, "올 왕국");
 
     // ================= 전투 도우미 =================
 
@@ -457,7 +461,7 @@ public class BattleManager : MonoBehaviour
         return best;
     }
 
-    // 사제가 따라갈, 가장 가까운 싸우는 아군 (사제 제외)
+    // 치유 직업이 따라갈, 가장 가까운 싸우는 아군 (치유 직업 제외)
     public Unit FindNearestFighter(Unit healer)
     {
         Unit best = null;
@@ -542,7 +546,7 @@ public class BattleManager : MonoBehaviour
         {
             new Upgrade { title = "날카로운 무기", desc = "모든 동료 공격력 +15%", apply = () => damageBonus *= 1.15f },
             new Upgrade { title = "빠른 손놀림", desc = "모든 동료 공격 속도 +12%", apply = () => attackSpeedBonus *= 1.12f },
-            new Upgrade { title = "매의 눈", desc = "원거리 동료와 사제의 사거리 +15%", apply = () => rangeBonus *= 1.15f },
+            new Upgrade { title = "매의 눈", desc = "원거리·치유 동료의 사거리 +15%", apply = () => rangeBonus *= 1.15f },
             new Upgrade { title = "강철 갑옷", desc = "모든 동료 최대 체력 +20%", apply = () =>
                 {
                     hpBonus *= 1.2f;
@@ -606,17 +610,17 @@ public class BattleManager : MonoBehaviour
         }
 
         // 오른쪽: 시너지
-        var syn = new Rect(w - 316, 66, 300, 40 + HeroClass.All.Length * 24);
+        var syn = new Rect(w - 316, 66, 300, 40 + Synergies.Length * 24);
         UI.Panel(syn, UI.WithAlpha(UI.PanelColor, 0.82f));
-        UI.Text(new Rect(syn.x + 16, syn.y + 6, syn.width - 32, 26), "시너지  (3명 / 6명)", 15, UI.TextSub, TextAnchor.MiddleLeft, true);
+        UI.Text(new Rect(syn.x + 16, syn.y + 6, syn.width - 32, 26), "소속 시너지  (2명 / 4명)", 15, UI.TextSub, TextAnchor.MiddleLeft, true);
         float y = syn.y + 32;
-        foreach (var c in HeroClass.All)
+        foreach (var sy in Synergies)
         {
-            int tier = SynergyTier(c);
+            int tier = SynergyTier(sy.faction);
             string stars = tier == 2 ? "★★" : tier == 1 ? "★" : "";
-            Color col = tier > 0 ? c.color : UI.WithAlpha(UI.TextSub, 0.7f);
-            UI.Text(new Rect(syn.x + 16, y, 150, 24), $"{c.name} {CountOf(c)} {stars}", 15, col, TextAnchor.MiddleLeft, true);
-            UI.Text(new Rect(syn.x + 150, y, syn.width - 166, 24), c.synergyText, 14, col, TextAnchor.MiddleRight);
+            Color col = tier > 0 ? sy.color : UI.WithAlpha(UI.TextSub, 0.7f);
+            UI.Text(new Rect(syn.x + 16, y, 150, 24), $"{sy.faction} {CountOf(sy.faction)} {stars}", 15, col, TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(syn.x + 150, y, syn.width - 166, 24), sy.effect, 14, col, TextAnchor.MiddleRight);
             y += 24;
         }
 

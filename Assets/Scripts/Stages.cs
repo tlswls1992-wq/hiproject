@@ -77,6 +77,7 @@ public static class Stages
 
     public static string Label(int level) => $"{StageOf(level) + 1}-{SubOf(level)}";
     public static string StageName(int level) => $"스테이지 {StageOf(level) + 1} · {stageNames[StageOf(level)]}";
+    public static string StageTitle(int stageNumber) => stageNames[Mathf.Clamp(stageNumber - 1, 0, StageCount - 1)]; // 스테이지 번호(1~10)의 이름만
     public static bool HasBoss(int level) => SubOf(level) == LevelsPerStage;
     public static bool HasMidBoss(int level) => SubOf(level) == MidBossRound;
     public static string BossName(int level) => bossNames[StageOf(level)];

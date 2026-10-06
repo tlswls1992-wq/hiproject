@@ -7,6 +7,7 @@ public class Unit : MonoBehaviour
 {
     public Team team;
     public HeroClass heroClass;      // 영웅일 때만 사용 (적은 null)
+    public string faction;           // 소속 (동료만 사용, 시너지 계산용)
     public float maxHp;
     public float hp;
     public float damage;
@@ -161,7 +162,7 @@ public class Unit : MonoBehaviour
         return DirectionTo(pos, target.transform.position);
     }
 
-    // 사제: 다친 아군이 있으면 사거리까지 다가가서 치유하고, 없으면 아군 뒤를 따라갑니다.
+    // 치유 직업(성녀·힐러): 다친 아군이 있으면 사거리까지 다가가서 치유하고, 없으면 아군 뒤를 따라갑니다.
     Vector2 HealerThink(Vector2 pos, BattleManager battle)
     {
         float range = attackRange * battle.RangeMultiplier(this);

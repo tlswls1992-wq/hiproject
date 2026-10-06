@@ -37,75 +37,107 @@ public static class RarityInfo
     }
 }
 
+// 출현 조건 종류
+public enum UnlockKind
+{
+    Always,      // 처음부터 뽑기에 나옴
+    Clears,      // 게임(10-10)을 N번 클리어한 뒤 나옴
+    StageClear,  // 특정 스테이지를 클리어한 뒤 나옴 (이후 회차에서도 계속 나옴)
+}
+
 // 뽑을 수 있는 캐릭터 한 명의 정보
 // 기본 설정: [종족 / 소속 / 직업 / 성향]
 public class CompanionDef
 {
     public string id;
     public string name;
+    public string gender;        // 성별 (지금은 화면에 표시하지 않음)
     public Rarity rarity;
     public string race;          // 종족
     public string faction;       // 소속
     public HeroClass job;        // 직업
     public Alignment alignment;  // 성향
-    public string desc;
+    public UnlockKind unlock;    // 출현 조건
+    public int unlockValue;      // Clears: 클리어 횟수 / StageClear: 스테이지 번호(1~10)
 
-    CompanionDef(string id, string name, Rarity rarity, string race, string faction, HeroClass job, Alignment alignment, string desc)
+    // ※ 인물 설정: 개발용 내부 메모입니다. 게임 화면에는 절대 표시하지 않아요.
+    //   (캠프 대화의 말투 등을 정할 때 참고만 합니다.)
+    public string note;
+
+    CompanionDef(string id, string name, string gender, Rarity rarity, string race, string faction, HeroClass job,
+                 Alignment alignment, string note, UnlockKind unlock = UnlockKind.Always, int unlockValue = 0)
     {
-        this.id = id; this.name = name; this.rarity = rarity;
+        this.id = id; this.name = name; this.gender = gender; this.rarity = rarity;
         this.race = race; this.faction = faction; this.job = job; this.alignment = alignment;
-        this.desc = desc;
+        this.note = note; this.unlock = unlock; this.unlockValue = unlockValue;
     }
 
     // [종족/소속/직업/성향] 한 줄 표시
     public string Profile => $"{race} / {faction} / {job.name} / {alignment}";
 
+    // 카드에 보이는 짧은 소개 (내부 설정은 드러내지 않음)
+    public string desc => IsHero ? "가챠의 힘을 가진 용사. 뽑으면 성급 상승!" : $"{faction}의 {job.name}";
+
     // ★ 새 캐릭터를 추가하려면 이 목록에 한 줄을 추가하세요. (id는 겹치지 않게)
-    //   순서: id, 이름, 등급, 종족, 소속, 직업, 성향, 한 줄 설명
+    //   순서: id, 이름, 성별, 등급, 종족, 소속, 직업, 성향, 인물 설정(내부용), [출현 조건, 조건 값]
     public static readonly CompanionDef[] All =
     {
         // 용사 본인도 뽑기에서 나옵니다. 용사 카드가 나오면 용사의 성급이 올라가요.
-        new CompanionDef(HeroId, "용사", Rarity.Unique, "인간", "용사 파티", HeroClass.Brave, Alignment.중립, "가챠의 힘을 가진 용사. 뽑으면 성급 상승!"),
-
-        new CompanionDef("n_balo",       "발로",          Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Soldier, Alignment.선,   "정의감 하나는 누구에게도 지지 않는 신참 병사"),
-        new CompanionDef("n_deboram",    "드보람",        Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Soldier, Alignment.실리, "받은 만큼만 일하는 현실적인 병사"),
-        new CompanionDef("c_villager",   "마을 청년",     Rarity.Normal,    "인간",     "올 왕국",     HeroClass.Warrior, Alignment.선,   "괭이 대신 검을 든 용감한 청년"),
-        new CompanionDef("c_hunter",     "사냥꾼",        Rarity.Normal,    "인간",     "자유민",      HeroClass.Archer,  Alignment.중립, "토끼 사냥이 특기"),
-        new CompanionDef("c_apprentice", "견습 마법사",   Rarity.Normal,    "인간",     "마탑",        HeroClass.Mage,    Alignment.혼돈, "가끔 주문을 틀린다"),
-        new CompanionDef("c_nun",        "수녀",          Rarity.Normal,    "인간",     "성교회",      HeroClass.Priest,  Alignment.선,   "기도로 상처를 낫게 한다"),
-
-        new CompanionDef("r_mercenary",  "용병 검사",     Rarity.Rare,      "인간",     "용병단",      HeroClass.Warrior, Alignment.실리, "돈만 주면 어디든 간다"),
-        new CompanionDef("r_ranger",     "숲의 궁수",     Rarity.Rare,      "엘프",     "숲의 부족",   HeroClass.Archer,  Alignment.중립, "숲에서 자란 명사수"),
-        new CompanionDef("r_pyro",       "불꽃 마법사",   Rarity.Rare,      "인간",     "마탑",        HeroClass.Mage,    Alignment.혼돈, "모든 것을 태워 버린다"),
-        new CompanionDef("r_cleric",     "성당 사제",     Rarity.Rare,      "인간",     "성교회",      HeroClass.Priest,  Alignment.질서, "올 왕국 대성당 출신"),
-
-        new CompanionDef("e_paladin",    "성기사",        Rarity.SuperRare, "인간",     "성교회",      HeroClass.Warrior, Alignment.명예, "신의 방패를 든 기사"),
-        new CompanionDef("e_sniper",     "그림자 저격수", Rarity.SuperRare, "하프엘프", "그림자 길드", HeroClass.Archer,  Alignment.실리, "한 발이면 충분하다"),
-        new CompanionDef("e_frost",      "얼음 마녀",     Rarity.SuperRare, "인간",     "북방 설산",   HeroClass.Mage,    Alignment.혼돈, "북쪽 설산의 마녀"),
-        new CompanionDef("e_bishop",     "대주교",        Rarity.SuperRare, "인간",     "성교회",      HeroClass.Priest,  Alignment.질서, "기적을 일으키는 자"),
-
-        new CompanionDef("l_swordsaint", "검성",          Rarity.Legendary, "인간",     "자유민",      HeroClass.Warrior, Alignment.명예, "천 번의 결투에서 진 적 없다"),
-        new CompanionDef("l_windarcher", "바람의 명궁",   Rarity.Legendary, "엘프",     "숲의 부족",   HeroClass.Archer,  Alignment.선,   "바람이 화살을 인도한다"),
-        new CompanionDef("l_archmage",   "대마법사",      Rarity.Legendary, "인간",     "마탑",        HeroClass.Mage,    Alignment.질서, "마탑의 주인"),
-        new CompanionDef("l_saint",      "성녀",          Rarity.Legendary, "인간",     "성교회",      HeroClass.Priest,  Alignment.선,   "죽은 자도 일으킨다는 전설"),
-
-        new CompanionDef("m_dragon",     "용기사",        Rarity.Mythic,    "용인족",   "용의 계약자", HeroClass.Warrior, Alignment.명예, "용과 계약한 최강의 기사"),
-        new CompanionDef("m_sage",       "시간의 현자",   Rarity.Mythic,    "불명",     "시간의 탑",   HeroClass.Mage,    Alignment.중립, "시간을 멈추는 대현자"),
+        new CompanionDef(HeroId,      "용사",     "남", Rarity.Unique,    "인간",   "용사 파티", HeroClass.Brave,      Alignment.중립, "용사 본인"),
+        new CompanionDef("teo",       "테오",     "남", Rarity.SuperRare, "인간",   "용사 파티", HeroClass.Lancer,     Alignment.명예, "용사의 고향 친구"),
+        new CompanionDef("maria",     "마리아",   "여", Rarity.SuperRare, "인간",   "용사 파티", HeroClass.Mage,       Alignment.질서, "용사 모험 동경 / 학자"),
+        new CompanionDef("amelia",    "아멜리아", "여", Rarity.SuperRare, "엘프",   "용사 파티", HeroClass.Archer,     Alignment.명예, "츤데레", UnlockKind.Clears, 1),
+        new CompanionDef("liliana",   "릴리아나", "여", Rarity.Unique,    "인간",   "용사 파티", HeroClass.Saint,      Alignment.선,   "선택받은 성녀", UnlockKind.Clears, 2),
+        new CompanionDef("mira",      "미라",     "여", Rarity.Unique,    "용",     "용사 파티", HeroClass.Dragon,     Alignment.질서, "호기심 많은 용 / 정체를 숨김", UnlockKind.Clears, 3),
+        new CompanionDef("goden",     "고덴",     "남", Rarity.SuperRare, "드워프", "용사 파티", HeroClass.Porter,     Alignment.실리, "만능 재주꾼 / 설명충"),
+        new CompanionDef("ian",       "이안",     "남", Rarity.Rare,      "인간",   "자유 용병", HeroClass.Adventurer, Alignment.중립, "호기심 넘치는 모험가"),
+        new CompanionDef("n_balo",    "발로",     "남", Rarity.Normal,    "인간",   "올 왕국",   HeroClass.Soldier,    Alignment.선,   "올 왕국의 평범한 병사"),
+        new CompanionDef("n_deboram", "드보람",   "여", Rarity.Normal,    "인간",   "올 왕국",   HeroClass.Soldier,    Alignment.실리, "올 왕국의 평범한 병사"),
+        new CompanionDef("dane",      "데인",     "남", Rarity.Rare,      "인간",   "올 왕국",   HeroClass.Knight,     Alignment.질서, "올 왕국 기사"),
+        new CompanionDef("petin",     "페틴",     "여", Rarity.Normal,    "인간",   "자유 용병", HeroClass.Mercenary,  Alignment.실리, "수전노 용병"),
+        new CompanionDef("siena",     "시에나",   "여", Rarity.SuperRare, "인간",   "올 왕국",   HeroClass.Inspector,  Alignment.질서, "올 왕국 감찰관", UnlockKind.StageClear, 1),
+        new CompanionDef("ozo",       "오죠",     "남", Rarity.Rare,      "인간",   "자유 용병", HeroClass.Mage,       Alignment.혼돈, "야망 있는 마법사"),
+        new CompanionDef("michaela",  "미카엘라", "여", Rarity.Rare,      "인간",   "자유 용병", HeroClass.Healer,     Alignment.명예, "의로운 힐러"),
     };
 
     public const string HeroId = "hero";
     public static CompanionDef Hero => Find(HeroId);
     public bool IsHero => id == HeroId;
 
-    // 이름 없는 일반 캐릭터 (같은 캐릭터를 파티에 여러 명 배치할 수 있음).
-    // 여기에 없는 캐릭터는 '이름이 있는 캐릭터'라서 같은 인물을 파티에 두 명 배치할 수 없어요.
-    static readonly string[] GenericIds =
-    {
-        "c_villager", "c_hunter", "c_apprentice", "c_nun",
-        "r_mercenary", "r_ranger", "r_pyro", "r_cleric",
-    };
+    // 이름이 있는 캐릭터는 같은 인물을 파티에 두 명 배치할 수 없어요. (지금은 모든 동료가 이름이 있음)
+    // 이름 없는 일반 캐릭터를 나중에 추가하면 여기에 id를 적어 주세요.
+    static readonly string[] GenericIds = { };
 
     public bool IsNamed => !IsHero && System.Array.IndexOf(GenericIds, id) < 0;
+
+    // 지금 뽑기에 나올 수 있는지 (출현 조건 확인)
+    public bool IsUnlocked
+    {
+        get
+        {
+            switch (unlock)
+            {
+                case UnlockKind.Clears: return SaveData.CompletedRuns >= unlockValue;
+                case UnlockKind.StageClear:
+                    return SaveData.CompletedRuns >= 1 || SaveData.ClearedStage >= unlockValue * Stages.LevelsPerStage;
+                default: return true;
+            }
+        }
+    }
+
+    // 출현 조건 안내 문구 (도감에서 아직 못 만난 인물에 표시)
+    public string UnlockHint
+    {
+        get
+        {
+            switch (unlock)
+            {
+                case UnlockKind.Clears: return $"{unlockValue}회 클리어 후 출현";
+                case UnlockKind.StageClear: return $"'{Stages.StageTitle(unlockValue)}' 클리어 후 출현";
+                default: return "기본 출현";
+            }
+        }
+    }
 
     public static CompanionDef Find(string id)
     {
@@ -113,14 +145,15 @@ public class CompanionDef
         return null;
     }
 
-    // 해당 등급 중 아무나 한 명 (그 등급에 캐릭터가 없으면 한 단계 아래 등급에서)
+    // 해당 등급 중 아무나 한 명 (출현 조건을 만족한 캐릭터만.
+    // 그 등급에 나올 캐릭터가 없으면 한 단계 아래 등급에서)
     public static CompanionDef RandomOf(Rarity rarity)
     {
         for (int r = (int)rarity; r >= 0; r--)
         {
             var list = new List<CompanionDef>();
             foreach (var c in All)
-                if ((int)c.rarity == r) list.Add(c);
+                if ((int)c.rarity == r && c.IsUnlocked) list.Add(c);
             if (list.Count > 0) return list[Random.Range(0, list.Count)];
         }
         return All[0];
