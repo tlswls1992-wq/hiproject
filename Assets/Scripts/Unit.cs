@@ -228,10 +228,12 @@ public class Unit : MonoBehaviour
         lastX = now.x;
         lastY = now.y;
 
-        // 잠깐 멈췄다 움직이는 걸 반복해도 깜빡이지 않게, 멈춘 뒤 0.12초 동안은 달리기 유지
-        runHold = moved > moveSpeed * 0.3f ? 0.12f : runHold - dt;
+        // 잠깐 멈췄다 움직이는 걸 반복해도 깜빡이지 않게, 멈춘 뒤 0.2초 동안은 달리기 유지
+        runHold = moved > moveSpeed * 0.3f ? 0.2f : runHold - dt;
         bool running = runHold > 0f;
         if (running) runClock += dt;
+        // 달리기 흔들림이 갑자기 시작/멈추지 않도록 0 ~ 1 사이로 부드럽게 바뀌는 값
+        runBlend = Mathf.MoveTowards(runBlend, running ? 1f : 0f, dt * 6f);
 
         // 공격 그림이 공격 간격보다 길면 빨리 재생해서 다음 공격 전에 끝나게 함
         float cd = Mathf.Max(0.2f, attackCooldown * 0.9f);
@@ -251,11 +253,14 @@ public class Unit : MonoBehaviour
             body.sprite = art.RunSprite(runClock);
             if (art.RunIsStill)
             {
-                // 달리기 그림이 한 장이면: 발걸음에 맞춰 통통 튀고 살짝 앞으로 기울임
-                float step = Mathf.Abs(Mathf.Sin(runClock * 13f));
-                basePos.y += step * 0.12f;
-                scale = new Vector3(1f + (1f - step) * 0.03f, 1f - (1f - step) * 0.03f, 1f);
-                rot = Quaternion.Euler(0f, 0f, facingRight ? -3f : 3f);
+                // 달리기 그림이 한 장이면: 발걸음(1초에 약 3걸음)에 맞춰 아주 살짝, 부드럽게 오르내림.
+                // (예전에는 크게 튀어서 통통 튀는 것처럼 보였음)
+                float phase = runClock * Mathf.PI * RunStepsPerSecond;
+                float lift = Mathf.Sin(phase);
+                lift *= lift;                                   // 0 ~ 1, 바닥에서 뾰족하지 않고 둥글게
+                basePos.y += lift * 0.035f * runBlend;
+                float sway = Mathf.Sin(phase * 0.5f) * 1.2f * runBlend; // 걸음마다 상체가 아주 살짝 좌우로
+                rot = Quaternion.Euler(0f, 0f, facingRight ? sway : -sway);
             }
         }
         else
@@ -277,6 +282,8 @@ public class Unit : MonoBehaviour
     float lastY;
     float runHold;
     float runClock;
+    float runBlend;
+    const float RunStepsPerSecond = 3f;
 
     float lastX;
 

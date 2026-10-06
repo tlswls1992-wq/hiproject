@@ -8,7 +8,7 @@ public static class Stages
     public const int StageCount = 10;
     public const int LevelsPerStage = 10;
     public const int Count = StageCount * LevelsPerStage; // 100판
-    public const int WavesPerLevel = 3;
+    public const int WavesPerLevel = 2;
     public const int MidBossRound = 5;
 
     // ★ 스테이지 이름

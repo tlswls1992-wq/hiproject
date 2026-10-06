@@ -180,17 +180,8 @@ public class GameManager : MonoBehaviour
             UI.Glow(new Vector2(x, y), 5f + i % 3, new Color(1f, 0.85f, 0.55f, 0.55f));
         }
 
-        // 오른쪽: 용사 전신 (천천히 숨 쉬듯 움직임)
-        var heroArt = CharacterArt.For(CompanionDef.HeroId);
-        if (heroArt != null && heroArt.full != null)
-        {
-            float bob = Mathf.Sin(Now * 1.6f) * 4f;
-            UI.Glow(new Vector2(w * 0.74f, 400f), 330f, new Color(1f, 0.75f, 0.45f, 0.25f));
-            CharacterArt.DrawTexture(new Rect(w * 0.74f - 230f, 50f + bob, 460f, 690f), heroArt.full, false);
-        }
-
-        // 왼쪽: 제목
-        float cx = heroArt != null ? w * 0.32f : w / 2f;
+        // 가운데: 제목
+        float cx = w / 2f;
         UI.Glow(new Vector2(cx, 165f), 300f, new Color(0f, 0f, 0f, 0.35f));
         UI.Text(new Rect(cx - 320, 100, 640, 120), "가챠 용사", 92, UI.Gold, TextAnchor.MiddleCenter, true);
         UI.Fill(new Rect(cx - 200, 222, 400, 1), UI.WithAlpha(UI.Gold, 0.7f));
@@ -735,7 +726,6 @@ public class GameManager : MonoBehaviour
         {
             var lines = new List<StoryLine>();
             foreach (var t in Stages.BossLines(level)) lines.Add(new StoryLine(Art.Boss, Stages.BossName(level), t));
-            lines.Add(new StoryLine(Art.HeroGacha, "용사", level >= Stages.Count ? "헤헤... 이번 뽑기가 마지막이다, 마왕!" : "헤헤... 다들, 간다!"));
             storyBossLevel = level;
             PlayStory(lines.ToArray(), SaveData.IsBossBeaten(Stages.StageOf(level)), () => BeginBattle(level));
             return;
@@ -843,11 +833,15 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        if (UI.Button(new Rect(bx - 290, 556, 270, 72), "야영지로", UI.Blue, 24))
+        // 스테이지 보스전(10라운드)이 끝나면 이기든 지든 무조건 야영지로 돌아갑니다.
+        bool bossFight = Stages.HasBoss(resultStage);
+        var campRect = bossFight ? new Rect(bx - 150, 556, 300, 72) : new Rect(bx - 290, 556, 270, 72);
+        if (UI.Button(campRect, "야영지로", UI.Blue, 24))
         {
             selectedStage = Mathf.Min(SaveData.ClearedStage + 1, Stages.Count);
             page = Page.Camp;
         }
+        if (bossFight) return;
         bool hasNext = resultVictory && resultStage < Stages.Count;
         if (UI.Button(new Rect(bx + 20, 556, 270, 72), hasNext ? "다음 라운드 ▶" : "다시 도전", UI.Primary, 24))
             StartBattle(hasNext ? resultStage + 1 : resultStage);

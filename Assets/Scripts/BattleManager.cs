@@ -544,27 +544,27 @@ public class BattleManager : MonoBehaviour
     {
         var pool = new List<Upgrade>
         {
-            new Upgrade { title = "날카로운 무기", desc = "모든 동료 공격력 +15%", apply = () => damageBonus *= 1.15f },
-            new Upgrade { title = "빠른 손놀림", desc = "모든 동료 공격 속도 +12%", apply = () => attackSpeedBonus *= 1.12f },
-            new Upgrade { title = "매의 눈", desc = "원거리·치유 동료의 사거리 +15%", apply = () => rangeBonus *= 1.15f },
-            new Upgrade { title = "강철 갑옷", desc = "모든 동료 최대 체력 +20%", apply = () =>
+            new Upgrade { title = "날카로운 무기", desc = "모든 동료 공격력 +8%", apply = () => damageBonus *= 1.08f },
+            new Upgrade { title = "빠른 손놀림", desc = "모든 동료 공격 속도 +6%", apply = () => attackSpeedBonus *= 1.06f },
+            new Upgrade { title = "매의 눈", desc = "원거리·치유 동료의 사거리 +8%", apply = () => rangeBonus *= 1.08f },
+            new Upgrade { title = "강철 갑옷", desc = "모든 동료 최대 체력 +10%", apply = () =>
                 {
-                    hpBonus *= 1.2f;
-                    foreach (var h in heroes) { h.maxHp *= 1.2f; h.hp *= 1.2f; h.UpdateHpBar(); }
+                    hpBonus *= 1.1f;
+                    foreach (var h in heroes) { h.maxHp *= 1.1f; h.hp *= 1.1f; h.UpdateHpBar(); }
                 } },
-            new Upgrade { title = "치유의 샘", desc = "모든 동료 체력 완전 회복", apply = () =>
+            new Upgrade { title = "치유의 샘", desc = "모든 동료 체력 50% 회복", apply = () =>
                 {
-                    foreach (var h in heroes) { h.hp = h.maxHp; h.UpdateHpBar(); }
+                    foreach (var h in heroes) { h.hp = Mathf.Min(h.maxHp, h.hp + h.maxHp * 0.5f); h.UpdateHpBar(); }
                 } },
-            new Upgrade { title = "전리품", desc = "골드 +" + (30 + Level * 5), apply = () => GoldEarned += 30 + Level * 5 },
+            new Upgrade { title = "전리품", desc = "골드 +" + (15 + Level * 5 / 2), apply = () => GoldEarned += 15 + Level * 5 / 2 },
         };
         if (leader != null && leader.IsAlive)
         {
-            pool.Add(new Upgrade { title = "용사의 함성", desc = "용사 공격력 +50%, 체력 회복", apply = () =>
+            pool.Add(new Upgrade { title = "용사의 함성", desc = "용사 공격력 +25%, 체력 50% 회복", apply = () =>
                 {
                     if (leader == null) return;
-                    leader.damage *= 1.5f;
-                    leader.hp = leader.maxHp;
+                    leader.damage *= 1.25f;
+                    leader.hp = Mathf.Min(leader.maxHp, leader.hp + leader.maxHp * 0.5f);
                     leader.UpdateHpBar();
                 } });
         }
@@ -596,18 +596,9 @@ public class BattleManager : MonoBehaviour
             SetSpeed(speed % 4 + 1);
 
         // 왼쪽: 파티 상태
-        var party = new Rect(16, 66, 300, 78);
+        var party = new Rect(16, 66, 300, 44);
         UI.Panel(party, UI.WithAlpha(UI.PanelColor, 0.82f));
-        UI.Text(new Rect(party.x + 16, party.y + 8, party.width - 32, 26), $"파티 생존  {heroes.Count} / {partySize}", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
-        if (leader != null && leader.IsAlive)
-        {
-            UI.Text(new Rect(party.x + 16, party.y + 42, 50, 24), "용사", 15, UI.Gold, TextAnchor.MiddleLeft, true);
-            UI.Bar(new Rect(party.x + 64, party.y + 46, party.width - 82, 16), leader.hp / leader.maxHp, new Color(1f, 0.75f, 0.2f));
-        }
-        else
-        {
-            UI.Text(new Rect(party.x + 16, party.y + 42, party.width - 32, 24), "용사가 쓰러졌다!", 15, new Color(1f, 0.5f, 0.5f), TextAnchor.MiddleLeft, true);
-        }
+        UI.Text(new Rect(party.x + 16, party.y + 8, party.width - 32, 28), $"파티 생존  {heroes.Count} / {partySize}", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
 
         // 오른쪽: 시너지
         var syn = new Rect(w - 316, 66, 300, 40 + Synergies.Length * 24);
@@ -622,13 +613,6 @@ public class BattleManager : MonoBehaviour
             UI.Text(new Rect(syn.x + 16, y, 150, 24), $"{sy.faction} {CountOf(sy.faction)} {stars}", 15, col, TextAnchor.MiddleLeft, true);
             UI.Text(new Rect(syn.x + 150, y, syn.width - 166, 24), sy.effect, 14, col, TextAnchor.MiddleRight);
             y += 24;
-        }
-
-        // 줄 이름 (선두 ~ 후미)
-        for (int col = 0; col < SaveData.Columns; col++)
-        {
-            var p = UI.WorldToUI(cam, new Vector2(ColumnCenterX(col), LaneTop + 1.2f));
-            UI.Text(new Rect(p.x - 40, p.y - 26, 80, 24), SaveData.ColumnNames[col], 15, UI.WithAlpha(UI.TextMain, 0.7f), TextAnchor.MiddleCenter, true);
         }
 
         // 보스 체력 (가운데)
