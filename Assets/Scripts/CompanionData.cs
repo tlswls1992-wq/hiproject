@@ -97,8 +97,8 @@ public class CompanionDef
     public static CompanionDef Hero => Find(HeroId);
     public bool IsHero => id == HeroId;
 
-    // 이름 없는 일반 캐릭터 (여러 명 뽑을 수 있음). 여기에 없는 캐릭터는 '이름이 있는 캐릭터'라서
-    // 한 번 뽑으면 다시 나오지 않아요. (용사는 뽑을 때마다 각성)
+    // 이름 없는 일반 캐릭터 (같은 캐릭터를 파티에 여러 명 배치할 수 있음).
+    // 여기에 없는 캐릭터는 '이름이 있는 캐릭터'라서 같은 인물을 파티에 두 명 배치할 수 없어요.
     static readonly string[] GenericIds =
     {
         "c_villager", "c_hunter", "c_apprentice", "c_nun",
@@ -113,15 +113,14 @@ public class CompanionDef
         return null;
     }
 
-    // 해당 등급 중 아무나 한 명 (그 등급에 나올 수 있는 캐릭터가 없으면 한 단계 아래 등급에서)
-    // excluded: 이미 가지고 있어서 나오면 안 되는 이름 있는 캐릭터
-    public static CompanionDef RandomOf(Rarity rarity, HashSet<string> excluded = null)
+    // 해당 등급 중 아무나 한 명 (그 등급에 캐릭터가 없으면 한 단계 아래 등급에서)
+    public static CompanionDef RandomOf(Rarity rarity)
     {
         for (int r = (int)rarity; r >= 0; r--)
         {
             var list = new List<CompanionDef>();
             foreach (var c in All)
-                if ((int)c.rarity == r && (excluded == null || !excluded.Contains(c.id))) list.Add(c);
+                if ((int)c.rarity == r) list.Add(c);
             if (list.Count > 0) return list[Random.Range(0, list.Count)];
         }
         return All[0];

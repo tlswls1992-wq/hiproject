@@ -46,36 +46,19 @@ public class GachaBanner
 
     public static readonly GachaBanner[] All = { Normal, Advanced, Legendary, Mythic };
 
-    // 뽑기 실행. 이미 가진 '이름이 있는 캐릭터'는 나오지 않고, 한 번에 여러 번 뽑아도 같은 캐릭터는 한 번만 나와요.
+    // 뽑기 실행. 같은 캐릭터도 여러 번 나올 수 있어요 (같은 캐릭터를 합쳐서 성급을 올릴 수 있음).
     public List<CompanionDef> Roll(int count)
     {
-        var taken = new HashSet<string>();
-        foreach (var id in SaveData.Roster)
-        {
-            var def = CompanionDef.Find(id);
-            if (def != null && def.IsNamed) taken.Add(id);
-        }
-
         var results = new List<CompanionDef>();
-        for (int i = 0; i < count; i++) results.Add(Take(RollOne(Rarity.Normal, taken), taken));
+        for (int i = 0; i < count; i++) results.Add(RollOne(Rarity.Normal));
 
         // 10회 뽑기 보장: 보장 등급 이상이 하나도 없으면 하나를 바꿔 줌
         if (count >= 10 && !results.Exists(c => c.rarity >= guarantee))
-        {
-            int idx = Random.Range(0, count);
-            taken.Remove(results[idx].id);
-            results[idx] = Take(RollOne(guarantee, taken), taken);
-        }
+            results[Random.Range(0, count)] = RollOne(guarantee);
         return results;
     }
 
-    static CompanionDef Take(CompanionDef def, HashSet<string> taken)
-    {
-        if (def.IsNamed) taken.Add(def.id);
-        return def;
-    }
-
-    CompanionDef RollOne(Rarity minRarity, HashSet<string> taken)
+    CompanionDef RollOne(Rarity minRarity)
     {
         float total = 0f;
         int highest = (int)minRarity;
@@ -89,9 +72,9 @@ public class GachaBanner
         for (int i = (int)minRarity; i < rates.Length; i++)
         {
             if (rates[i] <= 0f) continue;
-            if (roll < rates[i]) return CompanionDef.RandomOf((Rarity)i, taken);
+            if (roll < rates[i]) return CompanionDef.RandomOf((Rarity)i);
             roll -= rates[i];
         }
-        return CompanionDef.RandomOf((Rarity)highest, taken);
+        return CompanionDef.RandomOf((Rarity)highest);
     }
 }

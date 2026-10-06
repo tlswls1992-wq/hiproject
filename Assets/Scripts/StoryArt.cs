@@ -200,6 +200,41 @@ public static class StoryArt
         if (r.width > 20) UI.Text(r, "?", Mathf.RoundToInt(r.height * 0.4f), new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleCenter, true);
     }
 
+    // ---------------- 스테이지 보스 등장 컷씬 ----------------
+    // level: 보스가 나오는 판 번호 (스테이지 색과 마왕 여부를 정함), talking: 대사 중이면 몸이 흔들림
+    public static void DrawBoss(float w, int level, bool talking)
+    {
+        Color sky = Stages.SkyColor(level);
+        UI.Gradient(UI.Full, UI.Darken(sky, 0.35f), new Color(0.03f, 0.02f, 0.04f));
+        UI.Fill(new Rect(0, 420, w, 300), UI.Darken(Stages.GroundColor(level), 0.4f));
+
+        bool demonKing = level >= Stages.Count;
+        float shake = talking ? Mathf.Sin(Now * 40f) * 2f : 0f;
+        float breathe = Mathf.Sin(Now * 2f) * 4f;
+        var c = new Vector2(w / 2f + shake, 250f + breathe);
+        float size = demonKing ? 300f : 240f;
+        var bodyColor = demonKing ? new Color(0.12f, 0.02f, 0.05f) : new Color(0.22f, 0.08f, 0.28f);
+
+        // 뒤의 붉은 기운
+        UI.Glow(c, size * 1.3f + 20f * Mathf.Sin(Now * 3f), new Color(1f, 0.15f, 0.1f, 0.45f));
+        // 뿔
+        UI.Fill(new Rect(c.x - size * 0.45f, c.y - size * 0.75f, size * 0.12f, size * 0.35f), new Color(0.85f, 0.8f, 0.7f));
+        UI.Fill(new Rect(c.x + size * 0.33f, c.y - size * 0.75f, size * 0.12f, size * 0.35f), new Color(0.85f, 0.8f, 0.7f));
+        // 몸
+        UI.Round(new Rect(c.x - size * 0.5f, c.y - size * 0.45f, size, size * 0.95f), bodyColor);
+        UI.RoundFrame(new Rect(c.x - size * 0.5f, c.y - size * 0.45f, size, size * 0.95f), new Color(1f, 0.25f, 0.2f, 0.6f));
+        // 빛나는 눈
+        for (int side = -1; side <= 1; side += 2)
+        {
+            var eye = c + new Vector2(side * size * 0.18f, -size * 0.12f);
+            UI.Glow(eye, 34f, new Color(1f, 0.2f, 0.1f, 0.9f));
+            UI.Circle(eye, 10f, new Color(1f, 0.95f, 0.5f));
+        }
+        // 입
+        float open = talking ? 6f + Mathf.Abs(Mathf.Sin(Now * 12f)) * 14f : 6f;
+        UI.Fill(new Rect(c.x - size * 0.18f, c.y + size * 0.12f, size * 0.36f, open), new Color(0.6f, 0.05f, 0.05f));
+    }
+
     // ---------------- 승리 / 왕국 ----------------
 
     public static void DrawVictory(float w)

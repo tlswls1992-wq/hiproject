@@ -219,7 +219,8 @@ public class GachaScreen
     }
 
     // 동료 카드 앞면 (동료 목록 화면에서도 사용)
-    public static void DrawCardFace(Rect r, CompanionDef def, string tag, bool drawText = true)
+    // star: 성급 (★ 개수), level: 0이면 레벨 표시 안 함
+    public static void DrawCardFace(Rect r, CompanionDef def, string tag, bool drawText = true, int star = 1, int level = 0)
     {
         Color rc = RarityInfo.Animated(def.rarity);
         float s = r.height / 300f; // 카드 크기에 맞춰 글자 크기 조절
@@ -229,9 +230,12 @@ public class GachaScreen
         UI.RoundFrame(r, rc);
         if (!drawText) return;
 
-        // 별 (등급)
-        UI.Text(new Rect(r.x, r.y + 10f * s, r.width, 30f * s), new string('★', RarityInfo.Stars(def.rarity)),
-            Mathf.RoundToInt(22 * s), new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleCenter, true);
+        // 성급 (★) 과 레벨
+        UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), new string('★', star),
+            Mathf.RoundToInt(20 * s), UI.Gold, level > 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, true);
+        if (level > 0)
+            UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), "Lv." + level,
+                Mathf.RoundToInt(18 * s), UI.TextMain, TextAnchor.MiddleRight, true);
 
         // 직업 문양
         var center = new Vector2(r.center.x, r.y + 120f * s);
@@ -263,7 +267,7 @@ public class GachaScreen
         if (!string.IsNullOrEmpty(tag))
         {
             float tw = (tag.Length <= 3 ? 64f : 104f) * s;
-            var tagRect = new Rect(r.xMax - tw - 6f * s, r.y + 8f * s, tw, 26f * s);
+            var tagRect = new Rect(r.xMax - tw - 6f * s, r.y + 44f * s, tw, 26f * s); // 성급 줄 아래
             UI.Chip(tagRect, tag, def.IsHero ? new Color(0.95f, 0.55f, 0.1f) : new Color(0.9f, 0.25f, 0.3f), Mathf.Max(10, Mathf.RoundToInt(15 * s)));
         }
     }

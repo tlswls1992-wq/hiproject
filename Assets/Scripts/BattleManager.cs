@@ -10,7 +10,6 @@ public class BattleManager : MonoBehaviour
     // ---- 밸런스 숫자 (자유롭게 바꿔 보세요) ----
     const float SpawnInterval = 0.6f;
     const float WaveBreak = 2f;
-    const float AwakenBonus = 0.1f;          // 용사 각성 1단계마다 능력치 +10%
 
     // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
     public const float LaneTop = 2.5f;       // 유닛이 다닐 수 있는 가장 위쪽
@@ -19,7 +18,7 @@ public class BattleManager : MonoBehaviour
     const float ColumnGap = 1.8f;            // 줄 사이 간격 (선두 → 후미 방향)
     const float ZoneWidth = 1.5f;            // 한 줄의 가로 폭
 
-    enum EnemyKind { Grunt, Archer, Brute, Boss }
+    enum EnemyKind { Grunt, Archer, Brute, MidBoss, Boss }
 
     public readonly List<Unit> heroes = new List<Unit>();
     public readonly List<Unit> enemies = new List<Unit>();
@@ -28,7 +27,7 @@ public class BattleManager : MonoBehaviour
     public int Level { get; private set; }   // 1~100번째 판
     public int Wave { get; private set; }
     public int GoldEarned { get; private set; }
-    public bool Fled { get; private set; }   // 도망쳤는지
+    public readonly List<int> DeployedUids = new List<int>(); // 이번 전투에 나간 동료 (경험치 지급용)
     public bool IsPaused => World == null || finished || upgradeChoices != null;
     public bool HasEnemies => enemies.Count > 0;
 
@@ -41,12 +40,13 @@ public class BattleManager : MonoBehaviour
     Camera cam;
     Unit leader;
     Unit boss;
+    string bossName;
     int partySize;
     readonly List<EnemyKind> spawnQueue = new List<EnemyKind>();
     bool waveInProgress;
     float spawnTimer;
     float waveBreakTimer;
-    bool fastForward;
+    int speed = 1; // 전투 배속 1~4
     bool finished;
     bool victory;
     float finishTimer;
@@ -94,7 +94,6 @@ public class BattleManager : MonoBehaviour
         Level = level;
         Wave = 0;
         GoldEarned = 0;
-        Fled = false;
         finished = false;
         upgradeChoices = null;
         waveInProgress = false;
@@ -107,15 +106,19 @@ public class BattleManager : MonoBehaviour
         BuildBattlefield();
 
         SaveData.EnsureHeroPlaced();
+        DeployedUids.Clear();
         foreach (var p in SaveData.Party)
         {
-            var def = SaveData.DefOf(p.value);
-            if (def != null) SpawnCompanion(def, PlacementPosition(p.column, p.fx, p.fy));
+            if (DeployedUids.Count >= SaveData.DeployCap) break; // 출진 가능 인원까지만
+            var m = SaveData.MemberByUid(p.uid);
+            if (m == null) continue;
+            SpawnCompanion(m, PlacementPosition(p.column, p.fx, p.fy));
+            DeployedUids.Add(m.uid);
         }
         partySize = heroes.Count;
 
-        fastForward = SaveData.FastBattle;
-        Time.timeScale = fastForward ? 2f : 1f;
+        speed = SaveData.BattleSpeed;
+        Time.timeScale = speed;
     }
 
     public void End()
@@ -126,7 +129,7 @@ public class BattleManager : MonoBehaviour
         enemies.Clear();
         spawnQueue.Clear();
         leader = null;
-        fastForward = false;
+        speed = 1;
         Time.timeScale = 1f;
     }
 
@@ -135,7 +138,7 @@ public class BattleManager : MonoBehaviour
         if (finished) return;
         finished = true;
         victory = won;
-        finishTimer = Fled ? 1f : 2f;
+        finishTimer = 2f;
         Time.timeScale = 1f;
     }
 
@@ -231,45 +234,63 @@ public class BattleManager : MonoBehaviour
             else if (Level >= 8 && r < 0.37f) spawnQueue.Add(EnemyKind.Brute);
             else spawnQueue.Add(EnemyKind.Grunt);
         }
-        if (Stages.HasBoss(Level) && Wave == Stages.WavesPerLevel) spawnQueue.Add(EnemyKind.Boss);
+        if (Wave == Stages.WavesPerLevel)
+        {
+            if (Stages.HasBoss(Level)) spawnQueue.Add(EnemyKind.Boss);           // 10라운드: 스테이지 보스
+            else if (Stages.HasMidBoss(Level)) spawnQueue.Add(EnemyKind.MidBoss); // 5라운드: 중간 보스
+        }
     }
 
     void SpawnEnemy(EnemyKind kind)
     {
         // 화면 오른쪽 바깥에서 등장
-        float y = kind == EnemyKind.Boss ? (LaneTop + LaneBottom) / 2f : Random.Range(LaneBottom, LaneTop);
+        bool isBoss = kind == EnemyKind.Boss || kind == EnemyKind.MidBoss;
+        float y = isBoss ? (LaneTop + LaneBottom) / 2f : Random.Range(LaneBottom, LaneTop);
         var pos = new Vector2(HalfScreenWidth + 1f, y);
 
         float hpMul = 1f + 0.12f * (Level - 1) + 0.1f * (Wave - 1);
         float dmgMul = 1f + 0.05f * (Level - 1);
 
-        var u = CreateUnit(kind.ToString(), Team.Enemy, pos);
+        int stage = Stages.StageOf(Level);
+        string enemyId =
+            kind == EnemyKind.Boss ? EnemyDef.BossId(stage) :
+            kind == EnemyKind.MidBoss ? EnemyDef.MidBossId(stage) :
+            kind == EnemyKind.Archer ? "goblin_archer" :
+            kind == EnemyKind.Brute ? "ogre" : "goblin";
+        var def = EnemyDef.Find(enemyId);
+        SaveData.SeenEnemies.Add(enemyId); // 도감에 등록
+
+        var u = CreateUnit(def.name, Team.Enemy, pos);
         switch (kind)
         {
             case EnemyKind.Brute:
                 u.maxHp = 150; u.damage = 12; u.attackRange = 0.5f; u.attackCooldown = 1.2f;
                 u.moveSpeed = 1.0f; u.size = 1.0f; u.goldReward = 10;
-                u.Setup(SpriteFactory.Square(), new Color(0.6f, 0.1f, 0.1f), Color.clear);
                 break;
             case EnemyKind.Archer:
                 u.maxHp = 20; u.damage = 6; u.attackRange = 4f; u.attackCooldown = 1.5f;
                 u.moveSpeed = 1.3f; u.size = 0.45f; u.goldReward = 4; u.ranged = true;
-                u.Setup(SpriteFactory.Square(), new Color(1f, 0.6f, 0.2f), Color.clear);
+                break;
+            case EnemyKind.MidBoss:
+                u.maxHp = 300; u.damage = 14; u.attackRange = 0.7f; u.attackCooldown = 1.2f;
+                u.moveSpeed = 0.8f; u.size = 1.3f; u.goldReward = 60; u.isBoss = true;
                 break;
             case EnemyKind.Boss:
                 bool demonKing = Level >= Stages.Count;
                 u.maxHp = demonKing ? 900 : 500; u.damage = demonKing ? 30 : 20; u.attackRange = 0.8f;
                 u.attackCooldown = 1.3f; u.moveSpeed = 0.7f; u.size = demonKing ? 2.0f : 1.6f; u.goldReward = 150;
                 u.isBoss = true;
-                u.Setup(SpriteFactory.Square(), demonKing ? new Color(0.15f, 0.02f, 0.05f) : new Color(0.35f, 0.1f, 0.45f),
-                    new Color(1f, 0.2f, 0.2f));
-                boss = u;
                 break;
             default:
                 u.maxHp = 30; u.damage = 5; u.attackRange = 0.4f; u.attackCooldown = 1f;
                 u.moveSpeed = 1.6f; u.size = 0.5f; u.goldReward = 3;
-                u.Setup(SpriteFactory.Square(), new Color(0.9f, 0.25f, 0.25f), Color.clear);
                 break;
+        }
+        u.Setup(SpriteFactory.Square(), def.color, isBoss ? new Color(1f, 0.2f, 0.2f) : Color.clear);
+        if (isBoss)
+        {
+            boss = u;
+            bossName = def.name;
         }
         u.maxHp *= hpMul;
         u.hp = u.maxHp;
@@ -290,12 +311,11 @@ public class BattleManager : MonoBehaviour
         return u;
     }
 
-    void SpawnCompanion(CompanionDef def, Vector2 pos)
+    void SpawnCompanion(SaveData.Member member, Vector2 pos)
     {
+        var def = member.Def;
         var c = def.job;
-        float m = RarityInfo.StatMultiplier(def.rarity);
-        if (def.IsHero) m *= 1f + AwakenBonus * SaveData.HeroAwaken;
-        m *= SaveData.LevelMultiplier(def); // 강화 레벨
+        float m = SaveData.StatMultiplier(member); // 등급 × 레벨 × 성급 × 각성/호감도
 
         var u = CreateUnit(def.name, Team.Hero, pos);
         u.heroClass = c;
@@ -475,12 +495,6 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    public void Flee()
-    {
-        Fled = true;
-        Finish(false);
-    }
-
     // ================= 전투 보너스 (로그라이크 요소: 이번 판에서만 유지) =================
 
     void OfferUpgrades()
@@ -534,13 +548,12 @@ public class BattleManager : MonoBehaviour
         UI.Text(new Rect(20, 0, w * 0.36f, 56), $"{Stages.Label(Level)}  ·  {Stages.StageName(Level)}", 19, UI.TextMain, TextAnchor.MiddleLeft, true);
         UI.Chip(new Rect(w / 2 - 80, 12, 160, 32), $"웨이브 {Mathf.Max(Wave, 1)} / {Stages.WavesPerLevel}", UI.Neutral, 18);
         UI.Text(new Rect(w - 470, 0, 140, 56), $"+{GoldEarned} 골드", 18, UI.Gold, TextAnchor.MiddleRight, true);
-        if (UI.Button(new Rect(w - 316, 10, 96, 36), fastForward ? "x2 속도" : "x1 속도", UI.Blue, 16, !finished))
+        // 배속: 누를 때마다 x1 → x2 → x3 → x4 → x1
+        if (UI.Button(new Rect(w - 316, 10, 296, 36), $"전투 속도  x{speed}   (눌러서 변경)", UI.Blue, 16, !finished))
         {
-            fastForward = !fastForward;
-            Time.timeScale = fastForward ? 2f : 1f;
+            speed = speed % 4 + 1;
+            Time.timeScale = speed;
         }
-        if (UI.Button(new Rect(w - 210, 10, 190, 36), "도망쳐 용사!", UI.Red, 17, !finished))
-            Flee();
 
         // 왼쪽: 파티 상태
         var party = new Rect(16, 66, 300, 78);
@@ -582,7 +595,7 @@ public class BattleManager : MonoBehaviour
         if (boss != null && boss.IsAlive)
         {
             float bw = Mathf.Min(420f, w - 680f);
-            UI.Text(new Rect(w / 2 - bw / 2, 64, bw, 26), Stages.BossName(Level), 19, new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleCenter, true);
+            UI.Text(new Rect(w / 2 - bw / 2, 64, bw, 26), bossName, 19, new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleCenter, true);
             UI.Bar(new Rect(w / 2 - bw / 2, 92, bw, 18), boss.hp / boss.maxHp, new Color(0.85f, 0.18f, 0.22f));
         }
 
@@ -599,7 +612,7 @@ public class BattleManager : MonoBehaviour
         if (finished)
         {
             UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.45f));
-            string text = victory ? "클리어!" : Fled ? "후다닥! 도망쳤다..." : "파티 전멸...";
+            string text = victory ? "클리어!" : "파티 전멸...";
             UI.Text(new Rect(0, 280, w, 80), text, 56, victory ? UI.Gold : new Color(1f, 0.45f, 0.45f), TextAnchor.MiddleCenter, true);
         }
     }
