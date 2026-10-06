@@ -55,6 +55,16 @@ public static class Portrait
     {
         Color rc = RarityInfo.Animated(def.rarity);
         if (glow) UI.Glow(center, radius * 1.9f, UI.WithAlpha(rc, 0.35f));
+        var art = CharacterArt.For(def.id);
+        if (art != null && art.portrait != null)
+        {
+            // 초상화가 있으면 둥근 액자 안에 초상화
+            var box = new Rect(center.x - radius, center.y - radius, radius * 2, radius * 2);
+            UI.Round(new Rect(box.x - 3, box.y - 3, box.width + 6, box.height + 6), rc);
+            CharacterArt.DrawTexture(box, art.portrait, true);
+            UI.RoundFrame(box, rc);
+            return;
+        }
         UI.Circle(center, radius + Mathf.Max(3f, radius * 0.12f), rc);
         UI.Circle(center, radius, def.job.color);
         UI.Text(new Rect(center.x - radius, center.y - radius, radius * 2, radius * 2), def.job.letter,
@@ -292,7 +302,7 @@ public class DexScreen
             int count = SaveData.CountOwned(def);
             if (count > 0)
             {
-                GachaScreen.DrawCardFace(r, def, def.IsHero && SaveData.HeroAwaken > 0 ? "각성 +" + SaveData.HeroAwaken : null);
+                GachaScreen.DrawCardFace(r, def, def.IsHero && SaveData.HeroAwaken > 0 ? "각성 +" + SaveData.HeroAwaken : null, true, 1, 0, true);
                 if (count > 1) UI.Chip(new Rect(r.xMax - 46, r.yMax - 32, 40, 24), "x" + count, new Color(0f, 0f, 0f, 0.75f), 14);
             }
             else

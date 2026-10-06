@@ -132,6 +132,7 @@ public class GameManager : MonoBehaviour
     }
 
     static float Now => Time.unscaledTime;
+    static float UIScale => Screen.height / UI.Height; // 화면 좌표 → 실제 픽셀 배율
 
     // ================= 화면 그리기 =================
 
@@ -388,11 +389,21 @@ public class GameManager : MonoBehaviour
         // 대사 상자
         var box = new Rect(40, 486, w - 80, 196);
         UI.Panel(box, new Color(0.04f, 0.04f, 0.09f, 0.90f));
+        // 용사가 말할 때는 대화 상자 왼쪽 위에 초상화
+        float textX = box.x + 40;
+        var heroArt = line.speaker == "용사" ? CharacterArt.For(CompanionDef.HeroId) : null;
+        if (heroArt != null && heroArt.portrait != null)
+        {
+            var face = new Rect(box.x + 20, box.y - 120, 200, 216);
+            UI.Round(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6), UI.Gold);
+            CharacterArt.DrawTexture(face, heroArt.portrait, true);
+            textX = face.xMax + 24;
+        }
         if (line.speaker != "")
-            UI.Chip(new Rect(box.x + 24, box.y - 20, 150, 40), line.speaker, UI.Darken(UI.Primary, 0.9f), 20);
+            UI.Chip(new Rect(textX - 16, box.y - 20, 150, 40), line.speaker, UI.Darken(UI.Primary, 0.9f), 20);
 
         // 한 글자씩 나타나는 효과
-        UI.Text(new Rect(box.x + 40, box.y + 38, box.width - 100, box.height - 60), line.text.Substring(0, shown), 25,
+        UI.Text(new Rect(textX, box.y + 38, box.xMax - textX - 60, box.height - 60), line.text.Substring(0, shown), 25,
             UI.TextMain, TextAnchor.UpperLeft);
         if (!talking && Mathf.Repeat(Now, 1f) < 0.6f)
             UI.Text(new Rect(box.xMax - 80, box.yMax - 50, 50, 40), "▼", 22, Color.white);
@@ -479,7 +490,26 @@ public class GameManager : MonoBehaviour
             bool hover = hit.Contains(e.mousePosition);
             if (hover || seat.Key == talkMember) UI.Glow(pos, radius * 2.2f, new Color(1f, 0.85f, 0.4f, 0.45f));
             UI.Glow(pos + new Vector2(0, radius * 0.9f), radius * 1.4f, new Color(0f, 0f, 0f, 0.35f)); // 그림자
-            Portrait.Draw(pos + new Vector2(0, Mathf.Sin(Now * 2f + pos.x) * 1.5f), def, radius, false);
+            var art = CharacterArt.For(def.id);
+            if (art != null && art.idle.Length > 0)
+            {
+                // 대기 그림 (발이 자리 위치에 오도록)
+                float h = 150f * scale;
+                var idleTex = art.IdleTexture(Now);
+                var pic = new Rect(pos.x - h / 2f, pos.y + radius - h * (1f - CharacterArt.FeetPivot), h, h);
+                bool faceLeft = pos.x > fire.x; // 모닥불 쪽을 바라봄
+                if (faceLeft)
+                {
+                    var saved = GUI.matrix;
+                    GUIUtility.ScaleAroundPivot(new Vector2(-1f, 1f), pos * UIScale);
+                    CharacterArt.DrawTexture(pic, idleTex, false);
+                    GUI.matrix = saved;
+                }
+                else CharacterArt.DrawTexture(pic, idleTex, false);
+                hit = new Rect(pos.x - h * 0.3f, pic.y + h * 0.1f, h * 0.6f, h * 0.9f);
+                hover = hit.Contains(e.mousePosition);
+            }
+            else Portrait.Draw(pos + new Vector2(0, Mathf.Sin(Now * 2f + pos.x) * 1.5f), def, radius, false);
             UI.Text(new Rect(pos.x - 60, pos.y + radius + 4, 120, 20), def.name, 13, hover ? UI.Gold : UI.TextMain, TextAnchor.MiddleCenter, true);
             if (GUI.Button(hit, GUIContent.none, GUIStyle.none)) clickedSitter = seat.Key;
         }
@@ -563,8 +593,18 @@ public class GameManager : MonoBehaviour
             int shown = Mathf.Min(line.Length, Mathf.FloorToInt((Now - talkStart) * TextSpeeds[Mathf.Clamp(SaveData.TextSpeed, 0, 2)]));
             var box = new Rect(sceneL, 600, sceneR - sceneL, 100);
             UI.Panel(box, new Color(0.04f, 0.04f, 0.09f, 0.92f));
-            UI.Chip(new Rect(box.x + 20, box.y - 16, 150, 32), talkMember.Def.name, UI.Darken(UI.Primary, 0.9f), 16);
-            UI.Text(new Rect(box.x + 24, box.y + 26, box.width - 90, box.height - 34), line.Substring(0, shown), 19, UI.TextMain, TextAnchor.UpperLeft);
+            float textX = box.x + 24;
+            var talkArt = CharacterArt.For(talkMember.Def.id);
+            if (talkArt != null && talkArt.portrait != null)
+            {
+                // 대화 상자 왼쪽 위로 초상화
+                var face = new Rect(box.x + 14, box.y - 92, 170, 184);
+                UI.Round(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6), RarityInfo.Animated(talkMember.Def.rarity));
+                CharacterArt.DrawTexture(face, talkArt.portrait, true);
+                textX = face.xMax + 18;
+            }
+            UI.Chip(new Rect(textX - 4, box.y - 16, 150, 32), talkMember.Def.name, UI.Darken(UI.Primary, 0.9f), 16);
+            UI.Text(new Rect(textX, box.y + 26, box.xMax - textX - 60, box.height - 34), line.Substring(0, shown), 19, UI.TextMain, TextAnchor.UpperLeft);
             if (UI.Button(new Rect(box.xMax - 44, box.y + 8, 34, 30), "X", UI.Neutral, 14)) talkMember = null;
             else if (UI.ClickedAnywhere())
             {

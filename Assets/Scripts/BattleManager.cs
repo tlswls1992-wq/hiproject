@@ -329,6 +329,7 @@ public class BattleManager : MonoBehaviour
         u.splashRadius = c.splash;
         u.size = c.size;
         u.ranged = c.ranged;
+        u.art = CharacterArt.For(def.id); // 그림이 있으면 그림으로 나옴
         u.Setup(SpriteFactory.Circle(), c.color, RarityInfo.GetColor(def.rarity));
         heroes.Add(u);
         if (def.IsHero) leader = u;

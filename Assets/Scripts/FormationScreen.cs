@@ -195,10 +195,22 @@ public class FormationScreen
         var def = m.Def;
         Color rc = RarityInfo.Animated(def.rarity);
         if (def.IsHero) UI.Glow(center, radius * 1.8f, new Color(1f, 0.85f, 0.3f, 0.5f));
-        UI.Circle(center, radius + 4f, rc);
-        UI.Circle(center, radius, def.job.color);
-        UI.Text(new Rect(center.x - radius, center.y - radius, radius * 2, radius * 2), def.job.letter, Mathf.RoundToInt(radius * 0.9f),
-            Color.white, TextAnchor.MiddleCenter, true);
+        var art = CharacterArt.For(def.id);
+        if (art != null && art.idle.Length > 0)
+        {
+            // 대기 그림: 발밑에 등급 색 원, 발이 동그라미 아래쪽에 오도록
+            UI.Glow(center + new Vector2(0, radius * 0.7f), radius * 1.2f, UI.WithAlpha(rc, 0.7f));
+            float h = radius * 3.6f;
+            CharacterArt.DrawTexture(new Rect(center.x - h / 2f, center.y + radius - h * (1f - CharacterArt.FeetPivot), h, h),
+                art.IdleTexture(Time.unscaledTime), false);
+        }
+        else
+        {
+            UI.Circle(center, radius + 4f, rc);
+            UI.Circle(center, radius, def.job.color);
+            UI.Text(new Rect(center.x - radius, center.y - radius, radius * 2, radius * 2), def.job.letter, Mathf.RoundToInt(radius * 0.9f),
+                Color.white, TextAnchor.MiddleCenter, true);
+        }
         UI.Text(new Rect(center.x - 50, center.y + radius + 2, 100, 18), def.name, 12, Color.white, TextAnchor.MiddleCenter, true);
         if (m.star > 1) UI.Text(new Rect(center.x - 40, center.y - radius - 18, 80, 16), Stars(m.star), 11, UI.Gold, TextAnchor.MiddleCenter, true);
     }
@@ -214,9 +226,19 @@ public class FormationScreen
         UI.Text(new Rect(r.x + 6, r.y + 4, r.width - 12, 18), "Lv." + m.level, 12, UI.TextMain, TextAnchor.MiddleRight, true);
         var c = new Vector2(r.center.x, r.y + r.height * 0.45f);
         float rad = r.width * 0.24f;
-        UI.Circle(c, rad + 3f, rc);
-        UI.Circle(c, rad, def.job.color);
-        UI.Text(new Rect(c.x - rad, c.y - rad, rad * 2, rad * 2), def.job.letter, Mathf.RoundToInt(rad * 1.1f), Color.white, TextAnchor.MiddleCenter, true);
+        var art = CharacterArt.For(def.id);
+        if (art != null && art.portrait != null)
+        {
+            var face = new Rect(r.x + 10, r.y + 22, r.width - 20, r.height - 50);
+            CharacterArt.DrawTexture(face, art.portrait, true);
+            UI.RoundFrame(face, rc);
+        }
+        else
+        {
+            UI.Circle(c, rad + 3f, rc);
+            UI.Circle(c, rad, def.job.color);
+            UI.Text(new Rect(c.x - rad, c.y - rad, rad * 2, rad * 2), def.job.letter, Mathf.RoundToInt(rad * 1.1f), Color.white, TextAnchor.MiddleCenter, true);
+        }
         UI.Text(new Rect(r.x + 2, r.yMax - 26, r.width - 4, 22), def.name, 13, Color.white, TextAnchor.MiddleCenter, true);
     }
 }

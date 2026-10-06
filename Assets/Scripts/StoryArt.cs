@@ -135,6 +135,14 @@ public static class StoryArt
             UI.EndRotate(saved);
         }
 
+        // 진짜 그림이 있으면 그림으로, 없으면 도형으로 그린 용사
+        var art = CharacterArt.For(CompanionDef.HeroId);
+        if (art != null && art.full != null)
+        {
+            DrawHeroWithArt(art, c);
+            return;
+        }
+
         // 몸 (망토 → 옷)
         UI.Fill(new Rect(c.x - 85, c.y + 55, 170, 190), new Color(0.75f, 0.15f, 0.2f));
         UI.Fill(new Rect(c.x - 65, c.y + 55, 130, 180), new Color(0.2f, 0.4f, 0.8f));
@@ -190,6 +198,41 @@ public static class StoryArt
         var bubble = new Rect(c.x - 190, c.y - 150 - 6f * Mathf.Abs(Mathf.Sin(Now * 5f)), 120 * pop, 60 * pop);
         UI.Fill(bubble, Color.white);
         UI.Fill(new Rect(bubble.xMax - 30, bubble.yMax - 2, 16, 18), Color.white);
+        UI.Text(bubble, "헤헤", 30, new Color(0.3f, 0.15f, 0.1f), TextAnchor.MiddleCenter, true);
+    }
+
+    // 전신 그림 + 머리 위로 뒤집히며 빛나는 카드 + "헤헤" 말풍선
+    static void DrawHeroWithArt(CharacterArt art, Vector2 c)
+    {
+        var body = new Rect(c.x - 150, c.y - 175, 300, 450);
+        CharacterArt.DrawTexture(body, art.full, false);
+
+        // 1.6초마다 카드 한 장이 손 위로 떠올라 뒤집히며 빛남
+        float cycle = 1.6f;
+        float t = Mathf.Repeat(Now, cycle) / cycle;
+        int pick = Mathf.FloorToInt(Now / cycle);
+        var cardColor = RarityInfo.GetColor((Rarity)(pick % RarityInfo.Count));
+        float lift = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 2.5f));
+        var spot = new Vector2(c.x - 120, c.y - 40 - 80 * lift);
+        float flip = Mathf.Clamp01((t - 0.4f) / 0.2f);
+        float widthScale = Mathf.Abs(Mathf.Cos(flip * Mathf.PI));
+        var cardRect = new Rect(spot.x - 30 * widthScale, spot.y - 43, 60 * widthScale, 86);
+        if (flip >= 0.5f)
+        {
+            float burst = Mathf.Clamp01((t - 0.6f) / 0.4f);
+            UI.Glow(spot, 60f + 120f * burst, UI.WithAlpha(cardColor, 0.9f * (1f - burst)));
+            UI.Glow(spot, 55f, UI.WithAlpha(cardColor, 0.6f));
+            UI.Fill(cardRect, cardColor);
+            UI.Fill(new Rect(cardRect.x + 5, cardRect.y + 5, Mathf.Max(0, cardRect.width - 10), cardRect.height - 10), UI.Darken(cardColor, 0.5f));
+            if (widthScale > 0.8f) UI.Text(cardRect, "★", 30, Color.white, TextAnchor.MiddleCenter, true);
+        }
+        else DrawCardBack(cardRect);
+
+        // 말풍선 "헤헤"
+        float pop = 1f + 0.08f * Mathf.Abs(Mathf.Sin(Now * 5f));
+        var bubble = new Rect(c.x + 70, c.y - 200 - 6f * Mathf.Abs(Mathf.Sin(Now * 5f)), 120 * pop, 60 * pop);
+        UI.Round(bubble, Color.white);
+        UI.Fill(new Rect(bubble.x + 18, bubble.yMax - 2, 16, 18), Color.white);
         UI.Text(bubble, "헤헤", 30, new Color(0.3f, 0.15f, 0.1f), TextAnchor.MiddleCenter, true);
     }
 

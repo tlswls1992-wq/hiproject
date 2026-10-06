@@ -220,7 +220,8 @@ public class GachaScreen
 
     // 동료 카드 앞면 (동료 목록 화면에서도 사용)
     // star: 성급 (★ 개수), level: 0이면 레벨 표시 안 함
-    public static void DrawCardFace(Rect r, CompanionDef def, string tag, bool drawText = true, int star = 1, int level = 0)
+    // usePortrait: 그림이 있으면 전신 대신 초상화를 넣음 (도감용)
+    public static void DrawCardFace(Rect r, CompanionDef def, string tag, bool drawText = true, int star = 1, int level = 0, bool usePortrait = false)
     {
         Color rc = RarityInfo.Animated(def.rarity);
         float s = r.height / 300f; // 카드 크기에 맞춰 글자 크기 조절
@@ -237,13 +238,28 @@ public class GachaScreen
             UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), "Lv." + level,
                 Mathf.RoundToInt(18 * s), UI.TextMain, TextAnchor.MiddleRight, true);
 
-        // 직업 문양
+        // 캐릭터 그림 (없으면 직업 문양)
         var center = new Vector2(r.center.x, r.y + 120f * s);
-        UI.Glow(center, 75f * s, UI.WithAlpha(def.job.color, 0.5f));
-        UI.Circle(center, 50f * s, rc);
-        UI.Circle(center, 44f * s, def.job.color);
-        UI.Text(new Rect(center.x - 50f * s, center.y - 50f * s, 100f * s, 100f * s), def.job.letter,
-            Mathf.RoundToInt(40 * s), Color.white, TextAnchor.MiddleCenter, true);
+        var art = CharacterArt.For(def.id);
+        var picture = art == null ? null : usePortrait ? (art.portrait ?? art.full) : (art.full ?? art.portrait);
+        if (picture != null)
+        {
+            UI.Glow(center, 85f * s, UI.WithAlpha(rc, 0.45f));
+            bool isPortrait = picture == art.portrait;
+            var area = isPortrait
+                ? new Rect(r.x + 8f * s, r.y + 40f * s, r.width - 16f * s, 140f * s)
+                : new Rect(r.x + 6f * s, r.y + 30f * s, r.width - 12f * s, 154f * s);
+            CharacterArt.DrawTexture(area, picture, isPortrait);
+            if (isPortrait) UI.RoundFrame(area, UI.WithAlpha(rc, 0.8f));
+        }
+        else
+        {
+            UI.Glow(center, 75f * s, UI.WithAlpha(def.job.color, 0.5f));
+            UI.Circle(center, 50f * s, rc);
+            UI.Circle(center, 44f * s, def.job.color);
+            UI.Text(new Rect(center.x - 50f * s, center.y - 50f * s, 100f * s, 100f * s), def.job.letter,
+                Mathf.RoundToInt(40 * s), Color.white, TextAnchor.MiddleCenter, true);
+        }
 
         UI.Text(new Rect(r.x + 4f, r.y + 185f * s, r.width - 8f, 36f * s), def.name, Mathf.RoundToInt(26 * s), Color.white, TextAnchor.MiddleCenter, true);
         UI.Text(new Rect(r.x + 4f, r.y + 220f * s, r.width - 8f, 26f * s), $"{RarityInfo.Name(def.rarity)} · {def.job.name}",

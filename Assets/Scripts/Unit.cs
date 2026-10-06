@@ -20,6 +20,7 @@ public class Unit : MonoBehaviour
     public Vector2 homePosition;     // 편성한 자리 (동료만 사용)
     public bool isBoss;
     public bool isLeader;            // 용사
+    public CharacterArt art;         // 캐릭터 그림 (있으면 동그라미 대신 그림으로 나옴, Setup 전에 넣기)
 
     const float BarWidth = 0.8f;
 
@@ -31,6 +32,11 @@ public class Unit : MonoBehaviour
     SpriteRenderer hpBack;
     SpriteRenderer hpFillRenderer;
     Transform hpFill;
+    float animClock;                 // 대기 그림 재생용 시간
+    float attackAnimStart = -100f;   // 공격 그림을 시작한 시간
+    bool facingRight = true;         // 그림은 오른쪽(적이 오는 쪽)을 보고 있음
+
+    bool UsesArt => art != null && art.HasBattleSprites;
 
     public bool IsAlive => hp > 0f;
 
@@ -45,20 +51,44 @@ public class Unit : MonoBehaviour
         {
             var ringGo = new GameObject("Ring");
             ringGo.transform.SetParent(transform, false);
-            ringGo.transform.localScale = Vector3.one * (size + 0.18f);
             ring = ringGo.AddComponent<SpriteRenderer>();
-            ring.sprite = sprite;
-            ring.color = ringColor;
+            ring.sprite = SpriteFactory.Circle();
+            if (UsesArt)
+            {
+                // 그림이 있으면 발밑에 등급 색 납작한 원 (그림자처럼)
+                ringGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
+                ringGo.transform.localScale = new Vector3(size + 0.6f, (size + 0.6f) * 0.32f, 1f);
+                ring.color = new Color(ringColor.r, ringColor.g, ringColor.b, 0.55f);
+            }
+            else
+            {
+                ringGo.transform.localScale = Vector3.one * (size + 0.18f);
+                ring.sprite = sprite;
+                ring.color = ringColor;
+            }
         }
 
         var bodyGo = new GameObject("Body");
         bodyGo.transform.SetParent(transform, false);
-        bodyGo.transform.localScale = Vector3.one * size;
         body = bodyGo.AddComponent<SpriteRenderer>();
-        body.sprite = sprite;
-        body.color = color;
-
         float barY = size * 0.5f + 0.15f;
+        if (UsesArt)
+        {
+            // 그림의 발 위치가 동그라미 아래쪽에 오도록 놓음 (그림 크기는 CharacterArt.BattleCanvasHeight)
+            bodyGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
+            body.sprite = art.IdleSprite(0f);
+            baseColor = color = Color.white;
+            body.color = Color.white;
+            lastX = transform.position.x;
+            barY = -size * 0.5f + CharacterArt.BattleCanvasHeight * (1f - CharacterArt.FeetPivot) * 0.92f;
+        }
+        else
+        {
+            bodyGo.transform.localScale = Vector3.one * size;
+            body.sprite = sprite;
+            body.color = color;
+        }
+
         hpBack = MakeBar("HpBack", new Color(0f, 0f, 0f, 0.6f), barY);
         hpBack.transform.localScale = new Vector3(BarWidth, 0.1f, 1f);
         hpFillRenderer = MakeBar("HpFill", team == Team.Hero ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f), barY);
@@ -106,8 +136,10 @@ public class Unit : MonoBehaviour
         if (flashTimer > 0f)
         {
             flashTimer -= dt;
-            body.color = flashTimer > 0f ? Color.white : baseColor;
+            // 맞으면 잠깐 번쩍 (그림은 붉게, 동그라미는 하얗게)
+            body.color = flashTimer > 0f ? (UsesArt ? new Color(1f, 0.55f, 0.55f) : Color.white) : baseColor;
         }
+        if (UsesArt) Animate(dt);
 
         Vector2 pos = transform.position;
         Vector2 moveDir = team == Team.Hero ? HeroThink(pos, battle) : EnemyThink(pos, battle);
@@ -171,11 +203,32 @@ public class Unit : MonoBehaviour
 
     static Vector2 DirectionTo(Vector2 from, Vector2 to) => (to - from).normalized;
 
+    // 그림이 있는 캐릭터: 공격 중이면 공격 그림, 아니면 대기 그림. 움직이는 방향을 바라봄
+    void Animate(float dt)
+    {
+        animClock += dt;
+        Vector2 now = transform.position;
+        if (now.x - lastX > 0.002f) facingRight = true;
+        else if (now.x - lastX < -0.002f) facingRight = false;
+        lastX = now.x;
+
+        // 공격 그림이 공격 간격보다 길면 빨리 재생해서 다음 공격 전에 끝나게 함
+        float cd = Mathf.Max(0.2f, attackCooldown * 0.9f);
+        float speed = Mathf.Max(1f, art.AttackLength / cd);
+        var atk = art.AttackSprite(Time.time - attackAnimStart, speed);
+        body.sprite = atk != null ? atk : art.IdleSprite(animClock);
+        body.flipX = !facingRight;
+    }
+
+    float lastX;
+
     void TryAttack(Unit target)
     {
         if (cooldownTimer > 0f) return;
         var battle = BattleManager.Instance;
         cooldownTimer = attackCooldown * battle.CooldownMultiplier(this);
+        attackAnimStart = Time.time;
+        facingRight = target.transform.position.x >= transform.position.x;
         float dmg = damage * battle.DamageMultiplier(this);
         float splash = splashRadius * battle.SplashMultiplier(this);
 
