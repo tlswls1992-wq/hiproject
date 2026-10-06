@@ -171,25 +171,36 @@ public class GameManager : MonoBehaviour
     void DrawTitle()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.08f, 0.10f, 0.30f), new Color(0.35f, 0.15f, 0.40f));
-
-        // 반짝이는 별
-        for (int i = 0; i < 40; i++)
+        // 노을 진 왕국 배경 + 떠다니는 빛가루
+        UI.Backdrop("title");
+        for (int i = 0; i < 24; i++)
         {
-            float x = Mathf.Repeat(i * 137.5f, w);
-            float y = Mathf.Repeat(i * 89.3f, 450f);
-            float a = 0.3f + 0.7f * Mathf.Abs(Mathf.Sin(Now * (0.5f + i % 5 * 0.3f) + i));
-            UI.Glow(new Vector2(x, y), 8f, new Color(1f, 1f, 0.9f, a));
+            float x = Mathf.Repeat(i * 97.3f + Now * 10f, w);
+            float y = 560f - Mathf.Repeat(i * 41.7f + Now * (14f + i % 4 * 5f), 520f);
+            UI.Glow(new Vector2(x, y), 5f + i % 3, new Color(1f, 0.85f, 0.55f, 0.55f));
         }
 
-        UI.Glow(new Vector2(w / 2f, 170f), 330f, new Color(1f, 0.8f, 0.3f, 0.25f));
-        UI.Text(new Rect(0, 100, w, 110), "가챠 용사", 96, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(0, 205, w, 40), "마왕을 무찌를 동료는 뽑기로 정한다!", 24, Color.white);
+        // 오른쪽: 용사 전신 (천천히 숨 쉬듯 움직임)
+        var heroArt = CharacterArt.For(CompanionDef.HeroId);
+        if (heroArt != null && heroArt.full != null)
+        {
+            float bob = Mathf.Sin(Now * 1.6f) * 4f;
+            UI.Glow(new Vector2(w * 0.74f, 400f), 330f, new Color(1f, 0.75f, 0.45f, 0.25f));
+            CharacterArt.DrawTexture(new Rect(w * 0.74f - 230f, 50f + bob, 460f, 690f), heroArt.full, false);
+        }
+
+        // 왼쪽: 제목
+        float cx = heroArt != null ? w * 0.32f : w / 2f;
+        UI.Glow(new Vector2(cx, 165f), 300f, new Color(0f, 0f, 0f, 0.35f));
+        UI.Text(new Rect(cx - 320, 100, 640, 120), "가챠 용사", 92, UI.Gold, TextAnchor.MiddleCenter, true);
+        UI.Fill(new Rect(cx - 200, 222, 400, 1), UI.WithAlpha(UI.Gold, 0.7f));
+        UI.Diamond(new Vector2(cx, 222.5f), 8f, UI.Gold);
+        UI.Text(new Rect(cx - 320, 232, 640, 36), "마왕을 무찌를 동료는 뽑기로 정한다!", 21, UI.TextMain);
 
         // 메뉴 (확인 창이 떠 있을 때는 눌리지 않게 막습니다)
         bool active = modal == Modal.None;
-        float bx = w / 2f - 150f, by = 290f;
-        const float bh = 58f, gap = 14f;
+        float bx = cx - 150f, by = 300f;
+        const float bh = 56f, gap = 12f;
         if (UI.Button(new Rect(bx, by, 300, bh), "새로 시작", UI.Primary, 24, active))
         {
             if (SaveData.HasSave) modal = Modal.ConfirmNewGame;
@@ -225,7 +236,7 @@ public class GameManager : MonoBehaviour
         float w = UI.Width;
         UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.7f));
         var box = new Rect(w / 2f - 280f, 230f, 560f, 260f);
-        UI.Panel(box, new Color(0.10f, 0.11f, 0.18f, 0.97f));
+        UI.Panel(box, UI.WithAlpha(UI.PanelColor, 0.98f));
         UI.Text(new Rect(box.x + 30, box.y + 24, box.width - 60, 120), message, 21, UI.TextMain);
         bool yes = UI.Button(new Rect(box.x + 50, box.y + 170, 210, 60), yesLabel, UI.Red);
         bool no = UI.Button(new Rect(box.xMax - 260, box.y + 170, 210, 60), "취소", UI.Neutral);
@@ -284,7 +295,7 @@ public class GameManager : MonoBehaviour
     void DrawSaveLoad()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.10f, 0.12f, 0.22f), new Color(0.05f, 0.05f, 0.10f));
+        UI.Backdrop("menu");
         UI.TopBar(saveLoadIsLoad ? "불러오기" : "저장하기", false);
 
         for (int slot = 0; slot < SaveData.SlotCount; slot++)
@@ -325,7 +336,7 @@ public class GameManager : MonoBehaviour
     void DrawSettings()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.12f, 0.12f, 0.18f), new Color(0.05f, 0.05f, 0.08f));
+        UI.Backdrop("menu");
         UI.TopBar("설정", false);
         UI.Panel(new Rect(w / 2f - 420f, 96f, 840f, 400f));
 
@@ -388,7 +399,7 @@ public class GameManager : MonoBehaviour
 
         // 대사 상자
         var box = new Rect(40, 486, w - 80, 196);
-        UI.Panel(box, new Color(0.04f, 0.04f, 0.09f, 0.90f));
+        UI.Panel(box, UI.WithAlpha(UI.PanelColor, 0.94f));
         // 용사가 말할 때는 대화 상자 왼쪽 위에 초상화
         float textX = box.x + 40;
         var heroArt = line.speaker == "용사" ? CharacterArt.For(CompanionDef.HeroId) : null;
@@ -439,22 +450,15 @@ public class GameManager : MonoBehaviour
         float w = UI.Width;
         var e = Event.current;
 
-        // 밤하늘, 별, 숲, 땅
-        UI.Gradient(UI.Full, new Color(0.04f, 0.05f, 0.14f), new Color(0.15f, 0.11f, 0.20f));
-        for (int i = 0; i < 40; i++)
+        // 밤 숲속 공터 배경 + 반짝이는 별 몇 개
+        UI.Backdrop("camp");
+        for (int i = 0; i < 14; i++)
         {
             float x = Mathf.Repeat(i * 137.5f, w);
-            float y = Mathf.Repeat(i * 47.3f, 260f) + 64f;
-            float a = 0.2f + 0.6f * Mathf.Abs(Mathf.Sin(Now * (0.4f + i % 5 * 0.25f) + i));
-            UI.Glow(new Vector2(x, y), 5f, new Color(1f, 1f, 0.9f, a));
+            float y = Mathf.Repeat(i * 47.3f, 220f) + 70f;
+            float a = 0.15f + 0.6f * Mathf.Abs(Mathf.Sin(Now * (0.4f + i % 5 * 0.25f) + i));
+            UI.Glow(new Vector2(x, y), 6f, new Color(1f, 0.97f, 0.85f, a));
         }
-        for (int i = 0; i < 16; i++)
-        {
-            float x = i * (w / 14f) - 30f;
-            UI.Fill(new Rect(x - 8, 330, 16, 50), new Color(0.06f, 0.05f, 0.05f));
-            UI.Circle(new Vector2(x, 320 + (i % 3) * 14), 62 + (i % 2) * 22, new Color(0.04f, 0.09f, 0.07f));
-        }
-        UI.Fill(new Rect(0, 370, w, 350), new Color(0.09f, 0.12f, 0.09f));
 
         UI.TopBar($"야영지   ·   {SaveData.Cycle}회차");
 
@@ -545,7 +549,7 @@ public class GameManager : MonoBehaviour
             : Stages.HasMidBoss(selectedStage) ? $"중간 보스  {Stages.MidBossName(selectedStage)}"
             : $"라운드 {Stages.SubOf(selectedStage)}  ·  웨이브 {Stages.WavesPerLevel}개";
         UI.Chip(new Rect(left.x + 20, left.y + 174, left.width - 40, 30), roundInfo,
-            Stages.HasBoss(selectedStage) ? UI.Red : Stages.HasMidBoss(selectedStage) ? new Color(0.5f, 0.3f, 0.65f) : UI.Neutral, 14);
+            Stages.HasBoss(selectedStage) ? UI.Red : Stages.HasMidBoss(selectedStage) ? UI.Plum : UI.Neutral, 14);
         bool firstTime = selectedStage > SaveData.ClearedStage;
         int reward = Stages.ClearReward(selectedStage) * (firstTime ? 2 : 1);
         UI.Text(new Rect(left.x, left.y + 212, left.width, 24), $"클리어 보상 {reward:N0} 골드" + (firstTime ? " (최초 2배)" : ""), 15, UI.Gold);
@@ -565,13 +569,13 @@ public class GameManager : MonoBehaviour
         my += 80;
         if (UI.Button(new Rect(mx, my, mw, 54), "편성", UI.Green, 20)) { formation.Open(); page = Page.Formation; }
         my += 64;
-        if (UI.Button(new Rect(mx, my, mw, 54), "동료  (강화 · 판매)", new Color(0.50f, 0.36f, 0.72f), 18)) { members.Open(); page = Page.Members; }
+        if (UI.Button(new Rect(mx, my, mw, 54), "동료  (강화 · 판매)", UI.Plum, 18)) { members.Open(); page = Page.Members; }
         my += 64;
         if (UI.Button(new Rect(mx, my, mw, 54), "도감", UI.Blue, 20)) { dex.Open(); page = Page.Dex; }
         my += 64;
         if (SaveData.RunCleared)
         {
-            if (UI.Button(new Rect(mx, my, mw, 54), "전승 특전", new Color(0.8f, 0.35f, 0.5f), 20)) { legacy.Open(); page = Page.Legacy; }
+            if (UI.Button(new Rect(mx, my, mw, 54), "전승 특전", new Color(0.55f, 0.24f, 0.30f), 20)) { legacy.Open(); page = Page.Legacy; }
             my += 64;
         }
         float half = (mw - 10f) / 2f;
@@ -592,7 +596,7 @@ public class GameManager : MonoBehaviour
             string line = lines[talkIndex % lines.Length];
             int shown = Mathf.Min(line.Length, Mathf.FloorToInt((Now - talkStart) * TextSpeeds[Mathf.Clamp(SaveData.TextSpeed, 0, 2)]));
             var box = new Rect(sceneL, 600, sceneR - sceneL, 100);
-            UI.Panel(box, new Color(0.04f, 0.04f, 0.09f, 0.92f));
+            UI.Panel(box, UI.WithAlpha(UI.PanelColor, 0.95f));
             float textX = box.x + 24;
             var talkArt = CharacterArt.For(talkMember.Def.id);
             if (talkArt != null && talkArt.portrait != null)
@@ -640,7 +644,7 @@ public class GameManager : MonoBehaviour
     void DrawGachaSelect()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.09f, 0.05f, 0.18f), new Color(0.20f, 0.08f, 0.22f));
+        UI.Backdrop("menu");
         UI.TopBar("소환");
 
         var banners = GachaBanner.All;
@@ -765,7 +769,7 @@ public class GameManager : MonoBehaviour
     void DrawResult()
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, resultVictory ? new Color(0.32f, 0.23f, 0.10f) : new Color(0.20f, 0.08f, 0.10f), new Color(0.05f, 0.05f, 0.08f));
+        UI.Backdrop(resultVictory ? "title" : "menu", resultVictory ? 0.45f : 0.2f);
         if (resultVictory) UI.Glow(new Vector2(w / 2f, 150f), 300f, new Color(1f, 0.8f, 0.3f, 0.35f));
 
         UI.Text(new Rect(0, 80, w, 90), resultVictory ? "승리!" : "패배...", 72,

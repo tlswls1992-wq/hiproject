@@ -99,7 +99,7 @@ public class MemberScreen
     {
         float w = UI.Width;
         var e = Event.current;
-        UI.Gradient(UI.Full, new Color(0.10f, 0.13f, 0.22f), new Color(0.05f, 0.06f, 0.10f));
+        UI.Backdrop("menu");
         UI.TopBar($"동료   {SaveData.CompanionCount}명  ·  성급 강화 / 판매");
         bool active = confirm == Confirm.None;
 
@@ -197,7 +197,7 @@ public class MemberScreen
                 }
             }
             var go = new Rect(mergeBox.xMax - 240, mergeBox.y + 68, 220, 54);
-            if (UI.Button(go, $"★{selected.star} → ★{selected.star + 1}  강화", new Color(0.50f, 0.36f, 0.72f), 18, active && material != null))
+            if (UI.Button(go, $"★{selected.star} → ★{selected.star + 1}  강화", UI.Plum, 18, active && material != null))
                 confirm = Confirm.Merge;
             UI.Text(new Rect(mergeBox.x + 20, mergeBox.yMax - 40, mergeBox.width - 40, 26),
                 $"강화하면 성급 1마다 능력치 +{SaveData.StarBonus * 100:0}% · 재료로 쓴 동료는 사라져요", 14, UI.TextSub, TextAnchor.MiddleLeft);
@@ -234,7 +234,7 @@ public class MemberScreen
         float w = UI.Width;
         UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.7f));
         var box = new Rect(w / 2f - 280f, 220f, 560f, 270f);
-        UI.Panel(box, new Color(0.10f, 0.11f, 0.18f, 0.97f));
+        UI.Panel(box, UI.WithAlpha(UI.PanelColor, 0.98f));
         UI.Text(new Rect(box.x + 30, box.y + 24, box.width - 60, 140), message, 19, UI.TextMain);
         if (UI.Button(new Rect(box.x + 50, box.y + 186, 210, 58), yes, UI.Red)) { confirm = Confirm.None; return 1; }
         if (UI.Button(new Rect(box.xMax - 260, box.y + 186, 210, 58), "취소", UI.Neutral)) { confirm = Confirm.None; return 2; }
@@ -258,7 +258,7 @@ public class DexScreen
     public void Draw(System.Action onExit)
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.10f, 0.12f, 0.22f), new Color(0.05f, 0.05f, 0.10f));
+        UI.Backdrop("menu");
         UI.TopBar("도감");
 
         // 탭
@@ -341,7 +341,7 @@ public class DexScreen
             var r = new Rect((i % perRow) * (cw + gap), 8 + (i / perRow) * (ch + gap), cw, ch);
             bool known = SaveData.SeenEnemies.Contains(en.id);
             UI.Panel(r);
-            Color typeColor = en.type == EnemyType.Boss ? UI.Red : en.type == EnemyType.MidBoss ? new Color(0.5f, 0.3f, 0.65f) : UI.Neutral;
+            Color typeColor = en.type == EnemyType.Boss ? UI.Red : en.type == EnemyType.MidBoss ? UI.Plum : UI.Neutral;
             var icon = new Rect(r.x + 14, r.y + 20, 56, 56);
             if (known)
             {
@@ -380,7 +380,7 @@ public class LegacyScreen
     public void Draw(System.Action onExit, System.Action onNewCycle, System.Action<string> toast)
     {
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.22f, 0.10f, 0.20f), new Color(0.08f, 0.05f, 0.10f));
+        UI.Backdrop("title", 0.55f);
         UI.TopBar($"전승 특전   {SaveData.Cycle}회차 클리어", false);
         bool active = !confirmNewCycle;
 
@@ -406,7 +406,7 @@ public class LegacyScreen
                 aff > 0 ? new Color(1f, 0.5f, 0.6f) : UI.TextSub, TextAnchor.MiddleLeft, true);
             int points = SaveData.LegacyPoints(def);
             UI.Text(new Rect(r.xMax - 360, r.y, 160, rowH), $"남은 포인트 {points}", 16, points > 0 ? UI.Gold : UI.TextSub, TextAnchor.MiddleRight, true);
-            if (UI.Button(new Rect(r.xMax - 180, r.y + 13, 164, 44), "호감도 +1", new Color(0.8f, 0.35f, 0.5f), 17, active && points > 0)
+            if (UI.Button(new Rect(r.xMax - 180, r.y + 13, 164, 44), "호감도 +1", new Color(0.55f, 0.24f, 0.30f), 17, active && points > 0)
                 && SaveData.RaiseAffinity(def))
                 toast($"{def.name}의 호감도가 올랐어요! ({Portrait.Hearts(SaveData.AffinityOf(def))})");
         }
@@ -422,7 +422,7 @@ public class LegacyScreen
         {
             UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.7f));
             var box = new Rect(w / 2f - 290f, 210f, 580f, 290f);
-            UI.Panel(box, new Color(0.10f, 0.11f, 0.18f, 0.97f));
+            UI.Panel(box, UI.WithAlpha(UI.PanelColor, 0.98f));
             UI.Text(new Rect(box.x + 30, box.y + 24, box.width - 60, 160),
                 $"{SaveData.Cycle + 1}회차를 시작할까요?\n\n동료 · 골드 · 스테이지 진행은 처음부터 다시 시작하고,\n호감도와 적 도감만 이어져요.\n(남은 전승 포인트는 사라져요)", 18, UI.TextMain);
             if (UI.Button(new Rect(box.x + 50, box.y + 206, 220, 58), "시작하기", UI.Primary)) { confirmNewCycle = false; onNewCycle(); }

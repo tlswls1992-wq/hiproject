@@ -54,7 +54,7 @@ public class FormationScreen
         float w = UI.Width;
         var e = Event.current;
         Vector2 mouse = e.mousePosition;
-        UI.Gradient(UI.Full, new Color(0.12f, 0.18f, 0.16f), new Color(0.05f, 0.08f, 0.08f));
+        UI.Backdrop("menu");
         UI.TopBar($"편성   출진 {SaveData.Party.Count} / {SaveData.DeployCap}명", false);
 
         // ---- 줄 (선두 ~ 후미) ----

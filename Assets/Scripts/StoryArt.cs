@@ -248,8 +248,9 @@ public static class StoryArt
     public static void DrawBoss(float w, int level, bool talking)
     {
         Color sky = Stages.SkyColor(level);
-        UI.Gradient(UI.Full, UI.Darken(sky, 0.35f), new Color(0.03f, 0.02f, 0.04f));
-        UI.Fill(new Rect(0, 420, w, 300), UI.Darken(Stages.GroundColor(level), 0.4f));
+        // 그 스테이지의 전투 배경을 어둡게 깔고 보스를 그림
+        UI.Backdrop("battle_" + (Stages.StageOf(level) + 1), 0.6f);
+        UI.Fill(UI.Full, UI.WithAlpha(UI.Darken(sky, 0.3f), 0.35f));
 
         bool demonKing = level >= Stages.Count;
         float shake = talking ? Mathf.Sin(Now * 40f) * 2f : 0f;
@@ -295,17 +296,13 @@ public static class StoryArt
 
     public static void DrawKingdom(float w)
     {
-        UI.Gradient(UI.Full, new Color(0.45f, 0.70f, 0.95f), new Color(0.85f, 0.90f, 1f));
-        UI.Fill(new Rect(0, 400, w, 320), new Color(0.40f, 0.65f, 0.32f));
-        float cx = w / 2f, gy = 400f;
-        var c = new Color(0.85f, 0.85f, 0.9f);
-        UI.Fill(new Rect(cx - 150f, gy - 140f, 300f, 140f), c);
-        UI.Fill(new Rect(cx - 190f, gy - 200f, 70f, 200f), c);
-        UI.Fill(new Rect(cx + 120f, gy - 200f, 70f, 200f), c);
-        UI.Fill(new Rect(cx - 45f, gy - 260f, 90f, 260f), c);
-        UI.Fill(new Rect(cx - 25f, gy - 70f, 50f, 70f), UI.Darken(c, 0.4f));
-        float sway = Mathf.Sin(Now * 2f) * 6f;
-        UI.Fill(new Rect(cx - 2, gy - 320, 4, 60), Color.gray);
-        UI.Fill(new Rect(cx + 2, gy - 318, 40 + sway, 24), new Color(0.15f, 0.25f, 0.6f));
+        // 노을 지는 왕국 (타이틀과 같은 배경) + 천천히 떠다니는 빛가루
+        UI.Backdrop("title", 0.15f);
+        for (int i = 0; i < 20; i++)
+        {
+            float x = Mathf.Repeat(i * 97.3f + Now * 12f, w);
+            float y = 460f - Mathf.Repeat(i * 41.7f + Now * (18f + i % 4 * 6f), 420f);
+            UI.Glow(new Vector2(x, y), 6f, new Color(1f, 0.85f, 0.55f, 0.6f));
+        }
     }
 }

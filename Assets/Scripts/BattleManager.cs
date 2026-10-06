@@ -145,15 +145,32 @@ public class BattleManager : MonoBehaviour
     // 땅과 편성 줄을 그립니다. (나중에 진짜 그림으로 바꿀 부분)
     void BuildBattlefield()
     {
-        Color ground = Stages.GroundColor(Level);
-        MakeBlock("Ground", new Vector2(0f, (LaneTop + LaneBottom) / 2f - 4f),
-            new Vector2(80f, LaneTop - LaneBottom + 9f), ground, -2000);
-        MakeBlock("Horizon", new Vector2(0f, LaneTop + 1.2f), new Vector2(80f, 0.3f), UI.Darken(ground, 0.8f), -1999);
+        var bg = UI.Background("battle_" + (Stages.StageOf(Level) + 1));
+        if (bg != null)
+        {
+            // 스테이지 배경 그림을 화면 가득 (그림의 지평선이 위쪽 27% 근처)
+            var go = new GameObject("Backdrop");
+            go.transform.SetParent(World, false);
+            go.transform.position = new Vector3(cam.transform.position.x, cam.transform.position.y, 0f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            float ppu = bg.height / (cam.orthographicSize * 2f);
+            sr.sprite = Sprite.Create(bg, new Rect(0, 0, bg.width, bg.height), new Vector2(0.5f, 0.5f), ppu);
+            sr.sortingOrder = -3000;
+            float needW = HalfScreenWidth * 2f, haveW = bg.width / ppu;
+            if (haveW < needW) go.transform.localScale = Vector3.one * (needW / haveW); // 화면이 더 넓으면 키움
+        }
+        else
+        {
+            Color ground = Stages.GroundColor(Level);
+            MakeBlock("Ground", new Vector2(0f, (LaneTop + LaneBottom) / 2f - 4f),
+                new Vector2(80f, LaneTop - LaneBottom + 9f), ground, -2000);
+            MakeBlock("Horizon", new Vector2(0f, LaneTop + 1.2f), new Vector2(80f, 0.3f), UI.Darken(ground, 0.8f), -1999);
+        }
 
-        // 선두 ~ 후미 줄 표시 (시작 위치)
+        // 선두 ~ 후미 줄 표시 (시작 위치): 은은한 그림자 띠
         for (int col = 0; col < SaveData.Columns; col++)
             MakeBlock("Column", new Vector2(ColumnCenterX(col), (LaneTop + LaneBottom) / 2f),
-                new Vector2(ZoneWidth, LaneTop - LaneBottom + 1f), new Color(0f, 0f, 0f, col % 2 == 0 ? 0.10f : 0.05f), -1900);
+                new Vector2(ZoneWidth, LaneTop - LaneBottom + 1f), new Color(0.1f, 0.06f, 0.03f, col % 2 == 0 ? 0.10f : 0.05f), -1900);
     }
 
     SpriteRenderer MakeBlock(string blockName, Vector2 center, Vector2 scale, Color color, int order)
@@ -558,7 +575,7 @@ public class BattleManager : MonoBehaviour
 
         // 왼쪽: 파티 상태
         var party = new Rect(16, 66, 300, 78);
-        UI.Panel(party, new Color(0.05f, 0.06f, 0.10f, 0.7f));
+        UI.Panel(party, UI.WithAlpha(UI.PanelColor, 0.82f));
         UI.Text(new Rect(party.x + 16, party.y + 8, party.width - 32, 26), $"파티 생존  {heroes.Count} / {partySize}", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
         if (leader != null && leader.IsAlive)
         {
@@ -572,7 +589,7 @@ public class BattleManager : MonoBehaviour
 
         // 오른쪽: 시너지
         var syn = new Rect(w - 316, 66, 300, 40 + HeroClass.All.Length * 24);
-        UI.Panel(syn, new Color(0.05f, 0.06f, 0.10f, 0.7f));
+        UI.Panel(syn, UI.WithAlpha(UI.PanelColor, 0.82f));
         UI.Text(new Rect(syn.x + 16, syn.y + 6, syn.width - 32, 26), "시너지  (3명 / 6명)", 15, UI.TextSub, TextAnchor.MiddleLeft, true);
         float y = syn.y + 32;
         foreach (var c in HeroClass.All)
@@ -631,7 +648,7 @@ public class BattleManager : MonoBehaviour
         {
             var u = upgradeChoices[i];
             var r = new Rect(x0 + i * (cw + gap), 245, cw, ch);
-            if (UI.Button(r, "", new Color(0.18f, 0.22f, 0.36f)))
+            if (UI.Button(r, "", UI.Neutral))
             {
                 u.apply();
                 upgradeChoices = null;

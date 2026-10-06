@@ -10,17 +10,20 @@ public static class UI
     public static float Width => Screen.width / Scale;
     public static Rect Full => new Rect(0f, 0f, Width, Height);
 
-    // ---- 색 테마 (UI 전체의 색을 여기서 한 번에 바꿀 수 있어요) ----
-    public static readonly Color Gold = new Color(1f, 0.84f, 0.36f);
-    public static readonly Color TextMain = new Color(0.96f, 0.96f, 0.98f);
-    public static readonly Color TextSub = new Color(0.74f, 0.76f, 0.84f);
-    public static readonly Color PanelColor = new Color(0.07f, 0.08f, 0.13f, 0.82f);
-    public static readonly Color Primary = new Color(0.90f, 0.56f, 0.18f);  // 주요 버튼 (출격, 소환)
-    public static readonly Color Blue = new Color(0.27f, 0.47f, 0.76f);
-    public static readonly Color Green = new Color(0.22f, 0.58f, 0.45f);
-    public static readonly Color Red = new Color(0.70f, 0.27f, 0.30f);
-    public static readonly Color Neutral = new Color(0.25f, 0.27f, 0.35f);
-    static readonly Color Disabled = new Color(0.22f, 0.23f, 0.27f);
+    // ---- 색 테마 (용사 그림에서 뽑은 색: 양피지, 버건디 망토, 네이비 옷, 가죽, 청동) ----
+    // UI 전체의 색을 여기서 한 번에 바꿀 수 있어요.
+    public static readonly Color Gold = new Color(0.93f, 0.79f, 0.47f);       // 금색 장식, 강조 글자
+    public static readonly Color TextMain = new Color(0.96f, 0.91f, 0.81f);   // 양피지색 글자
+    public static readonly Color TextSub = new Color(0.78f, 0.70f, 0.58f);    // 흐린 양피지색 글자
+    public static readonly Color PanelColor = new Color(0.14f, 0.10f, 0.08f, 0.92f); // 어두운 가죽 판
+    public static readonly Color Primary = new Color(0.56f, 0.16f, 0.17f);    // 버건디 (출격, 소환)
+    public static readonly Color Blue = new Color(0.19f, 0.27f, 0.42f);       // 네이비
+    public static readonly Color Green = new Color(0.29f, 0.37f, 0.22f);      // 이끼색
+    public static readonly Color Red = new Color(0.52f, 0.23f, 0.14f);        // 녹슨 적갈색 (판매, 빼기)
+    public static readonly Color Neutral = new Color(0.31f, 0.23f, 0.17f);    // 가죽 갈색
+    public static readonly Color Plum = new Color(0.39f, 0.24f, 0.40f);       // 자주색
+    static readonly Color Bronze = new Color(0.55f, 0.40f, 0.22f);            // 테두리 청동
+    static readonly Color Disabled = new Color(0.20f, 0.17f, 0.15f);
 
     public static void Begin()
     {
@@ -128,6 +131,22 @@ public static class UI
     // ---------------- 글자 ----------------
 
     static readonly Dictionary<int, GUIStyle> textStyles = new Dictionary<int, GUIStyle>();
+    static Font fontRegular, fontBold, fontTitle;
+    static bool fontsLoaded;
+
+    // 나눔명조 (Resources/Fonts). 큰 제목은 가장 굵은 글꼴을 써요. 글꼴 파일이 없으면 기본 글꼴.
+    static Font FontFor(int size, bool bold)
+    {
+        if (!fontsLoaded)
+        {
+            fontsLoaded = true;
+            fontRegular = Resources.Load<Font>("Fonts/NanumMyeongjo");
+            fontBold = Resources.Load<Font>("Fonts/NanumMyeongjoBold");
+            fontTitle = Resources.Load<Font>("Fonts/NanumMyeongjoExtraBold");
+        }
+        if (size >= 40 && fontTitle != null) return fontTitle;
+        return bold ? (fontBold ?? fontRegular) : fontRegular;
+    }
 
     // 글자를 그립니다. (그림자 없이 한 번만 그려서 겹쳐 보이지 않아요)
     public static void Text(Rect r, string text, int size, Color color,
@@ -136,11 +155,13 @@ public static class UI
         int key = size * 100 + (int)anchor * 2 + (bold ? 1 : 0);
         if (!textStyles.TryGetValue(key, out var style))
         {
+            var font = FontFor(size, bold);
             style = new GUIStyle(GUI.skin.label)
             {
+                font = font,
                 fontSize = size,
                 alignment = anchor,
-                fontStyle = bold ? FontStyle.Bold : FontStyle.Normal,
+                fontStyle = bold && font == null ? FontStyle.Bold : FontStyle.Normal, // 글꼴 파일이 있으면 굵은 글꼴 파일을 씀
                 wordWrap = true,
                 clipping = TextClipping.Clip, // 칸을 넘치는 글자는 잘라서, 다른 글자와 겹치지 않게
             };
@@ -158,55 +179,129 @@ public static class UI
 
     // ---------------- 버튼, 판, 막대 ----------------
 
-    // 둥근 버튼. 눌렸으면 true를 돌려줍니다.
+    // 버튼: 가죽 바탕 + 청동/금색 테두리. 마우스를 올리면 금색으로 빛나요. 눌렸으면 true.
     public static bool Button(Rect r, string text, Color color, int fontSize = 22, bool enabled = true)
     {
         bool hover = enabled && r.Contains(Event.current.mousePosition);
-        Color bg = enabled ? (hover ? Color.Lerp(color, Color.white, 0.15f) : color) : Disabled;
-        Round(new Rect(r.x, r.y + 3f, r.width, r.height), new Color(0f, 0f, 0f, 0.35f)); // 그림자
-        Round(r, bg);
-        Round(new Rect(r.x + 2f, r.y + 2f, r.width - 4f, r.height * 0.45f), new Color(1f, 1f, 1f, enabled ? 0.10f : 0.03f));
-        if (hover) RoundFrame(r, new Color(1f, 1f, 1f, 0.45f));
-        Text(r, text, fontSize, enabled ? Color.white : new Color(0.55f, 0.56f, 0.6f), TextAnchor.MiddleCenter, true);
+        Color bg = enabled ? (hover ? Color.Lerp(color, Gold, 0.12f) : color) : Disabled;
+        if (hover) Glow(r.center, Mathf.Max(r.width, r.height) * 0.75f, WithAlpha(Gold, 0.18f));
+        Round(new Rect(r.x, r.y + 4f, r.width, r.height), new Color(0f, 0f, 0f, 0.45f)); // 그림자
+        Round(r, Darken(bg, 0.75f));                                                       // 아래쪽 어두운 면
+        Round(new Rect(r.x + 2f, r.y + 2f, r.width - 4f, r.height - 6f), bg);              // 윗면
+        Round(new Rect(r.x + 4f, r.y + 4f, r.width - 8f, r.height * 0.42f), new Color(1f, 0.95f, 0.85f, enabled ? 0.09f : 0.02f)); // 반사광
+        RoundFrame(r, enabled ? (hover ? Gold : WithAlpha(Bronze, 0.95f)) : WithAlpha(Bronze, 0.35f));
+        Text(r, text, fontSize, enabled ? TextMain : new Color(0.5f, 0.45f, 0.4f), TextAnchor.MiddleCenter, true);
         return enabled && GUI.Button(r, GUIContent.none, GUIStyle.none);
     }
 
-    // 둥근 반투명 판
+    // 판: 어두운 가죽 + 청동 테두리 + 안쪽 금색 실선 + 모서리 장식
     public static void Panel(Rect r, Color color)
     {
+        Round(new Rect(r.x + 2f, r.y + 5f, r.width, r.height), new Color(0f, 0f, 0f, 0.4f)); // 그림자
         Round(r, color);
-        RoundFrame(r, new Color(1f, 1f, 1f, 0.08f));
+        RoundFrame(r, WithAlpha(Bronze, 0.9f));
+        if (r.width > 60f && r.height > 60f)
+        {
+            RoundFrame(new Rect(r.x + 5f, r.y + 5f, r.width - 10f, r.height - 10f), WithAlpha(Gold, 0.22f));
+            float k = 9f;
+            foreach (var c in new[] { new Vector2(r.x + k, r.y + k), new Vector2(r.xMax - k, r.y + k), new Vector2(r.x + k, r.yMax - k), new Vector2(r.xMax - k, r.yMax - k) })
+            {
+                Circle(c, 3.2f, WithAlpha(Gold, 0.75f));
+                Circle(c, 1.4f, Darken(Bronze, 0.6f));
+            }
+        }
     }
 
     public static void Panel(Rect r) => Panel(r, PanelColor);
 
     public static void Bar(Rect r, float pct, Color fill)
     {
-        Round(r, new Color(0f, 0f, 0f, 0.55f));
+        Round(r, new Color(0.05f, 0.03f, 0.02f, 0.75f));
         float w = (r.width - 4f) * Mathf.Clamp01(pct);
-        if (w > 1f) Round(new Rect(r.x + 2f, r.y + 2f, w, r.height - 4f), fill);
+        if (w > 1f)
+        {
+            Round(new Rect(r.x + 2f, r.y + 2f, w, r.height - 4f), fill);
+            Fill(new Rect(r.x + 3f, r.y + 3f, Mathf.Max(0f, w - 2f), Mathf.Max(1f, (r.height - 6f) * 0.35f)), new Color(1f, 1f, 1f, 0.18f));
+        }
+        RoundFrame(r, WithAlpha(Bronze, 0.8f));
     }
 
     // 작은 이름표 (NEW, 각성 등)
     public static void Chip(Rect r, string text, Color color, int size = 15)
     {
         Round(r, color);
-        Text(r, text, size, Color.white, TextAnchor.MiddleCenter, true);
+        RoundFrame(r, WithAlpha(Gold, 0.45f));
+        Text(r, text, size, TextMain, TextAnchor.MiddleCenter, true);
     }
 
-    // 화면 위쪽 제목 막대 (오른쪽에 골드 표시)
+    // 화면 위쪽 제목 막대: 어두운 나무판 + 금색 두 줄 + 마름모 장식 (오른쪽에 골드 표시)
     public static void TopBar(string title, bool showGold = true)
     {
         float w = Width;
-        Fill(new Rect(0, 0, w, 64), new Color(0.03f, 0.03f, 0.06f, 0.75f));
-        Fill(new Rect(0, 63, w, 1), WithAlpha(Gold, 0.35f));
-        Text(new Rect(28, 0, w - 340, 64), title, 26, TextMain, TextAnchor.MiddleLeft, true);
+        Fill(new Rect(0, 0, w, 64), new Color(0.11f, 0.07f, 0.05f, 0.94f));
+        Textured(new Rect(0, 0, w, 64), new Color(1f, 0.85f, 0.7f, 0.07f));
+        Fill(new Rect(0, 60, w, 1), WithAlpha(Gold, 0.7f));
+        Fill(new Rect(0, 63, w, 1), WithAlpha(Bronze, 0.8f));
+        for (float x = 40; x < w; x += 160) Diamond(new Vector2(x, 61.5f), 4f, Gold);
+        Diamond(new Vector2(22, 32), 6f, Gold);
+        Text(new Rect(40, 0, w - 340, 62), title, 25, Gold, TextAnchor.MiddleLeft, true);
         if (!showGold) return;
-        var goldBox = new Rect(w - 250, 14, 226, 36);
-        Round(goldBox, new Color(0f, 0f, 0f, 0.45f));
+        var goldBox = new Rect(w - 250, 13, 226, 36);
+        Round(goldBox, new Color(0f, 0f, 0f, 0.5f));
+        RoundFrame(goldBox, WithAlpha(Bronze, 0.9f));
         Circle(new Vector2(goldBox.x + 20, goldBox.center.y), 10f, Gold);
-        Text(new Rect(goldBox.x + 38, goldBox.y, goldBox.width - 52, goldBox.height), $"{SaveData.Gold:N0} 골드", 20,
+        Circle(new Vector2(goldBox.x + 20, goldBox.center.y), 6f, Darken(Gold, 0.8f));
+        Text(new Rect(goldBox.x + 38, goldBox.y, goldBox.width - 52, goldBox.height), $"{SaveData.Gold:N0} 골드", 19,
             Gold, TextAnchor.MiddleRight, true);
+    }
+
+    // 작은 마름모 장식
+    public static void Diamond(Vector2 c, float size, Color color)
+    {
+        var saved = BeginRotate(45f, c);
+        Fill(new Rect(c.x - size / 2f, c.y - size / 2f, size, size), color);
+        EndRotate(saved);
+    }
+
+    // ---------------- 배경 그림과 질감 ----------------
+
+    static readonly Dictionary<string, Texture2D> backgrounds = new Dictionary<string, Texture2D>();
+    static Texture2D leather;
+    static bool leatherLoaded;
+
+    // 배경 그림 (Resources/Backgrounds/이름) 을 화면 가득 그립니다. dim: 0~1 어둡게
+    public static void Backdrop(string name, float dim = 0f)
+    {
+        var tex = Background(name);
+        if (tex != null) GUI.DrawTexture(Full, tex, ScaleMode.ScaleAndCrop);
+        else Gradient(Full, new Color(0.22f, 0.15f, 0.11f), new Color(0.08f, 0.05f, 0.04f));
+        if (dim > 0f) Fill(Full, new Color(0f, 0f, 0f, dim));
+    }
+
+    public static Texture2D Background(string name)
+    {
+        if (!backgrounds.TryGetValue(name, out var tex))
+        {
+            tex = Resources.Load<Texture2D>("Backgrounds/" + name);
+            backgrounds[name] = tex;
+        }
+        return tex;
+    }
+
+    // 가죽 질감을 이어 붙여 덮습니다 (네모난 곳에만 쓰세요)
+    public static void Textured(Rect r, Color tint)
+    {
+        if (!leatherLoaded)
+        {
+            leatherLoaded = true;
+            leather = Resources.Load<Texture2D>("UI/leather");
+            if (leather != null) leather.wrapMode = TextureWrapMode.Repeat; // 이어 붙이기
+        }
+        if (leather == null) return;
+        var old = GUI.color;
+        GUI.color = tint;
+        GUI.DrawTextureWithTexCoords(r, leather, new Rect(0f, 0f, r.width / 256f, r.height / 256f));
+        GUI.color = old;
     }
 
     // ---------------- 기타 ----------------

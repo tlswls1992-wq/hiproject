@@ -20,28 +20,28 @@ public class GachaBanner
     {
         name = "일반 뽑기", desc = "기본적인 동료를 모집합니다", cost = 100, unlockAfterStage = 0,
         rates = new float[] { 65, 27, 7, 1, 0, 0 }, guarantee = Rarity.Rare,
-        color = new Color(0.35f, 0.55f, 0.75f),
+        color = new Color(0.22f, 0.32f, 0.46f), // 네이비
     };
 
     public static readonly GachaBanner Advanced = new GachaBanner
     {
         name = "고급 뽑기", desc = "실력 있는 동료를 모집합니다", cost = 300, unlockAfterStage = 0,
         rates = new float[] { 25, 45, 22, 7, 1, 0 }, guarantee = Rarity.SuperRare,
-        color = new Color(0.55f, 0.35f, 0.80f),
+        color = new Color(0.38f, 0.24f, 0.42f), // 자주
     };
 
     public static readonly GachaBanner Legendary = new GachaBanner
     {
         name = "전설 뽑기", desc = "전설 속 영웅을 부릅니다", cost = 1000, unlockAfterStage = 20, // 2-10 클리어
         rates = new float[] { 0, 20, 40, 28, 11, 1 }, guarantee = Rarity.Unique,
-        color = new Color(0.85f, 0.60f, 0.15f),
+        color = new Color(0.62f, 0.45f, 0.18f), // 청동금
     };
 
     public static readonly GachaBanner Mythic = new GachaBanner
     {
         name = "신화 뽑기", desc = "신화의 존재를 소환합니다", cost = 3000, unlockAfterStage = 50, // 5-10 클리어
         rates = new float[] { 0, 0, 25, 40, 27, 8 }, guarantee = Rarity.Legendary,
-        color = new Color(0.80f, 0.20f, 0.30f),
+        color = new Color(0.55f, 0.14f, 0.18f), // 버건디
     };
 
     public static readonly GachaBanner[] All = { Normal, Advanced, Legendary, Mythic };
