@@ -492,21 +492,14 @@ public class GameManager : MonoBehaviour
         float w = UI.Width;
         var e = Event.current;
 
-        // 밤 숲속 공터 배경 + 반짝이는 별 몇 개
-        UI.Backdrop("camp");
-        for (int i = 0; i < 14; i++)
-        {
-            float x = Mathf.Repeat(i * 137.5f, w);
-            float y = Mathf.Repeat(i * 47.3f, 220f) + 70f;
-            float a = 0.15f + 0.6f * Mathf.Abs(Mathf.Sin(Now * (0.4f + i % 5 * 0.25f) + i));
-            UI.Glow(new Vector2(x, y), 6f, new Color(1f, 0.97f, 0.85f, a));
-        }
+        // 밤 숲속 공터 배경 (별이 반짝이고 모닥불 빛이 일렁임, CampScene.cs)
+        CampScene.DrawBackground();
 
         UI.TopBar($"야영지   ·   {SaveData.Cycle}회차");
 
         // ---- 가운데: 모닥불과 둘러앉은 동료 ----
         float sceneL = 350f, sceneR = w - 270f;
-        var fire = new Vector2((sceneL + sceneR) / 2f, 470f);
+        var fire = CampScene.FirePosition; // 배경 그림의 모닥불 자리
         var sitters = new List<SaveData.Member>();
         foreach (var p in SaveData.Party)
         {
@@ -514,12 +507,14 @@ public class GameManager : MonoBehaviour
             if (m != null && sitters.Count < 12) sitters.Add(m);
         }
 
-        float rx = Mathf.Min(240f, (sceneR - sceneL) / 2f - 50f), ry = 100f;
+        // 모닥불 뒤쪽은 넓게, 앞쪽은 좁게 둘러앉음 (앞쪽 동료가 아래 대화 상자에 가리지 않게)
+        float rx = Mathf.Min(240f, (sceneR - sceneL) / 2f - 50f), ryBack = 95f, ryFront = 70f;
         var seats = new List<KeyValuePair<SaveData.Member, Vector2>>();
         for (int i = 0; i < sitters.Count; i++)
         {
             float ang = (-90f + 360f * i / sitters.Count) * Mathf.Deg2Rad;
-            seats.Add(new KeyValuePair<SaveData.Member, Vector2>(sitters[i], fire + new Vector2(Mathf.Cos(ang) * rx, Mathf.Sin(ang) * ry)));
+            float sy = Mathf.Sin(ang);
+            seats.Add(new KeyValuePair<SaveData.Member, Vector2>(sitters[i], fire + new Vector2(Mathf.Cos(ang) * rx, sy * (sy > 0f ? ryFront : ryBack))));
         }
         seats.Sort((a, b) => a.Value.y.CompareTo(b.Value.y)); // 뒤쪽(위)부터 그림
 
@@ -527,10 +522,10 @@ public class GameManager : MonoBehaviour
         bool fireDrawn = false;
         foreach (var seat in seats)
         {
-            if (!fireDrawn && seat.Value.y > fire.y) { DrawCampfire(fire); fireDrawn = true; }
+            if (!fireDrawn && seat.Value.y > fire.y) { CampScene.DrawFire(); fireDrawn = true; }
             var pos = seat.Value;
             var def = seat.Key.Def;
-            float scale = Mathf.Lerp(0.85f, 1.1f, (pos.y - (fire.y - ry)) / (2f * ry)); // 앞쪽일수록 크게
+            float scale = Mathf.Lerp(0.85f, 1.1f, (pos.y - (fire.y - ryBack)) / (ryBack + ryFront)); // 앞쪽일수록 크게
             float radius = 24f * scale;
             var hit = new Rect(pos.x - radius - 6, pos.y - radius - 6, radius * 2 + 12, radius * 2 + 30);
             bool hover = hit.Contains(e.mousePosition);
@@ -551,7 +546,7 @@ public class GameManager : MonoBehaviour
             UI.Text(new Rect(pos.x - 60, pos.y + radius + 4, 120, 20), def.name, 13, hover ? UI.Gold : UI.TextMain, TextAnchor.MiddleCenter, true);
             if (GUI.Button(hit, GUIContent.none, GUIStyle.none)) clickedSitter = seat.Key;
         }
-        if (!fireDrawn) DrawCampfire(fire);
+        if (!fireDrawn) CampScene.DrawFire();
 
         if (clickedSitter != null)
         {
@@ -652,19 +647,6 @@ public class GameManager : MonoBehaviour
             UI.Text(new Rect(sceneL, 630, sceneR - sceneL, 40),
                 sitters.Count > 1 ? "모닥불 주위의 동료를 눌러서 말을 걸어 보세요" : "동료를 뽑고 편성하면 야영지에 함께 앉아요", 15, UI.TextSub);
         }
-    }
-
-    static void DrawCampfire(Vector2 fire)
-    {
-        UI.Glow(fire, 170f + 10f * Mathf.Sin(Now * 7f), new Color(1f, 0.5f, 0.15f, 0.35f));
-        UI.Fill(new Rect(fire.x - 34, fire.y + 6, 68, 10), new Color(0.35f, 0.22f, 0.12f));
-        UI.Fill(new Rect(fire.x - 26, fire.y + 12, 52, 8), new Color(0.28f, 0.18f, 0.10f));
-        for (int i = 0; i < 3; i++)
-        {
-            float flick = Mathf.Sin(Now * (9f + i * 3f) + i) * 4f;
-            UI.Glow(new Vector2(fire.x + (i - 1) * 10f, fire.y - 10f - i * 6f + flick), 22f - i * 4f, new Color(1f, 0.7f - i * 0.15f, 0.2f, 0.95f));
-        }
-        UI.Glow(new Vector2(fire.x, fire.y - 6f), 12f, new Color(1f, 0.95f, 0.6f, 1f));
     }
 
     // ---------------- 소환 선택 ----------------
