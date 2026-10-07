@@ -1,0 +1,21 @@
+{
+  "animation": "idle",
+  "direction": "right",
+  "frame_width": 640,
+  "frame_height": 640,
+  "columns": 4,
+  "rows": 2,
+  "frame_count": 8,
+  "frame_duration_ms": 150,
+  "loop": true,
+  "frames": [
+    "idle_00.png",
+    "idle_01.png",
+    "idle_02.png",
+    "idle_03.png",
+    "idle_04.png",
+    "idle_05.png",
+    "idle_06.png",
+    "idle_07.png"
+  ]
+}

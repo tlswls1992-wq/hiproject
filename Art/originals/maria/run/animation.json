@@ -1,0 +1,21 @@
+{
+  "animation": "run",
+  "direction": "right",
+  "frame_width": 640,
+  "frame_height": 640,
+  "columns": 4,
+  "rows": 2,
+  "frame_count": 8,
+  "frame_duration_ms": 90,
+  "loop": true,
+  "frames": [
+    "run_00.png",
+    "run_01.png",
+    "run_02.png",
+    "run_03.png",
+    "run_04.png",
+    "run_05.png",
+    "run_06.png",
+    "run_07.png"
+  ]
+}

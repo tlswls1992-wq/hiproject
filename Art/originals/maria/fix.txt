@@ -1,0 +1,1 @@
+attack_scale=1.17

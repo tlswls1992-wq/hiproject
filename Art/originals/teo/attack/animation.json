@@ -1,0 +1,21 @@
+{
+  "animation": "attack",
+  "direction": "right",
+  "frame_width": 640,
+  "frame_height": 640,
+  "columns": 4,
+  "rows": 2,
+  "frame_count": 8,
+  "frame_duration_ms": 100,
+  "loop": false,
+  "frames": [
+    "attack_00.png",
+    "attack_01.png",
+    "attack_02.png",
+    "attack_03.png",
+    "attack_04.png",
+    "attack_05.png",
+    "attack_06.png",
+    "attack_07.png"
+  ]
+}

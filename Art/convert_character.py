@@ -6,6 +6,8 @@
   full.*      전신 (뽑기 카드)
   preview.*   대기 모습 (야영지, 전투 대기) - 움직이는 이미지면 여러 장면
   run.*       달리는 모습 (전투 중 이동) - 한 장이면 코드로 위아래 흔들림을 줌
+  idle/ run/ attack/  장면별 투명 PNG 폴더 + animation.json (frames, frame_duration_ms) 형식도 됨
+  fix.txt     크기 보정 (예: attack_scale=1.22 → 공격 그림을 발 기준으로 1.22배). 동작마다 캐릭터 크기가 다를 때 사용
   run_sheet_4x2.*  달리기 장면표 (가로 4칸 x 세로 2칸처럼 여러 장면을 한 그림에 모은 것). 있으면 run.* 대신 사용
   attack.*    공격 모습 (전투) - 움직이는 이미지
 출력 (Assets/Resources/Characters/<캐릭터 id>/):
@@ -14,6 +16,7 @@
 - Unity는 webp를 읽지 못하고 gif는 첫 장면만 읽기 때문에 png로 바꿉니다.
 - 단색 배경은 가장자리에서부터 지워서 투명하게 만듭니다.
 """
+import json
 import sys
 from collections import deque
 from pathlib import Path
@@ -115,6 +118,48 @@ def frames_of_sheet(path: Path, cols: int, rows: int, frame_ms: int = 90):
     return out, [frame_ms] * len(out)
 
 
+def frames_of_folder(folder: Path):
+    """장면별 PNG 폴더 (animation.json에 장면 목록과 시간이 적혀 있음)"""
+    info = json.loads((folder / "animation.json").read_text(encoding="utf-8"))
+    frames = [Image.open(folder / f).convert("RGBA") for f in info["frames"]]
+    return frames, [int(info.get("frame_duration_ms", 100))] * len(frames)
+
+
+def rescale_from_feet(frames, scale):
+    """모든 장면을 발 위치(모든 장면을 합친 범위의 아래 가운데) 기준으로 확대/축소"""
+    if abs(scale - 1.0) < 1e-3:
+        return frames
+    boxes = [f.getbbox() for f in frames if f.getbbox()]
+    cx = (min(b[0] for b in boxes) + max(b[2] for b in boxes)) / 2
+    by = max(b[3] for b in boxes)
+    out = []
+    for f in frames:
+        w, h = f.size
+        big = f.resize((round(w * scale), round(h * scale)), Image.LANCZOS)
+        canvas = Image.new("RGBA", f.size, (0, 0, 0, 0))
+        canvas.paste(big, (round(cx - cx * scale), round(by - by * scale)), big)
+        out.append(canvas)
+    return out
+
+
+def read_fixes(src: Path):
+    fixes = {}
+    p = src / "fix.txt"
+    if p.exists():
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                fixes[k.strip()] = float(v)
+    return fixes
+
+
+def square_top(img: Image.Image) -> Image.Image:
+    """세로로 긴 초상화는 얼굴이 있는 위쪽을 정사각형으로 잘라 씀"""
+    if img.height > img.width * 1.1:
+        return img.crop((0, 0, img.width, img.width))
+    return img
+
+
 def fit(img: Image.Image, max_size: int) -> Image.Image:
     scale = min(1.0, max_size / max(img.size))
     if scale < 1.0:
@@ -143,25 +188,33 @@ def convert(char_id: str):
     out.mkdir(parents=True, exist_ok=True)
     anim_lines = []
 
+    fixes = read_fixes(src)
     for name, size in (("portrait", 768), ("full", 1024)):
         p = find(src, name)
         if p:
-            fit(remove_background(Image.open(p)), size).save(out / f"{name}.png", optimize=True)
+            img = remove_background(Image.open(p))
+            if name == "portrait":
+                img = square_top(img)
+            fit(img, size).save(out / f"{name}.png", optimize=True)
             print("saved", name)
 
     for name, folder in (("preview", "idle"), ("run", "run"), ("attack", "attack")):
         sheet = next(iter(src.glob(name + "_sheet_*x*.*")), None)
+        frame_dir = src / folder if (src / folder / "animation.json").exists() else None
         p = find(src, name)
-        if not p and not sheet:
+        if not p and not sheet and not frame_dir:
             continue
         (out / folder).mkdir(exist_ok=True)
         for old in (out / folder).glob("*.png"):
             old.unlink()
-        if sheet:
+        if frame_dir:
+            frames, durations = frames_of_folder(frame_dir)
+        elif sheet:
             cols, rows = (int(v) for v in sheet.stem.split("_sheet_")[1].split("x"))
             frames, durations = frames_of_sheet(sheet, cols, rows)
         else:
             frames, durations = frames_of(p)
+        frames = rescale_from_feet(frames, fixes.get(folder + "_scale", 1.0))
         frames = align_feet([fit(remove_background(f), 512) for f in frames])
         for i, f in enumerate(frames):
             f.save(out / folder / f"{folder}_{i:02d}.png", optimize=True)
