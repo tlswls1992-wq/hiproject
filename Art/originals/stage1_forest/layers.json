@@ -1,0 +1,244 @@
+{
+  "canvas": [
+    1280,
+    720
+  ],
+  "duration_seconds": 8,
+  "fps": 24,
+  "layers": [
+    {
+      "id": 0,
+      "sprite": "foliage/grass_1.png",
+      "size": [
+        132,
+        112
+      ],
+      "anchor_in_sprite": [
+        68.0,
+        111
+      ],
+      "anchor_in_scene": [
+        85,
+        702
+      ],
+      "phase_radians": 0.0,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 1,
+      "sprite": "foliage/grass_2.png",
+      "size": [
+        128,
+        104
+      ],
+      "anchor_in_sprite": [
+        57.0,
+        103
+      ],
+      "anchor_in_scene": [
+        242,
+        712
+      ],
+      "phase_radians": 0.8,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 2,
+      "sprite": "foliage/grass_3.png",
+      "size": [
+        105,
+        85
+      ],
+      "anchor_in_sprite": [
+        56.0,
+        84
+      ],
+      "anchor_in_scene": [
+        405,
+        719
+      ],
+      "phase_radians": 1.5,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 3,
+      "sprite": "foliage/grass_2.png",
+      "size": [
+        102,
+        85
+      ],
+      "anchor_in_sprite": [
+        45.0,
+        84
+      ],
+      "anchor_in_scene": [
+        612,
+        727
+      ],
+      "phase_radians": 2.2,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 4,
+      "sprite": "foliage/grass_1.png",
+      "size": [
+        119,
+        97
+      ],
+      "anchor_in_sprite": [
+        61.5,
+        96
+      ],
+      "anchor_in_scene": [
+        830,
+        729
+      ],
+      "phase_radians": 2.9,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 5,
+      "sprite": "foliage/grass_3.png",
+      "size": [
+        132,
+        108
+      ],
+      "anchor_in_sprite": [
+        71.0,
+        107
+      ],
+      "anchor_in_scene": [
+        998,
+        714
+      ],
+      "phase_radians": 3.6,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 6,
+      "sprite": "foliage/grass_2.png",
+      "size": [
+        145,
+        117
+      ],
+      "anchor_in_sprite": [
+        64.0,
+        116
+      ],
+      "anchor_in_scene": [
+        1168,
+        722
+      ],
+      "phase_radians": 4.4,
+      "motion": "root_anchored_bend"
+    },
+    {
+      "id": 7,
+      "sprite": "foliage/twig_1.png",
+      "size": [
+        166,
+        142
+      ],
+      "anchor_in_sprite": [
+        56.0,
+        0
+      ],
+      "anchor_in_scene": [
+        188,
+        30
+      ],
+      "phase_radians": 0.2,
+      "motion": "branch_anchored_rotation"
+    },
+    {
+      "id": 8,
+      "sprite": "foliage/twig_2.png",
+      "size": [
+        132,
+        116
+      ],
+      "anchor_in_sprite": [
+        54.0,
+        0
+      ],
+      "anchor_in_scene": [
+        319,
+        21
+      ],
+      "phase_radians": 1.2,
+      "motion": "branch_anchored_rotation"
+    },
+    {
+      "id": 9,
+      "sprite": "foliage/twig_3.png",
+      "size": [
+        109,
+        101
+      ],
+      "anchor_in_sprite": [
+        47.0,
+        0
+      ],
+      "anchor_in_scene": [
+        385,
+        0
+      ],
+      "phase_radians": 2.0,
+      "motion": "branch_anchored_rotation"
+    },
+    {
+      "id": 10,
+      "sprite": "foliage/twig_2.png",
+      "size": [
+        145,
+        136
+      ],
+      "anchor_in_sprite": [
+        59.5,
+        0
+      ],
+      "anchor_in_scene": [
+        970,
+        26
+      ],
+      "phase_radians": 2.8,
+      "motion": "branch_anchored_rotation"
+    },
+    {
+      "id": 11,
+      "sprite": "foliage/twig_1.png",
+      "size": [
+        162,
+        147
+      ],
+      "anchor_in_sprite": [
+        55.0,
+        0
+      ],
+      "anchor_in_scene": [
+        1091,
+        37
+      ],
+      "phase_radians": 3.7,
+      "motion": "branch_anchored_rotation"
+    },
+    {
+      "id": 12,
+      "sprite": "foliage/twig_3.png",
+      "size": [
+        128,
+        132
+      ],
+      "anchor_in_sprite": [
+        55.0,
+        0
+      ],
+      "anchor_in_scene": [
+        1190,
+        39
+      ],
+      "phase_radians": 4.7,
+      "motion": "branch_anchored_rotation"
+    }
+  ]
+}

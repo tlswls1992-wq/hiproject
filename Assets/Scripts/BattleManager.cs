@@ -12,8 +12,10 @@ public class BattleManager : MonoBehaviour
     const float EnemyStartGap = 6f;      // 웨이브가 시작될 때 파티 맨 앞과 적 진형 사이의 거리
 
     // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
-    public const float LaneTop = 2.5f;       // 유닛이 다닐 수 있는 가장 위쪽
-    public const float LaneBottom = -5.5f;   // 가장 아래쪽
+    // 유닛이 다닐 수 있는 가장 위쪽 / 아래쪽. 레이어 배경(BattleScene)이 있는 스테이지는 그 그림의 땅에 맞춰 바뀜
+    const float DefaultLaneTop = 2.5f, DefaultLaneBottom = -5.5f;
+    public static float LaneTop { get; private set; } = DefaultLaneTop;
+    public static float LaneBottom { get; private set; } = DefaultLaneBottom;
     const float FrontX = -2f;                // 선두 줄의 가운데 가로 위치
     const float ColumnGap = 1.8f;            // 줄 사이 간격 (선두 → 후미 방향)
     const float ZoneWidth = 1.5f;            // 한 줄의 가로 폭
@@ -149,6 +151,16 @@ public class BattleManager : MonoBehaviour
     // 땅과 편성 줄을 그립니다. (나중에 진짜 그림으로 바꿀 부분)
     void BuildBattlefield()
     {
+        LaneTop = DefaultLaneTop;
+        LaneBottom = DefaultLaneBottom;
+        // 레이어로 나뉜 움직이는 배경 (바람에 흔들리는 풀 · 가지)
+        if (BattleScene.TryBuild(Stages.StageOf(Level) + 1, World, cam, out var scene))
+        {
+            LaneTop = scene.laneTop;
+            LaneBottom = scene.laneBottom;
+            return;
+        }
+
         var bg = UI.Background("battle_" + (Stages.StageOf(Level) + 1));
         if (bg != null)
         {
