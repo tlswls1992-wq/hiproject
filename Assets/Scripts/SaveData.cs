@@ -12,7 +12,8 @@ public static class SaveData
     // ---- 성장 숫자 (자유롭게 바꿔 보세요) ----
     public const int MaxLevel = 30;          // 최대 레벨
     public const float LevelBonus = 0.02f;   // 레벨 1마다 능력치 +2%
-    public const int MaxStar = 5;            // 최대 성급
+    public const int StarsPerTier = 5;       // 별 5개를 채운 뒤 다음 합성부터 진급 (별 색이 바뀌고 다시 ★1부터)
+    public const int MaxStar = 15;           // 최대 성급: ★5 → 1차 진급 ★5 → 2차 진급 ★5 (총 15강)
     public const float StarBonus = 0.30f;    // 성급 1마다 능력치 +30% (성급 강화가 레벨보다 효과가 큼)
     public const float AffinityBonus = 0.05f; // 호감도 1마다 능력치 +5%
     public const int BaseDeploy = 7;         // 처음 출진 가능 인원 (용사 포함). 스테이지를 클리어할 때마다 +1
@@ -322,7 +323,7 @@ public static class SaveData
             if (hero.star < MaxStar)
             {
                 hero.star++;
-                return "성급 ★" + hero.star;
+                return "성급 " + FormationScreen.Stars(hero.star);
             }
             Gold += 300; // 최대 성급이면 골드로 돌려받음
             return "골드 +300";

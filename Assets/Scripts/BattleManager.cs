@@ -10,16 +10,16 @@ public class BattleManager : MonoBehaviour
     // ---- 밸런스 숫자 (자유롭게 바꿔 보세요) ----
     const float PartySpeedScale = 0.9f;  // 용사 파티 이동 속도 (1 = 직업 기본 속도). 0.9 = 10% 느리게
     const float EnemyStartGap = 6f;
-    const float SpacingScale = 1.5f;     // 같은 편끼리 떨어지는 거리 (1 = 몸 크기만큼)      // 웨이브가 시작될 때 파티 맨 앞과 적 진형 사이의 거리
+    const float SpacingScale = 0.75f;    // 같은 편끼리 가로로 떨어지는 거리 (1 = 두 그림의 반폭을 더한 만큼)      // 웨이브가 시작될 때 파티 맨 앞과 적 진형 사이의 거리
 
     // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
     // 유닛이 다닐 수 있는 가장 위쪽 / 아래쪽. 레이어 배경(BattleScene)이 있는 스테이지는 그 그림의 땅에 맞춰 바뀜
     const float DefaultLaneTop = 2.5f, DefaultLaneBottom = -5.5f;
     public static float LaneTop { get; private set; } = DefaultLaneTop;
     public static float LaneBottom { get; private set; } = DefaultLaneBottom;
-    const float FrontX = -2f;                // 선두 줄의 가운데 가로 위치
-    const float ColumnGap = 2.4f;            // 줄 사이 간격 (선두 → 후미 방향)
-    const float ZoneWidth = 2.0f;            // 한 줄의 가로 폭
+    const float FrontX = -1.5f;              // 선두 줄의 가운데 가로 위치
+    const float ColumnGap = 2.8f;            // 줄 사이 간격 (선두 → 후미 방향)
+    const float ZoneWidth = 2.2f;            // 한 줄의 가로 폭
 
     public readonly List<Unit> heroes = new List<Unit>();
     public readonly List<Unit> enemies = new List<Unit>();
@@ -422,7 +422,7 @@ public class BattleManager : MonoBehaviour
 
         const int rows = 5;
         int columns = Mathf.CeilToInt(troops.Count / (float)rows);
-        float colGap = columns > 1 ? Mathf.Min(2.0f, (maxX - minX) / (columns - 1)) : 0f;
+        float colGap = columns > 1 ? Mathf.Min(2.4f, (maxX - minX) / (columns - 1)) : 0f;
         for (int i = 0; i < troops.Count; i++)
         {
             int col = i / rows, row = i % rows;
@@ -664,12 +664,14 @@ public class BattleManager : MonoBehaviour
         foreach (var other in u.team == Team.Hero ? heroes : enemies)
         {
             if (other == u || other == null) continue;
-            float minDist = (u.size + other.size) * 0.5f * SpacingScale; // 캐릭터 그림이 커서 조금 더 떨어져 섬
+            // 가로는 그림 폭만큼, 세로는 줄 간격만큼 떨어져 서도록 (타원 모양의 개인 공간)
+            float rx = (u.bodyHalf + other.bodyHalf) * SpacingScale, ry = 0.75f;
             Vector2 diff = pos - (Vector2)other.transform.position;
-            float d = diff.magnitude;
-            if (d >= minDist) continue;
+            float d = Mathf.Sqrt((diff.x / rx) * (diff.x / rx) + (diff.y / ry) * (diff.y / ry));
+            if (d >= 1f) continue;
             if (d < 0.0001f) diff = Random.insideUnitCircle;
-            push += diff.normalized * (minDist - d) / minDist * 3f;
+            var n = new Vector2(diff.x / rx, diff.y / ry).normalized;
+            push += new Vector2(n.x * rx, n.y * ry).normalized * (1f - d) * 4f;
         }
         return push;
     }

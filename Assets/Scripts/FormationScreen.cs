@@ -187,7 +187,19 @@ public class FormationScreen
         if (dragging != null) DrawToken(mouse, dragging, TokenRadius + 4f);
     }
 
-    public static string Stars(int star) => new string('★', star);
+    // 성급 표시: 15강을 3단계(기본 · 1차 진급 · 2차 진급)로 나눠, 단계마다 별 1~5개와 별 색으로 보여 줌
+    public static int StarTier(int star) => Mathf.Clamp((star - 1) / SaveData.StarsPerTier, 0, 2);
+    public static string Stars(int star) => new string('★', (star - 1) % SaveData.StarsPerTier + 1);
+    public static string TierName(int star) => StarTier(star) == 0 ? "" : $"{StarTier(star)}차 진급";
+    public static Color StarColor(int star)
+    {
+        switch (StarTier(star))
+        {
+            case 1: return new Color(1f, 0.45f, 0.38f);   // 1차 진급: 붉은 별
+            case 2: return new Color(0.80f, 0.55f, 1f);   // 2차 진급: 보라 별
+            default: return UI.Gold;                      // 기본: 금색 별
+        }
+    }
 
     // 줄에 놓인 동료 (동그라미)
     static void DrawToken(Vector2 center, SaveData.Member m, float radius)
@@ -210,7 +222,7 @@ public class FormationScreen
                 Color.white, TextAnchor.MiddleCenter, true);
         }
         UI.Text(new Rect(center.x - 50, center.y + radius + 2, 100, 18), def.name, 12, Color.white, TextAnchor.MiddleCenter, true);
-        if (m.star > 1) UI.Text(new Rect(center.x - 40, center.y - radius - 18, 80, 16), Stars(m.star), 11, UI.Gold, TextAnchor.MiddleCenter, true);
+        if (m.star > 1) UI.Text(new Rect(center.x - 40, center.y - radius - 18, 80, 16), Stars(m.star), 11, StarColor(m.star), TextAnchor.MiddleCenter, true);
     }
 
     // 목록의 작은 동료 칸
@@ -220,7 +232,7 @@ public class FormationScreen
         Color rc = RarityInfo.Animated(def.rarity);
         UI.Round(r, UI.Darken(rc, 0.35f));
         UI.RoundFrame(r, rc);
-        UI.Text(new Rect(r.x + 6, r.y + 4, r.width - 12, 18), Stars(m.star), 12, UI.Gold, TextAnchor.MiddleLeft, true);
+        UI.Text(new Rect(r.x + 6, r.y + 4, r.width - 12, 18), Stars(m.star), 12, StarColor(m.star), TextAnchor.MiddleLeft, true);
         UI.Text(new Rect(r.x + 6, r.y + 4, r.width - 12, 18), "Lv." + m.level, 12, UI.TextMain, TextAnchor.MiddleRight, true);
         var c = new Vector2(r.center.x, r.y + r.height * 0.45f);
         float rad = r.width * 0.24f;

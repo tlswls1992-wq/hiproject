@@ -224,6 +224,30 @@ public class GachaScreen
         DrawCardFace(rr, card.def, card.tag, widthScale > 0.85f);
     }
 
+    // 카드의 캐릭터 그림: 작은 상자 없이 카드 윗부분을 꽉 채움 (그림이 없으면 직업 문양)
+    static void DrawCardPicture(Rect r, CompanionDef def, bool usePortrait, float s, Color rc)
+    {
+        var art = CharacterArt.For(def.id);
+        var picture = art == null ? null : usePortrait ? (art.portrait ?? art.full) : (art.full ?? art.portrait);
+        if (picture != null)
+        {
+            bool isPortrait = picture == art.portrait;
+            UI.Glow(new Vector2(r.center.x, r.y + 100f * s), 95f * s, new Color(1f, 0.82f, 0.55f, 0.14f));
+            var area = isPortrait
+                ? new Rect(r.x + 3f, r.y + 3f, r.width - 6f, 202f * s)         // 초상화: 카드 윗부분 전체
+                : new Rect(r.x + 6f * s, r.y + 30f * s, r.width - 12f * s, 160f * s); // 전신: 카드 안에 맞춤
+            CharacterArt.DrawTexture(area, picture, isPortrait);
+        }
+        else
+        {
+            var center = new Vector2(r.center.x, r.y + 120f * s);
+            UI.Circle(center, 50f * s, UI.WithAlpha(UI.Bronze, 0.9f));
+            UI.Circle(center, 44f * s, def.job.color);
+            UI.Text(new Rect(center.x - 50f * s, center.y - 50f * s, 100f * s, 100f * s), def.job.letter,
+                Mathf.RoundToInt(40 * s), Color.white, TextAnchor.MiddleCenter, true);
+        }
+    }
+
     // 동료 카드 앞면 (동료 목록 화면에서도 사용)
     // star: 성급 (★ 개수), level: 0이면 레벨 표시 안 함
     // usePortrait: 그림이 있으면 전신 대신 초상화를 넣음 (도감용)
@@ -232,40 +256,25 @@ public class GachaScreen
         Color rc = RarityInfo.Animated(def.rarity);
         float s = r.height / 300f; // 카드 크기에 맞춰 글자 크기 조절
 
-        UI.Round(r, new Color(0.08f, 0.08f, 0.12f));
-        if (r.width > 24f) UI.Round(new Rect(r.x + 5f, r.y + 5f, r.width - 10f, r.height * 0.55f), UI.WithAlpha(UI.Darken(rc, 0.6f), 0.8f));
-        UI.RoundFrame(r, rc);
-        if (!drawText) return;
+        // 카드 바탕: 차분한 가죽색 (등급은 테두리 색과 아래 글자로만 표시)
+        UI.Round(r, new Color(0.09f, 0.07f, 0.06f));
+        if (r.width > 24f) UI.Gradient(new Rect(r.x + 4f, r.y + 4f, r.width - 8f, r.height * 0.6f), new Color(0.24f, 0.18f, 0.13f), new Color(0.10f, 0.075f, 0.06f));
+        if (!drawText) { UI.RoundFrame(r, UI.WithAlpha(rc, 0.85f)); return; }
+
+        // 캐릭터 그림을 먼저 그리고, 그 위에 별 · 레벨 · 이름을 얹음
+        DrawCardPicture(r, def, usePortrait, s, rc);
+        UI.RoundFrame(r, UI.WithAlpha(rc, 0.85f));
 
         // 성급 (★) 과 레벨
-        UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), new string('★', star),
-            Mathf.RoundToInt(20 * s), UI.Gold, level > 0 || !string.IsNullOrEmpty(tag) ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, true);
+        UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), FormationScreen.Stars(star),
+            Mathf.RoundToInt(20 * s), FormationScreen.StarColor(star), level > 0 || !string.IsNullOrEmpty(tag) ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, true);
         if (level > 0)
             UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), "Lv." + level,
                 Mathf.RoundToInt(18 * s), UI.TextMain, TextAnchor.MiddleRight, true);
 
-        // 캐릭터 그림 (없으면 직업 문양)
-        var center = new Vector2(r.center.x, r.y + 120f * s);
-        var art = CharacterArt.For(def.id);
-        var picture = art == null ? null : usePortrait ? (art.portrait ?? art.full) : (art.full ?? art.portrait);
-        if (picture != null)
-        {
-            UI.Glow(center, 85f * s, UI.WithAlpha(rc, 0.45f));
-            bool isPortrait = picture == art.portrait;
-            var area = isPortrait
-                ? new Rect(r.x + 8f * s, r.y + 40f * s, r.width - 16f * s, 140f * s)
-                : new Rect(r.x + 6f * s, r.y + 30f * s, r.width - 12f * s, 154f * s);
-            CharacterArt.DrawTexture(area, picture, isPortrait);
-            if (isPortrait) UI.RoundFrame(area, UI.WithAlpha(rc, 0.8f));
-        }
-        else
-        {
-            UI.Glow(center, 75f * s, UI.WithAlpha(def.job.color, 0.5f));
-            UI.Circle(center, 50f * s, rc);
-            UI.Circle(center, 44f * s, def.job.color);
-            UI.Text(new Rect(center.x - 50f * s, center.y - 50f * s, 100f * s, 100f * s), def.job.letter,
-                Mathf.RoundToInt(40 * s), Color.white, TextAnchor.MiddleCenter, true);
-        }
+        // 이름 아래쪽은 글자가 잘 보이도록 어둡게
+        UI.Gradient(new Rect(r.x + 3f, r.y + 175f * s, r.width - 6f, 30f * s), new Color(0.09f, 0.07f, 0.06f, 0f), new Color(0.09f, 0.07f, 0.06f, 1f));
+        UI.Round(new Rect(r.x + 3f, r.y + 205f * s, r.width - 6f, r.height - 208f * s), new Color(0.09f, 0.07f, 0.06f, 1f));
 
         UI.Text(new Rect(r.x + 4f, r.y + 185f * s, r.width - 8f, 36f * s), def.name, Mathf.RoundToInt(26 * s), Color.white, TextAnchor.MiddleCenter, true);
         UI.Text(new Rect(r.x + 4f, r.y + 220f * s, r.width - 8f, 26f * s), $"{RarityInfo.Name(def.rarity)} · {def.job.name}",

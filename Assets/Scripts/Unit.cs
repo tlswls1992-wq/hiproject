@@ -24,13 +24,14 @@ public class Unit : MonoBehaviour
     public CharacterArt art;         // 캐릭터 그림 (있으면 동그라미 대신 그림으로 나옴, Setup 전에 넣기)
     public EnemyLook.Look look;      // 적 모습 (코드로 그린 그림, Setup 전에 넣기)
     public bool healer;              // 공격 대신 아군을 치유
+    public float bodyHalf = 0.5f;    // 몸의 가로 반폭 (그림 크기 기준, 겹치지 않게 서는 간격과 근접 공격 거리에 사용)
     public string title;             // 이름표 (정예 · 보스만 머리 위에 표시)
     public Color projectileColor = Color.white;
     public string attackSound;       // 공격할 때 효과음 (AudioManager)
     public string impactSound;       // 투사체가 맞을 때 효과음
 
     const float BarWidth = 1.2f;
-    const float CircleScale = 3.5f; // 그림 없는 동료 동그라미 크기 (몸 크기 x 3.5)
+    const float CircleScale = 3.15f; // 그림 없는 동료 동그라미 크기 (몸 크기 x 3.15)
 
     float cooldownTimer;
     float flashTimer;
@@ -121,6 +122,12 @@ public class Unit : MonoBehaviour
             barY = size * CircleScale * 0.5f + 0.2f;
         }
 
+        // 그림 크기에 맞춘 몸 반폭
+        if (UsesArt) bodyHalf = CharacterArt.BattleCanvasHeight * 0.24f;
+        else if (UsesLook) bodyHalf = look.CanvasFor(size) * look.width * 0.42f;
+        else bodyHalf = size * CircleScale * 0.5f;
+        slot = (slotCounter++ % 3) - 1; // 같은 적을 노릴 때 위·가운데·아래로 나눠 서기
+
         hpBack = MakeBar("HpBack", new Color(0f, 0f, 0f, 0.6f), barY);
         hpBack.transform.localScale = new Vector3(BarWidth, 0.14f, 1f);
         hpFillRenderer = MakeBar("HpFill", team == Team.Hero ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f), barY);
@@ -193,8 +200,24 @@ public class Unit : MonoBehaviour
         Unit target = battle.FindNearestOpponent(this);
         if (target == null) return ToHome(pos);
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
-        return DirectionTo(pos, target.transform.position);
+        return Approach(pos, target);
     }
+
+    // 다가갈 위치: 근접은 상대의 바로 옆(내 쪽)에서 위·가운데·아래로 나눠 서고, 원거리는 상대 쪽으로 곧장
+    int slot;
+    static int slotCounter;
+    Vector2 Approach(Vector2 pos, Unit target)
+    {
+        Vector2 tp = target.transform.position;
+        if (ranged) return DirectionTo(pos, tp);
+        float side = pos.x <= tp.x ? -1f : 1f;
+        float reach = MeleeReach(target) * 0.85f;
+        var spot = new Vector2(tp.x + side * reach, tp.y + slot * 0.8f);
+        spot.y = Mathf.Clamp(spot.y, BattleManager.LaneBottom, BattleManager.LaneTop);
+        return (spot - pos).sqrMagnitude < 0.01f ? Vector2.zero : DirectionTo(pos, spot);
+    }
+
+    float MeleeReach(Unit target) => attackRange * BattleManager.Instance.RangeMultiplier(this) + bodyHalf + target.bodyHalf * 0.5f;
 
     // 치유 직업(성녀·힐러): 다친 아군이 있으면 사거리까지 다가가서 치유하고, 없으면 아군 뒤를 따라갑니다.
     Vector2 HealerThink(Vector2 pos, BattleManager battle)
@@ -241,13 +264,17 @@ public class Unit : MonoBehaviour
         }
         if (healer) return HealerThink(pos, battle);
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
-        return DirectionTo(pos, target.transform.position);
+        return Approach(pos, target);
     }
 
+    // 사거리 안인지: 근접은 가로로 닿고 세로로 너무 멀지 않으면, 원거리는 직선 거리로
     bool InRange(Vector2 pos, Unit target)
     {
+        Vector2 tp = target.transform.position;
+        if (!ranged)
+            return Mathf.Abs(pos.x - tp.x) <= MeleeReach(target) && Mathf.Abs(pos.y - tp.y) <= 1.1f;
         float range = attackRange * BattleManager.Instance.RangeMultiplier(this);
-        return Vector2.Distance(pos, target.transform.position) <= range + (size + target.size) * 0.5f;
+        return Vector2.Distance(pos, tp) <= range + bodyHalf + target.bodyHalf;
     }
 
     static Vector2 DirectionTo(Vector2 from, Vector2 to) => (to - from).normalized;

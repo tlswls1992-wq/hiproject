@@ -22,7 +22,7 @@ public static class UI
     public static readonly Color Red = new Color(0.52f, 0.23f, 0.14f);        // 녹슨 적갈색 (판매, 빼기)
     public static readonly Color Neutral = new Color(0.31f, 0.23f, 0.17f);    // 가죽 갈색
     public static readonly Color Plum = new Color(0.39f, 0.24f, 0.40f);       // 자주색
-    static readonly Color Bronze = new Color(0.55f, 0.40f, 0.22f);            // 테두리 청동
+    public static readonly Color Bronze = new Color(0.55f, 0.40f, 0.22f);           // 테두리 청동
     static readonly Color Disabled = new Color(0.20f, 0.17f, 0.15f);
 
     public static void Begin()
@@ -180,6 +180,15 @@ public static class UI
     // ---------------- 버튼, 판, 막대 ----------------
 
     // 버튼: 가죽 바탕 + 청동/금색 테두리. 마우스를 올리면 금색으로 빛나요. 눌렸으면 true.
+    // 인물 그림 뒤에 까는 차분한 배경 (등급 색 대신, 어두운 가죽색에 은은한 불빛)
+    public static void PortraitBackdrop(Rect r, bool frame = true)
+    {
+        Round(r, new Color(0.10f, 0.075f, 0.06f, 0.96f));
+        Gradient(new Rect(r.x + 3f, r.y + 3f, r.width - 6f, r.height - 6f), new Color(0.26f, 0.19f, 0.14f, 0.9f), new Color(0.09f, 0.065f, 0.05f, 0.9f));
+        Glow(new Vector2(r.center.x, r.y + r.height * 0.42f), Mathf.Min(r.width, r.height) * 0.55f, new Color(1f, 0.82f, 0.55f, 0.16f));
+        if (frame) RoundFrame(r, WithAlpha(Bronze, 0.9f));
+    }
+
     public static bool Button(Rect r, string text, Color color, int fontSize = 22, bool enabled = true)
     {
         bool hover = enabled && r.Contains(Event.current.mousePosition);

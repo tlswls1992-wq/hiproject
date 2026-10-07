@@ -410,8 +410,9 @@ public class GameManager : MonoBehaviour
         if (heroArt != null && heroArt.portrait != null)
         {
             var face = new Rect(box.x + 20, box.y - 120, 200, 216);
-            UI.Round(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6), UI.Gold);
+            UI.PortraitBackdrop(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6));
             CharacterArt.DrawTexture(face, heroArt.portrait, true);
+            UI.RoundFrame(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6), UI.WithAlpha(UI.Bronze, 0.9f));
             textX = face.xMax + 24;
         }
         if (line.speaker != "")
@@ -508,7 +509,7 @@ public class GameManager : MonoBehaviour
         }
 
         // 모닥불 뒤쪽은 넓게, 앞쪽은 좁게 둘러앉음 (앞쪽 동료가 아래 대화 상자에 가리지 않게)
-        float rx = Mathf.Min(240f, (sceneR - sceneL) / 2f - 50f), ryBack = 95f, ryFront = 70f;
+        float rx = Mathf.Min(290f, (sceneR - sceneL) / 2f - 40f), ryBack = 95f, ryFront = 70f;
         var seats = new List<KeyValuePair<SaveData.Member, Vector2>>();
         for (int i = 0; i < sitters.Count; i++)
         {
@@ -535,7 +536,7 @@ public class GameManager : MonoBehaviour
             if (art != null && art.idle.Length > 0)
             {
                 // 대기 그림 (발이 자리 위치에 오도록, 모닥불 쪽을 바라봄, 캐릭터마다 숨 쉬는 박자가 조금씩 다름)
-                float h = 150f * scale;
+                float h = 215f * scale; // 야영지 캐릭터 크기
                 var feet = new Vector2(pos.x, pos.y + radius);
                 art.DrawStanding(feet, h, Now + pos.x * 0.37f, pos.x > fire.x);
                 var pic = new Rect(pos.x - h / 2f, feet.y - h * (1f - CharacterArt.FeetPivot), h, h);
@@ -590,7 +591,7 @@ public class GameManager : MonoBehaviour
         UI.Text(new Rect(left.x + 20, left.y + 376, left.width - 40, 40), "스테이지를 클리어할 때마다 출진 인원이 1명 늘어요", 13, UI.TextSub, TextAnchor.UpperLeft);
         UI.Text(new Rect(left.x + 20, left.y + 430, left.width - 40, 24), $"진행도  {SaveData.ClearedStage} / {Stages.Count}", 15, UI.TextSub, TextAnchor.MiddleLeft);
         UI.Bar(new Rect(left.x + 20, left.y + 458, left.width - 40, 14), SaveData.ClearedStage / (float)Stages.Count, UI.Gold);
-        UI.Text(new Rect(left.x + 20, left.y + 484, left.width - 40, 40), $"용사 {FormationScreen.Stars(SaveData.HeroMember.star)}  ·  동료 {SaveData.CompanionCount}명", 14, UI.TextSub, TextAnchor.MiddleLeft);
+        UI.Text(new Rect(left.x + 20, left.y + 484, left.width - 40, 40), $"용사 {FormationScreen.TierName(SaveData.HeroMember.star)} {FormationScreen.Stars(SaveData.HeroMember.star)}  ·  동료 {SaveData.CompanionCount}명", 14, UI.TextSub, TextAnchor.MiddleLeft);
 
         // ---- 오른쪽: 메뉴 ----
         float mx = w - 250f, mw = 230f, my = 80f;
@@ -632,8 +633,9 @@ public class GameManager : MonoBehaviour
             {
                 // 대화 상자 왼쪽 위로 초상화
                 var face = new Rect(box.x + 14, box.y - 92, 170, 184);
-                UI.Round(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6), RarityInfo.Animated(talkMember.Def.rarity));
+                UI.PortraitBackdrop(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6));
                 CharacterArt.DrawTexture(face, talkArt.portrait, true);
+                UI.RoundFrame(new Rect(face.x - 3, face.y - 3, face.width + 6, face.height + 6), UI.WithAlpha(UI.Bronze, 0.9f));
                 textX = face.xMax + 18;
             }
             UI.Chip(new Rect(textX - 4, box.y - 16, 150, 32), talkMember.Def.name, UI.Darken(UI.Primary, 0.9f), 16);

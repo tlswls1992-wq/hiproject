@@ -9,7 +9,7 @@ public static class EnemyLook
     public const int Size = 128;      // 그림 한 장의 픽셀 크기
     public const float Ground = 0.04f; // 그림 안에서 발이 닿는 높이 (아래에서 4%)
     // 그림 크기: 사람 모양 일반 적(몸 크기 0.5)이 용사와 비슷한 키가 되도록. 몸 크기가 커져도 너무 거대해지지 않게 완만하게 커짐
-    public const float VisualScale = 2.38f;
+    public const float VisualScale = 2.14f; // (전투 캐릭터 0.9배)
 
     public class Look
     {
@@ -20,6 +20,7 @@ public static class EnemyLook
         // 몸 크기(size)에 맞는 그림 한 변의 길이 (월드 단위)
         public float CanvasFor(float size) => scale * Mathf.Pow(size, 0.6f);
         public bool hovers; // 공중에 떠 있는 적 (와이번, 상어, 크라켄)
+        public float width; // 그림에서 몸이 차지하는 가로 폭 (0~1, 겹치지 않게 간격을 잡을 때 사용)
     }
 
     static readonly Dictionary<string, Look> cache = new Dictionary<string, Look>();
@@ -47,6 +48,7 @@ public static class EnemyLook
             texture = tex,
             sprite = Sprite.Create(tex, new Rect(0, 0, Size, Size), new Vector2(0.5f, Ground), Size),
             top = p.Top,
+            width = p.Width,
             scale = ScaleOf(def.shape) * VisualScale,
             hovers = def.shape == EnemyShape.Wyvern || def.shape == EnemyShape.Shark || def.shape == EnemyShape.Kraken,
         };
@@ -434,6 +436,7 @@ public static class EnemyLook
         readonly int n;
         readonly Color[] px;
         public float Top { get; private set; }
+        public float Width { get; private set; }
 
         public Painter(int n) { this.n = n; px = new Color[n * n]; }
 
@@ -544,7 +547,7 @@ public static class EnemyLook
         public Texture2D Finish(Color outline)
         {
             var result = new Color[px.Length];
-            int top = 0;
+            int top = 0, minX = n, maxX = 0;
             for (int y = 0; y < n; y++)
             {
                 float shade = 0.84f + 0.26f * y / n;
@@ -552,7 +555,7 @@ public static class EnemyLook
                 {
                     int i = y * n + x;
                     var c = px[i];
-                    if (c.a > 0.5f) top = Mathf.Max(top, y);
+                    if (c.a > 0.5f) { top = Mathf.Max(top, y); minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x); }
                     // 주변 2픽셀 안에 몸이 있으면 테두리
                     float near = 0f;
                     for (int dy = -2; dy <= 2; dy++)
@@ -574,6 +577,7 @@ public static class EnemyLook
                 }
             }
             Top = (top + 1f) / n;
+            Width = maxX >= minX ? (maxX - minX + 1f) / n : 0.5f;
             var tex = new Texture2D(n, n, TextureFormat.RGBA32, false);
             tex.wrapMode = TextureWrapMode.Clamp;
             tex.filterMode = FilterMode.Bilinear;

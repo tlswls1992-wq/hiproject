@@ -25,7 +25,7 @@ public class CharacterArt
     Sprite[] attackSprites;
 
     // 전투에서 그림 한 장(정사각형 캔버스)의 높이 (게임 세계 단위). 캐릭터가 커 보이면 줄이세요.
-    public const float BattleCanvasHeight = 5.2f; // 전투 그림 높이 (월드 단위). 용사가 너무 작아서 2배로
+    public const float BattleCanvasHeight = 4.68f; // 전투 그림 높이 (월드 단위). 예전 2.6의 2배에서 0.9배로
     // 캔버스 아래에서 발이 있는 높이 비율 (그림의 이 지점이 유닛의 발 위치가 됨)
     // (변환 스크립트가 모든 동작의 발을 그림 아래 6% 지점에 맞춰 둠)
     public const float FeetPivot = 0.065f;
