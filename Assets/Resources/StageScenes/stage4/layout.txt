@@ -1,0 +1,9 @@
+canvas=1280,720
+zoom=1.2
+lanes=548,700
+bob=boat,575,289,147,126,2,0.6,4
+bob=boat_reflection,575,361,147,22,-2,0,4
+foam=wave_foam,438,423,465,30,-16,12,0,0.42
+foam=wave_foam,934,559,680,34,-13,12,0.45,0.45
+foam=wave_foam,788,457,460,17,-10,12,0.75,0.24
+glint=water_glints,4,0.35,1

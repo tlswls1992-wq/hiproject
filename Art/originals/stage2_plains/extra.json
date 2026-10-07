@@ -1,0 +1,159 @@
+{
+ "sway": [
+  {
+   "sprite": "grass/grass_1.png",
+   "size": [
+    104,
+    100
+   ],
+   "anchor_in_sprite": [
+    52.0,
+    99
+   ],
+   "anchor_in_scene": [
+    50,
+    722
+   ],
+   "phase_radians": 0.0,
+   "motion": "root_anchored_bend"
+  },
+  {
+   "sprite": "grass/grass_2.png",
+   "size": [
+    120,
+    96
+   ],
+   "anchor_in_sprite": [
+    60.0,
+    95
+   ],
+   "anchor_in_scene": [
+    212,
+    722
+   ],
+   "phase_radians": 0.9,
+   "motion": "root_anchored_bend"
+  },
+  {
+   "sprite": "grass/grass_3.png",
+   "size": [
+    98,
+    82
+   ],
+   "anchor_in_sprite": [
+    49.0,
+    81
+   ],
+   "anchor_in_scene": [
+    353,
+    722
+   ],
+   "phase_radians": 1.8,
+   "motion": "root_anchored_bend"
+  },
+  {
+   "sprite": "grass/grass_1.png",
+   "size": [
+    116,
+    90
+   ],
+   "anchor_in_sprite": [
+    58.0,
+    89
+   ],
+   "anchor_in_scene": [
+    906,
+    722
+   ],
+   "phase_radians": 2.7,
+   "motion": "root_anchored_bend"
+  },
+  {
+   "sprite": "grass/grass_2.png",
+   "size": [
+    122,
+    98
+   ],
+   "anchor_in_sprite": [
+    61.0,
+    97
+   ],
+   "anchor_in_scene": [
+    1076,
+    722
+   ],
+   "phase_radians": 3.6,
+   "motion": "root_anchored_bend"
+  },
+  {
+   "sprite": "grass/grass_3.png",
+   "size": [
+    116,
+    103
+   ],
+   "anchor_in_sprite": [
+    58.0,
+    102
+   ],
+   "anchor_in_scene": [
+    1218,
+    722
+   ],
+   "phase_radians": 4.5,
+   "motion": "root_anchored_bend"
+  }
+ ],
+ "clouds": [
+  {
+   "sprite": "clouds/cloud_2.png",
+   "start": [
+    851,
+    73
+   ],
+   "size": [
+    310,
+    77
+   ],
+   "travel": [
+    80,
+    0
+   ],
+   "phase": 0.5,
+   "opacity": 1.0
+  },
+  {
+   "sprite": "clouds/cloud_1.png",
+   "start": [
+    315,
+    104
+   ],
+   "size": [
+    230,
+    68
+   ],
+   "travel": [
+    80,
+    0
+   ],
+   "phase": 0.5,
+   "opacity": 1.0
+  },
+  {
+   "sprite": "clouds/cloud_3.png",
+   "start": [
+    1067,
+    175
+   ],
+   "size": [
+    180,
+    51
+   ],
+   "travel": [
+    80,
+    0
+   ],
+   "phase": 0.5,
+   "opacity": 0.95
+  }
+ ]
+}

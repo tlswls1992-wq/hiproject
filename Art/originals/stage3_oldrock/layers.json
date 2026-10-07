@@ -1,0 +1,116 @@
+{
+  "name": "올드락 산맥",
+  "description": "대륙의 제일 높은 올드락 산맥\n정말 여기를 오르란 말이야?\n지하로 가는 길이 있다는 소문이...",
+  "canvas": [
+    1280,
+    720
+  ],
+  "duration_seconds": 12,
+  "fps": 12,
+  "fixed_layer": "background_static.png",
+  "cloud_instances": [
+    {
+      "sprite": "clouds/cloud_1.png",
+      "start": [
+        545,
+        63
+      ],
+      "size": [
+        405,
+        130
+      ],
+      "phase": 0.0,
+      "opacity": 0.82,
+      "travel": [
+        150,
+        -12
+      ]
+    },
+    {
+      "sprite": "clouds/cloud_2.png",
+      "start": [
+        665,
+        226
+      ],
+      "size": [
+        470,
+        151
+      ],
+      "phase": 0.24,
+      "opacity": 0.75,
+      "travel": [
+        150,
+        -12
+      ]
+    },
+    {
+      "sprite": "clouds/cloud_3.png",
+      "start": [
+        793,
+        341
+      ],
+      "size": [
+        360,
+        139
+      ],
+      "phase": 0.47,
+      "opacity": 0.83,
+      "travel": [
+        150,
+        -12
+      ]
+    },
+    {
+      "sprite": "clouds/cloud_2.png",
+      "start": [
+        962,
+        497
+      ],
+      "size": [
+        520,
+        174
+      ],
+      "phase": 0.68,
+      "opacity": 0.85,
+      "travel": [
+        150,
+        -12
+      ]
+    },
+    {
+      "sprite": "clouds/cloud_1.png",
+      "start": [
+        984,
+        99
+      ],
+      "size": [
+        425,
+        123
+      ],
+      "phase": 0.83,
+      "opacity": 0.65,
+      "travel": [
+        150,
+        -12
+      ]
+    },
+    {
+      "sprite": "clouds/cloud_3.png",
+      "start": [
+        543,
+        353
+      ],
+      "size": [
+        312,
+        121
+      ],
+      "phase": 0.57,
+      "opacity": 0.45,
+      "travel": [
+        150,
+        -12
+      ]
+    }
+  ],
+  "motion": "Clouds move left to right with smooth formation and dissipation. Fixed rock geometry and fixed camera."
+}

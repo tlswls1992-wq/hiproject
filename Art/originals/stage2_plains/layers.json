@@ -1,0 +1,82 @@
+{
+  "name": "동부평원",
+  "description": "넓디 넓은 동부 평원\n말을 타고 달려도 끝이 보이지 않는다\n하지만 수 많은 갈림길이 있을지도...?",
+  "canvas": [
+    1280,
+    720
+  ],
+  "duration_seconds": 16,
+  "fps": 24,
+  "horse_path": {
+    "start_x": -80,
+    "travel": 1680,
+    "start_phase": 0.42,
+    "direction": "right"
+  },
+  "horse_layers": [
+    {
+      "offset": 0,
+      "ground_y": 347,
+      "size": [
+        44,
+        28
+      ],
+      "phase": 0
+    },
+    {
+      "offset": 37,
+      "ground_y": 344,
+      "size": [
+        41,
+        26
+      ],
+      "phase": 2
+    },
+    {
+      "offset": 75,
+      "ground_y": 351,
+      "size": [
+        47,
+        30
+      ],
+      "phase": 4
+    },
+    {
+      "offset": 108,
+      "ground_y": 344,
+      "size": [
+        42,
+        26
+      ],
+      "phase": 1
+    },
+    {
+      "offset": 142,
+      "ground_y": 349,
+      "size": [
+        45,
+        28
+      ],
+      "phase": 3
+    },
+    {
+      "offset": 181,
+      "ground_y": 346,
+      "size": [
+        42,
+        27
+      ],
+      "phase": 5
+    },
+    {
+      "offset": 215,
+      "ground_y": 352,
+      "size": [
+        46,
+        29
+      ],
+      "phase": 2
+    }
+  ],
+  "notes": "Fixed terrain; six discrete gallop poses; independent foreground grass and cloud layers. Horses wrap only when the entire herd is beyond the screen."
+}

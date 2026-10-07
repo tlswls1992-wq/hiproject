@@ -1,0 +1,71 @@
+{
+  "name": "카니 해안",
+  "description": "시원한 바다다!!\n배를 타면 어디든 갈 수 있어!\n폭풍우를 만난다면 예기치 못한 곳으로 갈 지도....",
+  "canvas": [
+    1280,
+    720
+  ],
+  "duration_seconds": 12,
+  "fps": 24,
+  "boat": {
+    "center": [
+      575,
+      289
+    ],
+    "size": [
+      147,
+      126
+    ],
+    "bob_pixels": 2,
+    "roll_degrees": 0.6
+  },
+  "waves": [
+    {
+      "center": [
+        438,
+        423
+      ],
+      "size": [
+        465,
+        30
+      ],
+      "angle": -16,
+      "phase": 0.0,
+      "opacity": 0.42
+    },
+    {
+      "center": [
+        934,
+        559
+      ],
+      "size": [
+        680,
+        34
+      ],
+      "angle": -13,
+      "phase": 0.45,
+      "opacity": 0.45
+    },
+    {
+      "center": [
+        788,
+        457
+      ],
+      "size": [
+        460,
+        17
+      ],
+      "angle": -10,
+      "phase": 0.75,
+      "opacity": 0.24
+    }
+  ],
+  "layers": [
+    "background_static.png",
+    "boat.png",
+    "wave_foam.png",
+    "water_glints.png",
+    "boat_reflection.png"
+  ],
+  "notes": "Only separate boat, foam and glints move. Terrain and pier remain fixed."
+}

@@ -44,25 +44,75 @@ def main():
         f"zoom={args.zoom}",
         f"lanes={args.lanes}",
     ]
-    saved = set()
-    for layer in layout["layers"]:
-        sprite = Path(layer["sprite"]).stem
-        if sprite not in saved:
-            img = Image.open(src / layer["sprite"])
-            # 화면에서는 작게 쓰이므로 너무 큰 그림은 줄여서 용량 절약 (가장 크게 쓰이는 크기의 2배까지)
-            biggest = max(l["size"][0] for l in layout["layers"] if Path(l["sprite"]).stem == sprite)
-            limit = biggest * 2
-            if img.width > limit:
-                img = img.resize((limit, round(img.height * limit / img.width)), Image.LANCZOS)
-            img.save(out / f"{sprite}.png", optimize=True)
-            saved.add(sprite)
-        kind = "bend" if "bend" in layer.get("motion", "") else "rotate"
+    saved = {}
+
+    def sprite(rel, biggest_w):
+        """조각 그림을 복사 (화면에서 쓰이는 크기의 2배까지만 남겨 용량 절약). 게임 안 이름을 돌려줌"""
+        name = Path(rel).stem
+        if name in saved:
+            return name
+        img = Image.open(src / rel)
+        limit = max(8, int(biggest_w * 2))
+        if img.width > limit:
+            img = img.resize((limit, round(img.height * limit / img.width)), Image.LANCZOS)
+        img.save(out / f"{name}.png", optimize=True)
+        saved[name] = True
+        return name
+
+    def num(v):
+        return f"{v:g}" if isinstance(v, (int, float)) else str(v)
+
+    def emit(kind, *values):
+        lines.append(kind + "=" + ",".join(num(v) for v in values))
+
+    duration = layout.get("duration_seconds", 8)
+    extra = json.loads((src / "extra.json").read_text()) if (src / "extra.json").exists() else {}
+
+    # 1) 바람에 흔들리는 풀/가지 (layers)
+    for layer in layout.get("layers", []) + extra.get("sway", []):
+        if not isinstance(layer, dict):
+            continue
         w, h = layer["size"]
+        name = sprite(layer["sprite"], w)
         ax, ay = layer["anchor_in_sprite"]
         sx, sy = layer["anchor_in_scene"]
-        lines.append(f"sway={sprite},{w},{h},{ax},{ay},{sx},{sy},{layer.get('phase_radians', 0)},{kind}")
+        kind = "bend" if "bend" in layer.get("motion", "bend") else "rotate"
+        emit("sway", name, w, h, ax, ay, sx, sy, layer.get("phase_radians", 0), kind)
+
+    # 2) 흘러가는 구름 (cloud_instances): 시작 위치(가운데)에서 travel만큼 이동하며 생겼다 사라짐
+    for c in layout.get("cloud_instances", []) + extra.get("clouds", []):
+        w, h = c["size"]
+        name = sprite(c["sprite"], w)
+        dx, dy = c.get("travel", [60, 0])
+        emit("drift", name, c["start"][0], c["start"][1], w, h, dx, dy, c.get("period", duration), c.get("phase", 0), c.get("opacity", 1))
+
+    # 3) 달리는 말 무리 (horse_layers)
+    if "horse_layers" in layout:
+        frames = sorted((src / "horses").glob("gallop_*.png"))
+        for f in frames:
+            sprite(f"horses/{f.name}", 60)
+        path = layout["horse_path"]
+        emit("herd", "gallop_", len(frames), path["start_x"], path["travel"], duration, path.get("start_phase", 0), 12)
+        for hl in layout["horse_layers"]:
+            emit("horse", hl["offset"], hl["ground_y"], hl["size"][0], hl["size"][1], hl.get("phase", 0))
+
+    # 4) 바다: 출렁이는 배, 밀려오는 물거품, 반짝이는 물빛
+    if "boat" in layout:
+        bt = layout["boat"]
+        w, h = bt["size"]
+        emit("bob", sprite("boat.png", w), bt["center"][0], bt["center"][1], w, h, bt.get("bob_pixels", 2), bt.get("roll_degrees", 0.5), 4)
+        if (src / "boat_reflection.png").exists():
+            ref = Image.open(src / "boat_reflection.png")
+            emit("bob", sprite("boat_reflection.png", ref.width), bt["center"][0], bt["center"][1] + h / 2 + ref.height / 2 - 2,
+                 ref.width, ref.height, -bt.get("bob_pixels", 2), 0, 4)
+    for wv in layout.get("waves", []):
+        w, h = wv["size"]
+        emit("foam", sprite("wave_foam.png", 700), wv["center"][0], wv["center"][1], w, h, wv.get("angle", 0), duration, wv.get("phase", 0), wv.get("opacity", 0.4))
+    if (src / "water_glints.png").exists():
+        emit("glint", sprite("water_glints.png", layout["canvas"][0] / 2), 4.0, 0.35, 1.0)
+
     (out / "layout.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print("saved", out, len(saved), "sprites,", len(layout["layers"]), "layers")
+    print("saved", out, len(saved), "sprites,", len(lines) - 3, "moving layers")
 
 
 if __name__ == "__main__":
