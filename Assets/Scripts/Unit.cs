@@ -29,7 +29,8 @@ public class Unit : MonoBehaviour
     public string attackSound;       // 공격할 때 효과음 (AudioManager)
     public string impactSound;       // 투사체가 맞을 때 효과음
 
-    const float BarWidth = 0.8f;
+    const float BarWidth = 1.2f;
+    const float CircleScale = 3.5f; // 그림 없는 동료 동그라미 크기 (몸 크기 x 3.5)
 
     float cooldownTimer;
     float flashTimer;
@@ -64,7 +65,7 @@ public class Unit : MonoBehaviour
             ring.sprite = SpriteFactory.Circle();
             if (UsesLook)
             {
-                float w = size * look.scale * 0.42f;
+                float w = look.CanvasFor(size) * 0.42f;
                 ringGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
                 ringGo.transform.localScale = new Vector3(w, w * 0.28f, 1f);
                 ring.color = ringColor;
@@ -73,12 +74,12 @@ public class Unit : MonoBehaviour
             {
                 // 그림이 있으면 발밑에 등급 색 납작한 원 (그림자처럼)
                 ringGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
-                ringGo.transform.localScale = new Vector3(size + 0.6f, (size + 0.6f) * 0.32f, 1f);
+                ringGo.transform.localScale = new Vector3(size * 2f + 1.2f, (size * 2f + 1.2f) * 0.32f, 1f);
                 ring.color = new Color(ringColor.r, ringColor.g, ringColor.b, 0.55f);
             }
             else
             {
-                ringGo.transform.localScale = Vector3.one * (size + 0.18f);
+                ringGo.transform.localScale = Vector3.one * (size * CircleScale + 0.25f);
                 ring.sprite = sprite;
                 ring.color = ringColor;
             }
@@ -103,23 +104,25 @@ public class Unit : MonoBehaviour
         {
             // 코드로 그린 적: 발이 동그라미 아래쪽에 오도록 놓고, 몸 크기에 맞춰 키움
             bodyGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
-            bodyGo.transform.localScale = Vector3.one * size * look.scale;
+            bodyGo.transform.localScale = Vector3.one * look.CanvasFor(size);
             body.sprite = look.sprite;
             baseColor = color = Color.white;
             body.color = Color.white;
             lastX = transform.position.x;
             lastY = transform.position.y;
-            barY = -size * 0.5f + size * look.scale * (look.top - EnemyLook.Ground) + 0.18f + (look.hovers ? size * 0.35f : 0f);
+            barY = -size * 0.5f + look.CanvasFor(size) * (look.top - EnemyLook.Ground) + 0.18f + (look.hovers ? size * 0.35f : 0f);
         }
         else
         {
-            bodyGo.transform.localScale = Vector3.one * size;
+            // 그림이 없는 동료: 동그라미 (용사 그림 크기에 맞춰 크게)
+            bodyGo.transform.localScale = Vector3.one * size * CircleScale;
             body.sprite = sprite;
             body.color = color;
+            barY = size * CircleScale * 0.5f + 0.2f;
         }
 
         hpBack = MakeBar("HpBack", new Color(0f, 0f, 0f, 0.6f), barY);
-        hpBack.transform.localScale = new Vector3(BarWidth, 0.1f, 1f);
+        hpBack.transform.localScale = new Vector3(BarWidth, 0.14f, 1f);
         hpFillRenderer = MakeBar("HpFill", team == Team.Hero ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f), barY);
         hpFill = hpFillRenderer.transform;
         UpdateHpBar();
@@ -144,7 +147,7 @@ public class Unit : MonoBehaviour
     {
         if (hpFill == null) return;
         float pct = Mathf.Clamp01(hp / maxHp);
-        hpFill.localScale = new Vector3(BarWidth * pct, 0.1f, 1f);
+        hpFill.localScale = new Vector3(BarWidth * pct, 0.14f, 1f);
         hpFill.localPosition = new Vector3(-BarWidth * (1f - pct) / 2f, hpFill.localPosition.y, 0f);
     }
 
@@ -330,7 +333,7 @@ public class Unit : MonoBehaviour
         if (walking) runClock += dt;
         runBlend = Mathf.MoveTowards(runBlend, walking ? 1f : 0f, dt * 6f);
 
-        float s = size * look.scale;
+        float s = look.CanvasFor(size);
         Vector3 pos = new Vector3(0f, -size * 0.5f, 0f);
         Vector3 scale = Vector3.one * s;
         float tilt = 0f;

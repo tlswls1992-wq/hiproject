@@ -8,13 +8,17 @@ public static class EnemyLook
 {
     public const int Size = 128;      // 그림 한 장의 픽셀 크기
     public const float Ground = 0.04f; // 그림 안에서 발이 닿는 높이 (아래에서 4%)
+    // 그림 크기: 사람 모양 일반 적(몸 크기 0.5)이 용사와 비슷한 키가 되도록. 몸 크기가 커져도 너무 거대해지지 않게 완만하게 커짐
+    public const float VisualScale = 2.38f;
 
     public class Look
     {
         public Texture2D texture;
         public Sprite sprite;
         public float top;   // 그림에서 가장 높은 곳 (0~1, 체력바 위치용)
-        public float scale; // 몸 크기(size) 1당 그림 크기 (월드 단위)
+        public float scale; // 모양별 그림 크기 배율
+        // 몸 크기(size)에 맞는 그림 한 변의 길이 (월드 단위)
+        public float CanvasFor(float size) => scale * Mathf.Pow(size, 0.6f);
         public bool hovers; // 공중에 떠 있는 적 (와이번, 상어, 크라켄)
     }
 
@@ -43,7 +47,7 @@ public static class EnemyLook
             texture = tex,
             sprite = Sprite.Create(tex, new Rect(0, 0, Size, Size), new Vector2(0.5f, Ground), Size),
             top = p.Top,
-            scale = ScaleOf(def.shape),
+            scale = ScaleOf(def.shape) * VisualScale,
             hovers = def.shape == EnemyShape.Wyvern || def.shape == EnemyShape.Shark || def.shape == EnemyShape.Kraken,
         };
         cache[def.id] = look;
@@ -60,7 +64,7 @@ public static class EnemyLook
             case EnemyShape.Golem: return 2.9f;
             case EnemyShape.Shark: return 3.0f;
             case EnemyShape.Beast:
-            case EnemyShape.Lynx:
+            case EnemyShape.Lynx: return 2.6f;
             case EnemyShape.Scorpion: return 3.1f;
             case EnemyShape.Wyvern: return 3.3f;
             default: return 3.5f; // 사람, 인어

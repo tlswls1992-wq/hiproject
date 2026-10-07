@@ -9,7 +9,8 @@ public class BattleManager : MonoBehaviour
 
     // ---- 밸런스 숫자 (자유롭게 바꿔 보세요) ----
     const float PartySpeedScale = 0.9f;  // 용사 파티 이동 속도 (1 = 직업 기본 속도). 0.9 = 10% 느리게
-    const float EnemyStartGap = 6f;      // 웨이브가 시작될 때 파티 맨 앞과 적 진형 사이의 거리
+    const float EnemyStartGap = 6f;
+    const float SpacingScale = 1.5f;     // 같은 편끼리 떨어지는 거리 (1 = 몸 크기만큼)      // 웨이브가 시작될 때 파티 맨 앞과 적 진형 사이의 거리
 
     // ---- 전장 배치 (화면 고정, 옆에서 보는 시점) ----
     // 유닛이 다닐 수 있는 가장 위쪽 / 아래쪽. 레이어 배경(BattleScene)이 있는 스테이지는 그 그림의 땅에 맞춰 바뀜
@@ -17,8 +18,8 @@ public class BattleManager : MonoBehaviour
     public static float LaneTop { get; private set; } = DefaultLaneTop;
     public static float LaneBottom { get; private set; } = DefaultLaneBottom;
     const float FrontX = -2f;                // 선두 줄의 가운데 가로 위치
-    const float ColumnGap = 1.8f;            // 줄 사이 간격 (선두 → 후미 방향)
-    const float ZoneWidth = 1.5f;            // 한 줄의 가로 폭
+    const float ColumnGap = 2.4f;            // 줄 사이 간격 (선두 → 후미 방향)
+    const float ZoneWidth = 2.0f;            // 한 줄의 가로 폭
 
     public readonly List<Unit> heroes = new List<Unit>();
     public readonly List<Unit> enemies = new List<Unit>();
@@ -39,7 +40,6 @@ public class BattleManager : MonoBehaviour
     float hpBonus = 1f;
 
     Camera cam;
-    Unit leader;
     Unit boss;
     string bossName;
     int partySize;
@@ -131,7 +131,6 @@ public class BattleManager : MonoBehaviour
         World = null;
         heroes.Clear();
         enemies.Clear();
-        leader = null;
         speed = 1;
         Time.timeScale = 1f;
     }
@@ -399,7 +398,7 @@ public class BattleManager : MonoBehaviour
 
         // 일반 적
         var troops = new List<EnemyDef>();
-        int count = 4 + Mathf.Min(Level / 5, 12) + Wave * 2;
+        int count = Mathf.RoundToInt((4 + Mathf.Min(Level / 5, 12) + Wave * 2) * 1.2f); // 적의 수 1.2배
         for (int i = 0; i < count; i++) troops.Add(EnemyDef.Find(pool[Random.Range(0, pool.Length)]));
 
         // 후반 라운드(6~9)에는 '(1)' 인물이 가끔 섞여 나옴 (한 전투에 한 명씩만)
@@ -423,7 +422,7 @@ public class BattleManager : MonoBehaviour
 
         const int rows = 5;
         int columns = Mathf.CeilToInt(troops.Count / (float)rows);
-        float colGap = columns > 1 ? Mathf.Min(1.4f, (maxX - minX) / (columns - 1)) : 0f;
+        float colGap = columns > 1 ? Mathf.Min(2.0f, (maxX - minX) / (columns - 1)) : 0f;
         for (int i = 0; i < troops.Count; i++)
         {
             int col = i / rows, row = i % rows;
@@ -553,7 +552,6 @@ public class BattleManager : MonoBehaviour
         u.art = CharacterArt.For(def.id); // 그림이 있으면 그림으로 나옴
         u.Setup(SpriteFactory.Circle(), c.color, RarityInfo.GetColor(def.rarity));
         heroes.Add(u);
-        if (def.IsHero) leader = u;
     }
 
     // ================= 시너지 & 보너스 =================
@@ -666,7 +664,7 @@ public class BattleManager : MonoBehaviour
         foreach (var other in u.team == Team.Hero ? heroes : enemies)
         {
             if (other == u || other == null) continue;
-            float minDist = (u.size + other.size) * 0.5f;
+            float minDist = (u.size + other.size) * 0.5f * SpacingScale; // 캐릭터 그림이 커서 조금 더 떨어져 섬
             Vector2 diff = pos - (Vector2)other.transform.position;
             float d = diff.magnitude;
             if (d >= minDist) continue;
@@ -722,41 +720,38 @@ public class BattleManager : MonoBehaviour
 
     // ================= 전투 보너스 (로그라이크 요소: 이번 판에서만 유지) =================
 
+    // 웨이브를 이기면 세 가지 중 하나를 골라요: 회복 / 골드 / 출전한 동료 한 명 강화
     void OfferUpgrades()
     {
-        var pool = new List<Upgrade>
+        int gold = 15 + Level * 5 / 2;
+        upgradeChoices = new List<Upgrade>
         {
-            new Upgrade { title = "날카로운 무기", desc = "모든 동료 공격력 +8%", apply = () => damageBonus *= 1.08f },
-            new Upgrade { title = "빠른 손놀림", desc = "모든 동료 공격 속도 +6%", apply = () => attackSpeedBonus *= 1.06f },
-            new Upgrade { title = "매의 눈", desc = "원거리·치유 동료의 사거리 +8%", apply = () => rangeBonus *= 1.08f },
-            new Upgrade { title = "강철 갑옷", desc = "모든 동료 최대 체력 +10%", apply = () =>
-                {
-                    hpBonus *= 1.1f;
-                    foreach (var h in heroes) { h.maxHp *= 1.1f; h.hp *= 1.1f; h.UpdateHpBar(); }
-                } },
-            new Upgrade { title = "치유의 샘", desc = "모든 동료 체력 50% 회복", apply = () =>
+            new Upgrade { title = "회복", desc = "살아 있는 모든 동료\n체력 50% 회복", apply = () =>
                 {
                     foreach (var h in heroes) { h.hp = Mathf.Min(h.maxHp, h.hp + h.maxHp * 0.5f); h.UpdateHpBar(); }
                 } },
-            new Upgrade { title = "전리품", desc = "골드 +" + (15 + Level * 5 / 2), apply = () => GoldEarned += 15 + Level * 5 / 2 },
+            new Upgrade { title = "골드", desc = $"골드 +{gold}", apply = () => GoldEarned += gold },
         };
-        if (leader != null && leader.IsAlive)
-        {
-            pool.Add(new Upgrade { title = "용사의 함성", desc = "용사 공격력 +25%, 체력 50% 회복", apply = () =>
-                {
-                    if (leader == null) return;
-                    leader.damage *= 1.25f;
-                    leader.hp = Mathf.Min(leader.maxHp, leader.hp + leader.maxHp * 0.5f);
-                    leader.UpdateHpBar();
-                } });
-        }
 
-        upgradeChoices = new List<Upgrade>();
-        for (int i = 0; i < 3 && pool.Count > 0; i++)
+        // 강화: 살아 있는 출전 동료 중 한 명을 무작위로 골라 이번 판 동안 강하게
+        var alive = heroes.FindAll(h => h != null && h.IsAlive);
+        if (alive.Count > 0)
         {
-            int idx = Random.Range(0, pool.Count);
-            upgradeChoices.Add(pool[idx]);
-            pool.RemoveAt(idx);
+            var target = alive[Random.Range(0, alive.Count)];
+            upgradeChoices.Add(new Upgrade
+            {
+                title = "강화",
+                desc = $"{target.name}\n공격력 · 최대 체력 +30%",
+                apply = () =>
+                {
+                    if (target == null || !target.IsAlive) return;
+                    target.damage *= 1.3f;
+                    target.maxHp *= 1.3f;
+                    target.hp *= 1.3f;
+                    target.UpdateHpBar();
+                    SpawnEffect(target.transform.position, target.size + 1.2f, new Color(1f, 0.85f, 0.4f, 0.5f));
+                },
+            });
         }
     }
 
@@ -842,7 +837,7 @@ public class BattleManager : MonoBehaviour
     {
         UI.Fill(UI.Full, new Color(0f, 0f, 0f, 0.65f));
         UI.Text(new Rect(0, 140, w, 50), $"웨이브 {Wave} 클리어!", 34, UI.Gold, TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(0, 188, w, 30), "전투 보너스를 하나 고르세요  (이번 판 동안만 유지)", 18, UI.TextSub);
+        UI.Text(new Rect(0, 188, w, 30), "보상을 하나 고르세요  (강화는 이번 판 동안만 유지)", 18, UI.TextSub);
 
         const float cw = 260, ch = 190, gap = 28;
         float x0 = (w - (cw * upgradeChoices.Count + gap * (upgradeChoices.Count - 1))) / 2f;
