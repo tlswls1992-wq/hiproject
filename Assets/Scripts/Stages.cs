@@ -15,35 +15,23 @@ public static class Stages
     static readonly string[] stageNames =
     {
         "올 왕국 외곽 숲", "동부 평원", "올드락 산맥", "카니 해안", "포빌리아 왕국 검문소",
-        "은혜의 땅", "노란 용의 굴", "붉은 정글", "옛 대전쟁터", "마왕성",
+        "은혜의 땅", "노란 용의 동굴", "붉은 정글", "옛 대전쟁터", "마왕성",
     };
 
-    // ★ 중간 보스 (5라운드)와 스테이지 보스 (10라운드) 이름 (임시)
-    static readonly string[] midBossNames =
+    // 7~10 스테이지의 중간 보스 / 보스 이름과 대사 (아직 대본이 없는 스테이지용, 임시)
+    static readonly string[] legacyMidBossNames = { "", "", "", "", "", "", "새끼 황룡", "정글 주술사", "망령 기사", "마왕군 사천왕" };
+    static readonly string[] legacyBossNames = { "", "", "", "", "", "", "노란 용", "붉은 표범 여왕", "전쟁의 망령 장군", "마왕" };
+    static readonly string[][] legacyBossLines =
     {
-        "숲 도적 두목", "평원 늑대 우두머리", "산적 대장", "해적 갑판장", "검문소 경비대장",
-        "타락한 수도사", "새끼 황룡", "정글 주술사", "망령 기사", "마왕군 사천왕",
-    };
-    static readonly string[] bossNames =
-    {
-        "거대 멧돼지 왕", "켄타우로스 족장", "바위 거인", "거대 게 카니", "포빌리아 기사단장",
-        "거짓 성자", "노란 용", "붉은 표범 여왕", "전쟁의 망령 장군", "마왕",
-    };
-
-    // ★ 스테이지 보스 등장 대사 (컷씬). 보스를 한 번 이기면 다음부터는 건너뛸 수 있어요.
-    static readonly string[][] bossLines =
-    {
-        new[] { "꾸에에엑! 내 숲에 발을 들인 놈이 누구냐!", "네놈들 전부 오늘 저녁거리다!" },
-        new[] { "인간 따위가 이 평원을 달릴 자격이 있다고 생각하나?", "켄타우로스의 창을 받아라!" },
-        new[] { "......쿠구구구.", "산을... 어지럽히는 자... 돌이 되어라......" },
-        new[] { "철컥철컥! 이 해안은 내 집게발 아래에 있다!", "모래 속에 파묻어 주마!" },
-        new[] { "멈춰라. 포빌리아 왕국은 수상한 자를 통과시키지 않는다.", "통행증이 없다면... 검으로 증명해라!" },
-        new[] { "어서 오세요, 길 잃은 어린 양들이여.", "여기서 영원히 쉬게 해 드리지요... 영원히." },
+        null, null, null, null, null, null,
         new[] { "크하하하! 내 보물을 노리고 왔느냐, 작은 것들아!", "황금빛 불꽃에 타 버려라!" },
         new[] { "후후... 정글의 사냥꾼은 소리 없이 다가가는 법.", "너희는 이미 내 사냥감이야." },
         new[] { "아직... 전쟁은... 끝나지 않았다......", "모든 산 자를 이 전쟁터에 묻어 주마!" },
         new[] { "가챠의 힘을 가진 용사라... 기다리고 있었다.", "운으로 여기까지 왔다면, 운이 다할 때까지 놀아 주마!" },
     };
+    public static string LegacyMidBossName(int stage) => legacyMidBossNames[stage];
+    public static string LegacyBossName(int stage) => legacyBossNames[stage];
+    public static string[] LegacyBossLines(int stage) => legacyBossLines[stage];
 
     static readonly Color[] skyColors =
     {
@@ -80,16 +68,14 @@ public static class Stages
     public static string StageTitle(int stageNumber) => stageNames[Mathf.Clamp(stageNumber - 1, 0, StageCount - 1)]; // 스테이지 번호(1~10)의 이름만
     public static bool HasBoss(int level) => SubOf(level) == LevelsPerStage;
     public static bool HasMidBoss(int level) => SubOf(level) == MidBossRound;
-    public static string BossName(int level) => bossNames[StageOf(level)];
-    public static string MidBossName(int level) => midBossNames[StageOf(level)];
-    public static string[] BossLines(int level) => bossLines[StageOf(level)];
+    public static StageScript Script(int level) => StageScript.Of(StageOf(level));
+    public static string BossName(int level) => EnemyDef.Find(Script(level).boss).name;
+    public static string MidBossName(int level) => EnemyDef.Find(Script(level).midBoss).name;
     public static Color SkyColor(int level) => skyColors[StageOf(level)];
     public static Color GroundColor(int level) => groundColors[StageOf(level)];
 
     // 0부터 시작하는 스테이지 번호로 이름 얻기 (도감용)
     public static string StageNameByIndex(int stage) => stageNames[stage];
-    public static string BossNameByIndex(int stage) => bossNames[stage];
-    public static string MidBossNameByIndex(int stage) => midBossNames[stage];
 
     // 클리어 보상 골드 (처음 클리어하면 2배)
     public static int ClearReward(int level) => 100 + level * 20;

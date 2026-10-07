@@ -431,12 +431,14 @@ public class DexScreen
             var r = new Rect((i % perRow) * (cw + gap), 8 + (i / perRow) * (ch + gap), cw, ch);
             bool known = SaveData.SeenEnemies.Contains(en.id);
             UI.Panel(r);
-            Color typeColor = en.type == EnemyType.Boss ? UI.Red : en.type == EnemyType.MidBoss ? UI.Plum : UI.Neutral;
-            var icon = new Rect(r.x + 14, r.y + 20, 56, 56);
+            Color typeColor = en.type == EnemyType.Boss ? UI.Red : en.type == EnemyType.MidBoss ? UI.Plum : en.type == EnemyType.Elite ? UI.Blue : UI.Neutral;
+            var icon = new Rect(r.x + 10, r.y + 14, 68, 68);
             if (known)
             {
-                UI.Round(icon, en.color);
+                UI.Round(icon, new Color(0.85f, 0.78f, 0.64f, 0.18f));
                 UI.RoundFrame(icon, en.type == EnemyType.Normal ? new Color(1f, 1f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f));
+                var full = EnemyLook.FullArt(en.id);
+                GUI.DrawTexture(new Rect(icon.x + 2, icon.y + 2, icon.width - 4, icon.height - 4), full != null ? full : EnemyLook.For(en).texture, ScaleMode.ScaleToFit);
                 UI.Text(new Rect(r.x + 82, r.y + 12, r.width - 92, 26), en.name, 17, UI.TextMain, TextAnchor.MiddleLeft, true);
                 UI.Text(new Rect(r.x + 82, r.y + 66, r.width - 92, 44), en.desc, 12, UI.TextSub, TextAnchor.UpperLeft);
             }

@@ -10,6 +10,7 @@ public class GachaScreen
         public CompanionDef def;
         public string tag;            // "NEW", "성급 ★2" 같은 표시 (없으면 null)
         public float flipStart = -1f; // 뒤집기 시작한 시간 (-1이면 아직 안 뒤집음)
+        public bool sounded;          // 뒤집히는 소리를 냈는지
     }
 
     const float PortalDuration = 2.4f;
@@ -190,6 +191,11 @@ public class GachaScreen
         Color rc = RarityInfo.Animated(rarity);
         float flipT = card.flipStart < 0f ? 0f : Mathf.Clamp01((Now - card.flipStart) / FlipDuration);
         bool showFront = flipT >= 0.5f;
+        if (showFront && !card.sounded)
+        {
+            card.sounded = true;
+            AudioManager.Play(rarity >= Rarity.Unique ? "rare" : "gacha", 0.6f, 0.02f);
+        }
         float widthScale = Mathf.Abs(Mathf.Cos(flipT * Mathf.PI));
         var rr = new Rect(r.center.x - r.width * widthScale / 2f, r.y, r.width * widthScale, r.height);
 

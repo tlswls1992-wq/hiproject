@@ -14,7 +14,7 @@ public class GameManager : MonoBehaviour
     enum Modal { None, ConfirmNewGame, ConfirmQuit }
 
     // 스토리 장면 그림 종류 (StoryArt.cs)
-    enum Art { King, HeroGacha, Victory, Kingdom, Boss }
+    enum Art { King, HeroGacha, Victory, Kingdom }
 
     class StoryLine
     {
@@ -76,7 +76,6 @@ public class GameManager : MonoBehaviour
     bool resultFirstClear;
     int resultExp;
     readonly List<string> resultNotes = new List<string>();
-    int storyBossLevel; // 보스 컷씬에서 그릴 보스의 판 번호
     string resultUnlock;
 
     string toast;
@@ -124,6 +123,8 @@ public class GameManager : MonoBehaviour
         // 화면 비율이 달라도 전장 전체가 보이도록 맞춥니다.
         cam.orthographicSize = Mathf.Max(8f, HalfWorldWidth / cam.aspect);
         FastForwardDialogue();
+        // 전투 중 음악은 BattleManager가 정하고, 결과 화면은 승리/패배 소리만. 나머지 화면은 야영지 음악
+        if (page != Page.Battle && page != Page.Result) AudioManager.PlayMusic("camp");
     }
 
     void ShowToast(string text)
@@ -329,9 +330,9 @@ public class GameManager : MonoBehaviour
         float w = UI.Width;
         UI.Backdrop("menu");
         UI.TopBar("설정", false);
-        UI.Panel(new Rect(w / 2f - 420f, 96f, 840f, 400f));
+        UI.Panel(new Rect(w / 2f - 420f, 86f, 840f, 530f));
 
-        float x = w / 2f - 380f, y = 120f;
+        float x = w / 2f - 380f, y = 106f;
         var on = UI.Primary;
         var off = UI.Neutral;
 
@@ -340,18 +341,31 @@ public class GameManager : MonoBehaviour
             if (UI.Button(new Rect(x + 280 + i * 160, y, 145, 56), TextSpeedNames[i], SaveData.TextSpeed == i ? on : off, 22))
                 SaveData.TextSpeed = i;
 
-        y += 90;
+        y += 76;
         UI.Text(new Rect(x, y, 260, 56), "전투 시작 속도", 24, Color.white, TextAnchor.MiddleLeft, true);
         for (int sp = 1; sp <= 4; sp++)
             if (UI.Button(new Rect(x + 280 + (sp - 1) * 118, y, 106, 56), "x" + sp, SaveData.BattleSpeed == sp ? on : off, 22))
                 SaveData.BattleSpeed = sp;
 
-        y += 90;
+        y += 76;
+        string[] volumeNames = { "끔", "25%", "50%", "75%", "100%" };
+        UI.Text(new Rect(x, y, 260, 56), "배경음악", 24, Color.white, TextAnchor.MiddleLeft, true);
+        for (int v = 0; v <= SaveData.VolumeSteps; v++)
+            if (UI.Button(new Rect(x + 280 + v * 94, y, 86, 56), volumeNames[v], SaveData.MusicLevel == v ? on : off, 19))
+                SaveData.MusicLevel = v;
+
+        y += 76;
+        UI.Text(new Rect(x, y, 260, 56), "효과음", 24, Color.white, TextAnchor.MiddleLeft, true);
+        for (int v = 0; v <= SaveData.VolumeSteps; v++)
+            if (UI.Button(new Rect(x + 280 + v * 94, y, 86, 56), volumeNames[v], SaveData.SfxLevel == v ? on : off, 19))
+                SaveData.SfxLevel = v;
+
+        y += 76;
         UI.Text(new Rect(x, y, 260, 56), "화면", 24, Color.white, TextAnchor.MiddleLeft, true);
         if (UI.Button(new Rect(x + 280, y, 145, 56), "창 모드", !Screen.fullScreen ? on : off, 22)) Screen.fullScreen = false;
         if (UI.Button(new Rect(x + 440, y, 145, 56), "전체 화면", Screen.fullScreen ? on : off, 22)) Screen.fullScreen = true;
 
-        y += 90;
+        y += 76;
         UI.Text(new Rect(x, y, 260, 56), "오프닝 건너뛰기", 24, Color.white, TextAnchor.MiddleLeft, true);
         UI.Text(new Rect(x + 280, y, 460, 56), SaveData.OpeningSeen ? "사용 가능 (오프닝을 본 적이 있어요)" : "오프닝을 한 번 보면 사용할 수 있어요", 18,
             new Color(1f, 1f, 1f, 0.7f), TextAnchor.MiddleLeft);
@@ -384,7 +398,6 @@ public class GameManager : MonoBehaviour
             case Art.King: StoryArt.DrawKing(w, talking); break;
             case Art.HeroGacha: StoryArt.DrawHeroGacha(w); break;
             case Art.Victory: StoryArt.DrawVictory(w); break;
-            case Art.Boss: StoryArt.DrawBoss(w, storyBossLevel, talking); break;
             default: StoryArt.DrawKingdom(w); break;
         }
 
@@ -718,18 +731,10 @@ public class GameManager : MonoBehaviour
 
     // ---------------- 전투 & 결과 ----------------
 
-    // 스테이지 보스(10라운드)는 전투 전에 보스 대사 컷씬이 나와요. 그 보스를 이긴 적이 있으면 건너뛸 수 있어요.
+    // 맵 입장 멘트와 보스 대사는 전투 화면 위에 사념파처럼 나와요 (BattleManager의 '사념파 대사')
     void StartBattle(int level)
     {
         talkMember = null;
-        if (Stages.HasBoss(level))
-        {
-            var lines = new List<StoryLine>();
-            foreach (var t in Stages.BossLines(level)) lines.Add(new StoryLine(Art.Boss, Stages.BossName(level), t));
-            storyBossLevel = level;
-            PlayStory(lines.ToArray(), SaveData.IsBossBeaten(Stages.StageOf(level)), () => BeginBattle(level));
-            return;
-        }
         BeginBattle(level);
     }
 
@@ -830,6 +835,28 @@ public class GameManager : MonoBehaviour
                     page = Page.Camp;
                     ShowToast($"{SaveData.Cycle}회차 클리어! 야영지에서 '전승 특전'을 열 수 있어요");
                 });
+            return;
+        }
+
+        // 스테이지 보스를 이기면 '스테이지 엔딩 선택지'로 다음 목적지를 고릅니다.
+        var choices = Stages.Script(resultStage).endingChoices;
+        if (resultVictory && Stages.HasBoss(resultStage) && choices.Length > 0)
+        {
+            UI.Text(new Rect(0, 528, w, 30), "어디로 갈까?", 19, UI.Gold, TextAnchor.MiddleCenter, true);
+            float cy = 566f - (choices.Length - 1) * 70f;
+            for (int i = 0; i < choices.Length; i++)
+            {
+                var c = choices[i];
+                var r = new Rect(bx - 470, cy + i * 70f, 940, 62);
+                if (UI.Button(r, "", UI.Primary, 18))
+                {
+                    selectedStage = Mathf.Min(Mathf.Min((c.toStage - 1) * Stages.LevelsPerStage + 1, SaveData.ClearedStage + 1), Stages.Count);
+                    page = Page.Camp;
+                    ShowToast($"다음 목적지: {Stages.StageTitle(c.toStage)}");
+                }
+                UI.Text(new Rect(r.x + 24, r.y, r.width - 220, r.height - 4), $"{i + 1}. {c.text}", 18, UI.TextMain, TextAnchor.MiddleLeft, true);
+                UI.Text(new Rect(r.xMax - 210, r.y, 190, r.height - 4), "→ " + Stages.StageTitle(c.toStage), 16, UI.Gold, TextAnchor.MiddleRight, true);
+            }
             return;
         }
 

@@ -22,6 +22,12 @@ public class Unit : MonoBehaviour
     public bool isBoss;
     public bool isLeader;            // 용사
     public CharacterArt art;         // 캐릭터 그림 (있으면 동그라미 대신 그림으로 나옴, Setup 전에 넣기)
+    public EnemyLook.Look look;      // 적 모습 (코드로 그린 그림, Setup 전에 넣기)
+    public bool healer;              // 공격 대신 아군을 치유
+    public string title;             // 이름표 (정예 · 보스만 머리 위에 표시)
+    public Color projectileColor = Color.white;
+    public string attackSound;       // 공격할 때 효과음 (AudioManager)
+    public string impactSound;       // 투사체가 맞을 때 효과음
 
     const float BarWidth = 0.8f;
 
@@ -38,6 +44,7 @@ public class Unit : MonoBehaviour
     bool facingRight = true;         // 그림은 오른쪽(적이 오는 쪽)을 보고 있음
 
     bool UsesArt => art != null && art.HasBattleSprites;
+    bool UsesLook => !UsesArt && look != null;
 
     public bool IsAlive => hp > 0f;
 
@@ -48,13 +55,21 @@ public class Unit : MonoBehaviour
         hp = maxHp;
         baseColor = color;
 
+        if (UsesLook) ringColor = new Color(0f, 0f, 0f, 0.6f); // 코드로 그린 적은 발밑에 그림자
         if (ringColor.a > 0f)
         {
             var ringGo = new GameObject("Ring");
             ringGo.transform.SetParent(transform, false);
             ring = ringGo.AddComponent<SpriteRenderer>();
             ring.sprite = SpriteFactory.Circle();
-            if (UsesArt)
+            if (UsesLook)
+            {
+                float w = size * look.scale * 0.42f;
+                ringGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
+                ringGo.transform.localScale = new Vector3(w, w * 0.28f, 1f);
+                ring.color = ringColor;
+            }
+            else if (UsesArt)
             {
                 // 그림이 있으면 발밑에 등급 색 납작한 원 (그림자처럼)
                 ringGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
@@ -84,6 +99,18 @@ public class Unit : MonoBehaviour
             lastY = transform.position.y;
             barY = -size * 0.5f + CharacterArt.BattleCanvasHeight * (1f - CharacterArt.FeetPivot) * 0.92f;
         }
+        else if (UsesLook)
+        {
+            // 코드로 그린 적: 발이 동그라미 아래쪽에 오도록 놓고, 몸 크기에 맞춰 키움
+            bodyGo.transform.localPosition = new Vector3(0f, -size * 0.5f, 0f);
+            bodyGo.transform.localScale = Vector3.one * size * look.scale;
+            body.sprite = look.sprite;
+            baseColor = color = Color.white;
+            body.color = Color.white;
+            lastX = transform.position.x;
+            lastY = transform.position.y;
+            barY = -size * 0.5f + size * look.scale * (look.top - EnemyLook.Ground) + 0.18f + (look.hovers ? size * 0.35f : 0f);
+        }
         else
         {
             bodyGo.transform.localScale = Vector3.one * size;
@@ -109,6 +136,9 @@ public class Unit : MonoBehaviour
         sr.color = color;
         return sr;
     }
+
+    // 이름표를 붙일 위치 (체력바 바로 위)
+    public Vector3 NameAnchor => transform.position + new Vector3(0f, hpBack != null ? hpBack.transform.localPosition.y + 0.15f : size, 0f);
 
     public void UpdateHpBar()
     {
@@ -139,9 +169,10 @@ public class Unit : MonoBehaviour
         {
             flashTimer -= dt;
             // 맞으면 잠깐 번쩍 (그림은 붉게, 동그라미는 하얗게)
-            body.color = flashTimer > 0f ? (UsesArt ? new Color(1f, 0.55f, 0.55f) : Color.white) : baseColor;
+            body.color = flashTimer > 0f ? (UsesArt || UsesLook ? new Color(1f, 0.55f, 0.55f) : Color.white) : baseColor;
         }
         if (UsesArt) Animate(dt);
+        else if (UsesLook) AnimateLook(dt);
 
         Vector2 pos = transform.position;
         Vector2 moveDir = team == Team.Hero ? HeroThink(pos, battle) : EnemyThink(pos, battle);
@@ -154,7 +185,7 @@ public class Unit : MonoBehaviour
     // 적이 없으면 편성한 자리로 돌아갑니다.
     Vector2 HeroThink(Vector2 pos, BattleManager battle)
     {
-        if (heroClass != null && heroClass.healer) return HealerThink(pos, battle);
+        if (healer) return HealerThink(pos, battle);
 
         Unit target = battle.FindNearestOpponent(this);
         if (target == null) return ToHome(pos);
@@ -174,12 +205,14 @@ public class Unit : MonoBehaviour
             {
                 cooldownTimer = attackCooldown * battle.CooldownMultiplier(this);
                 ally.Heal(damage * battle.HealMultiplier(this));
+                attackAnimStart = Time.time;
+                AudioManager.Play("heal", 0.45f);
                 battle.SpawnEffect(ally.transform.position, ally.size + 0.6f, new Color(0.5f, 1f, 0.5f, 0.5f));
             }
             return Vector2.zero;
         }
 
-        if (!battle.HasEnemies) return ToHome(pos);
+        if (battle.FindNearestOpponent(this) == null) return team == Team.Hero ? ToHome(pos) : Vector2.zero;
         Unit friend = battle.FindNearestFighter(this);
         if (friend != null && Vector2.Distance(pos, friend.transform.position) > range * 0.6f)
             return DirectionTo(pos, friend.transform.position);
@@ -203,6 +236,7 @@ public class Unit : MonoBehaviour
             if (Vector2.Distance(pos, target.transform.position) > aggro) return Vector2.zero; // 아직 대기
             engaged = true;
         }
+        if (healer) return HealerThink(pos, battle);
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
         return DirectionTo(pos, target.transform.position);
     }
@@ -279,6 +313,60 @@ public class Unit : MonoBehaviour
         body.flipX = !facingRight;
     }
 
+    // 코드로 그린 적의 움직임: 대기 중엔 숨쉬기, 걸을 땐 통통 걸음, 공격할 땐 앞으로 덤벼듦.
+    // 그림은 왼쪽을 보고 있으므로 오른쪽으로 갈 때만 뒤집음
+    void AnimateLook(float dt)
+    {
+        animClock += dt;
+        Vector2 now = transform.position;
+        float vx = dt > 0f ? (now.x - lastX) / dt : 0f;
+        float moved = dt > 0f ? Mathf.Abs(vx) + Mathf.Abs(now.y - lastY) / dt : 0f;
+        if (vx > 0.3f) facingRight = true;
+        else if (vx < -0.3f) facingRight = false;
+        lastX = now.x;
+        lastY = now.y;
+        runHold = moved > moveSpeed * 0.3f ? 0.2f : runHold - dt;
+        bool walking = runHold > 0f;
+        if (walking) runClock += dt;
+        runBlend = Mathf.MoveTowards(runBlend, walking ? 1f : 0f, dt * 6f);
+
+        float s = size * look.scale;
+        Vector3 pos = new Vector3(0f, -size * 0.5f, 0f);
+        Vector3 scale = Vector3.one * s;
+        float tilt = 0f;
+
+        if (look.hovers)
+        {
+            // 떠 있는 적: 공중에서 천천히 오르내림
+            pos.y += size * 0.35f + Mathf.Sin(animClock * 2.6f + transform.position.y) * 0.08f * s;
+        }
+        else
+        {
+            // 숨쉬기 + 걸음
+            float breath = Mathf.Sin(animClock * 2.2f + transform.position.x);
+            scale = new Vector3(s * (1f - breath * 0.012f), s * (1f + breath * 0.02f), 1f);
+            float phase = runClock * Mathf.PI * 3.2f;
+            float hop = Mathf.Sin(phase); hop *= hop;
+            pos.y += hop * 0.07f * s * runBlend;
+            tilt = Mathf.Sin(phase * 0.5f) * 4f * runBlend;
+        }
+
+        // 공격: 0.25초 동안 앞으로 덤볐다가 돌아옴
+        float atk = Time.time - attackAnimStart;
+        if (atk >= 0f && atk < 0.25f)
+        {
+            float k = Mathf.Sin(atk / 0.25f * Mathf.PI);
+            pos.x += (facingRight ? 1f : -1f) * k * 0.18f * s;
+            tilt += k * 10f;
+        }
+
+        var t = body.transform;
+        t.localPosition = pos;
+        t.localScale = scale;
+        t.localRotation = Quaternion.Euler(0f, 0f, facingRight ? -tilt : tilt);
+        body.flipX = facingRight;
+    }
+
     float lastY;
     float runHold;
     float runClock;
@@ -297,7 +385,8 @@ public class Unit : MonoBehaviour
         float dmg = damage * battle.DamageMultiplier(this);
         float splash = splashRadius * battle.SplashMultiplier(this);
 
-        if (ranged) Projectile.Launch(this, target, dmg, splash, baseColor);
+        AudioManager.Play(attackSound, team == Team.Hero ? 0.55f : 0.4f);
+        if (ranged) Projectile.Launch(this, target, dmg, splash, UsesArt || UsesLook ? projectileColor : baseColor, impactSound);
         else battle.ApplyHit(target.transform.position, target, team, dmg, splash);
     }
 
@@ -318,7 +407,13 @@ public class Unit : MonoBehaviour
         if (hp <= 0f)
         {
             hp = 0f;
-            if (battle != null) battle.OnUnitDied(this);
+            if (battle != null)
+            {
+                battle.OnUnitDied(this);
+                // 쓰러질 때 연기처럼 퍼지는 효과
+                battle.SpawnEffect(transform.position, size * 1.6f, new Color(0.9f, 0.85f, 0.8f, 0.45f));
+                if (team == Team.Enemy) AudioManager.Play("die", 0.35f);
+            }
             Destroy(gameObject);
         }
         else

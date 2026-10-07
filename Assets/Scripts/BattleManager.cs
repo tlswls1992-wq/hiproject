@@ -18,8 +18,6 @@ public class BattleManager : MonoBehaviour
     const float ColumnGap = 1.8f;            // 줄 사이 간격 (선두 → 후미 방향)
     const float ZoneWidth = 1.5f;            // 한 줄의 가로 폭
 
-    enum EnemyKind { Grunt, Archer, Brute, MidBoss, Boss }
-
     public readonly List<Unit> heroes = new List<Unit>();
     public readonly List<Unit> enemies = new List<Unit>();
 
@@ -28,7 +26,7 @@ public class BattleManager : MonoBehaviour
     public int Wave { get; private set; }
     public int GoldEarned { get; private set; }
     public readonly List<int> DeployedUids = new List<int>(); // 이번 전투에 나간 동료 (경험치 지급용)
-    public bool IsPaused => World == null || finished || upgradeChoices != null || userPaused;
+    public bool IsPaused => World == null || finished || upgradeChoices != null || userPaused || talk != null;
     bool userPaused; // 스페이스 바로 일시정지
     public bool HasEnemies => enemies.Count > 0;
 
@@ -96,6 +94,8 @@ public class BattleManager : MonoBehaviour
         upgradeChoices = null;
         waveInProgress = false;
         boss = null;
+        talk = null;
+        spawnedNamed.Clear();
         damageBonus = attackSpeedBonus = rangeBonus = hpBonus = 1f;
 
         cam.backgroundColor = Stages.SkyColor(level);
@@ -117,6 +117,10 @@ public class BattleManager : MonoBehaviour
         userPaused = false;
         speed = SaveData.BattleSpeed;
         Time.timeScale = speed;
+
+        AudioManager.PlayMusic("battle");
+        // 스테이지 첫 라운드: 맵 입장 멘트
+        if (Stages.SubOf(level) == 1) StartTalk(null, Stages.Script(level).entrance);
     }
 
     public void End()
@@ -137,6 +141,9 @@ public class BattleManager : MonoBehaviour
         victory = won;
         finishTimer = 2f;
         Time.timeScale = 1f;
+        talk = null;
+        AudioManager.StopMusic();
+        AudioManager.Play(won ? "win" : "lose", 0.8f, 0f);
     }
 
     // 땅과 편성 줄을 그립니다. (나중에 진짜 그림으로 바꿀 부분)
@@ -196,6 +203,7 @@ public class BattleManager : MonoBehaviour
             if (finishTimer <= 0f) onFinished?.Invoke(victory);
             return;
         }
+        if (talk != null) { UpdateTalk(); return; }
         if (IsPaused) return;
         UpdateWaves();
     }
@@ -203,7 +211,7 @@ public class BattleManager : MonoBehaviour
     // 키보드: 숫자 1~4 = 배속, 스페이스 = 일시정지/계속
     void HandleKeys()
     {
-        if (finished) return;
+        if (finished || talk != null) return;
         int key = GameInput.SpeedKeyPressed();
         if (key > 0) SetSpeed(key);
         if (GameInput.PausePressed() && upgradeChoices == null)
@@ -217,6 +225,133 @@ public class BattleManager : MonoBehaviour
     {
         speed = Mathf.Clamp(value, 1, 4);
         if (!userPaused) Time.timeScale = speed;
+    }
+
+    // ================= 사념파 대사 (맵 입장 멘트, 보스 대사) =================
+    // 전투가 잠시 멈추고, 화면 위에 대사가 한 줄씩 떠오릅니다. 보스 그림이 있으면 오른쪽에 전신이 나와요.
+    // 클릭: 다음 줄 (다 나왔으면 닫기) · 왼쪽 Ctrl: 빨리 감기 · 스테이지를 깬 적이 있으면 건너뛰기 버튼
+
+    class Talk
+    {
+        public string speaker;      // 비어 있으면 해설 (맵 입장 멘트)
+        public Texture2D image;     // 보스 전신 그림 (Resources/Enemies/<id>/full.png)
+        public readonly List<string> lines = new List<string>();
+        public readonly List<float> shownAt = new List<float>(); // 줄마다 나타난 시각
+        public float clock;         // 대사 진행 시간 (빨리 감기하면 빨라짐)
+        public float nextAt;        // 다음 줄이 나올 시각
+        public float openedAt;      // 화면에 뜬 실제 시각 (어둡게 깔리는 효과용)
+        public bool skippable;
+    }
+
+    Talk talk;
+    static readonly float[] TalkCharsPerSecond = { 12f, 22f, 40f }; // 설정의 대사 속도 (느림/보통/빠름)
+
+    void StartTalk(EnemyDef speaker, ScriptLine[] lines)
+    {
+        if (lines == null || lines.Length == 0) return;
+        var deployed = new List<CompanionDef>();
+        foreach (int uid in DeployedUids)
+        {
+            var m = SaveData.MemberByUid(uid);
+            if (m != null) deployed.Add(m.Def);
+        }
+        var t = new Talk
+        {
+            speaker = speaker != null ? speaker.name : "",
+            image = speaker != null ? EnemyLook.FullArt(speaker.id) : null,
+            skippable = SaveData.IsBossBeaten(Stages.StageOf(Level)),
+            openedAt = Time.unscaledTime,
+            nextAt = 0.5f,
+        };
+        foreach (var line in lines)
+            if (line.Applies(deployed)) t.lines.Add(line.text);
+        if (t.lines.Count == 0) return;
+        talk = t;
+    }
+
+    void UpdateTalk()
+    {
+        float speedUp = GameInput.FastForwardHeld() ? 4f : 1f;
+        talk.clock += Time.unscaledDeltaTime * speedUp;
+        if (talk.shownAt.Count < talk.lines.Count)
+        {
+            if (talk.clock >= talk.nextAt) RevealTalkLine();
+        }
+        else if (talk.clock >= talk.nextAt + 1.8f) talk = null; // 마지막 줄 뒤 잠깐 기다렸다 전투 재개
+    }
+
+    void RevealTalkLine()
+    {
+        string line = talk.lines[talk.shownAt.Count];
+        talk.shownAt.Add(talk.clock);
+        float cps = TalkCharsPerSecond[Mathf.Clamp(SaveData.TextSpeed, 0, 2)];
+        talk.nextAt = talk.clock + 0.6f + line.Length / cps;
+        AudioManager.Play("whisper", 0.5f, 0.1f);
+    }
+
+    void DrawTalk(float w)
+    {
+        float appear = Mathf.Clamp01((Time.unscaledTime - talk.openedAt) / 0.4f);
+        UI.Fill(UI.Full, new Color(0.03f, 0.01f, 0.06f, 0.55f * appear));
+
+        bool narration = talk.speaker == "";
+        float textRight = w - 90f;
+        if (talk.image != null)
+        {
+            // 오른쪽에 보스 전신
+            float h = 640f, iw = h * talk.image.width / talk.image.height;
+            var r = new Rect(w - iw - 30f, 720f - h - 10f + (1f - appear) * 30f, iw, h);
+            UI.Glow(r.center, h * 0.45f, new Color(0.6f, 0.2f, 0.8f, 0.25f * appear));
+            var old = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, appear);
+            GUI.DrawTexture(r, talk.image, ScaleMode.ScaleToFit);
+            GUI.color = old;
+            textRight = r.x - 20f;
+        }
+
+        float lineH = 54f;
+        float blockH = talk.lines.Count * lineH + (narration ? 0f : 44f);
+        float y = 340f - blockH / 2f;
+        float x = 90f, width = textRight - x;
+        var anchor = narration && talk.image == null ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft;
+        if (!narration)
+        {
+            UI.Text(new Rect(x, y, width, 36), talk.speaker, 22, UI.WithAlpha(UI.Gold, appear), anchor, true);
+            UI.Fill(new Rect(x, y + 38, Mathf.Min(260f, width), 1), UI.WithAlpha(UI.Gold, 0.5f * appear));
+            y += 44f;
+        }
+        for (int i = 0; i < talk.shownAt.Count; i++)
+        {
+            float t = Mathf.Clamp01((talk.clock - talk.shownAt[i]) / 0.6f);
+            string line = talk.lines[i];
+            bool aside = line.StartsWith("(");
+            // 머릿속에 울리는 느낌: 살짝 흔들리며 떠오름
+            float wobble = Mathf.Sin(Time.unscaledTime * 1.7f + i * 1.3f) * 2.5f;
+            var r = new Rect(x + wobble, y + i * lineH + (1f - t) * 16f, width, lineH);
+            Color main = narration ? UI.TextMain : new Color(0.93f, 0.88f, 1f);
+            if (aside) main = new Color(0.75f, 0.72f, 0.70f);
+            int size = aside ? 20 : 30;
+            // 은은한 빛 번짐 (같은 글자를 흐리게 여러 번)
+            Color aura = narration ? new Color(1f, 0.8f, 0.5f, 0.22f * t) : new Color(0.7f, 0.45f, 1f, 0.28f * t);
+            for (int k = 0; k < 4; k++)
+            {
+                float ox = k % 2 == 0 ? -2f : 2f, oy = k < 2 ? -2f : 2f;
+                UI.Text(new Rect(r.x + ox, r.y + oy, r.width, r.height), line, size, aura, anchor, true);
+            }
+            UI.Text(r, line, size, UI.WithAlpha(main, t), anchor, true);
+        }
+
+        UI.Text(new Rect(0, 672, w * 0.6f, 28), "클릭: 다음   ·   왼쪽 Ctrl: 빨리 감기", 14, UI.WithAlpha(UI.TextSub, 0.8f * appear));
+        if (talk.skippable && UI.Button(new Rect(w - 176, 70, 150, 44), "건너뛰기 ▶▶", UI.WithAlpha(UI.Neutral, 0.9f), 17))
+        {
+            talk = null;
+            return;
+        }
+        if (UI.ClickedAnywhere())
+        {
+            if (talk.shownAt.Count < talk.lines.Count) RevealTalkLine();
+            else talk = null;
+        }
     }
 
     // ================= 웨이브 =================
@@ -238,22 +373,34 @@ public class BattleManager : MonoBehaviour
 
     // 웨이브의 적들을 처음부터 오른쪽에 진을 친 채로 한꺼번에 배치합니다.
     // 적은 용사 파티가 가까이 오면(접근 거리 안) 그때부터 싸워요.
+    // 어떤 적이 나오는지는 StageScript.cs(스테이지 대본)에서 정해요.
     void StartNextWave()
     {
         Wave++;
         waveInProgress = true;
 
-        var kinds = new List<EnemyKind>();
+        var script = Stages.Script(Level);
+        int round = Stages.SubOf(Level);
+        bool latePhase = round > Stages.MidBossRound;
+        string[] pool = latePhase ? script.late : script.early;
+        bool lastWave = Wave == Stages.WavesPerLevel;
+
+        // 일반 적
+        var troops = new List<EnemyDef>();
         int count = 4 + Mathf.Min(Level / 5, 12) + Wave * 2;
-        for (int i = 0; i < count; i++)
-        {
-            float r = Random.value;
-            if (Level >= 5 && r < 0.25f) kinds.Add(EnemyKind.Archer);
-            else if (Level >= 8 && r < 0.37f) kinds.Add(EnemyKind.Brute);
-            else kinds.Add(EnemyKind.Grunt);
-        }
-        // 앞줄은 근접, 뒷줄은 궁수
-        kinds.Sort((x, y) => (x == EnemyKind.Archer ? 1 : 0).CompareTo(y == EnemyKind.Archer ? 1 : 0));
+        for (int i = 0; i < count; i++) troops.Add(EnemyDef.Find(pool[Random.Range(0, pool.Length)]));
+
+        // 후반 라운드(6~9)에는 '(1)' 인물이 가끔 섞여 나옴 (한 전투에 한 명씩만)
+        if (latePhase && !Stages.HasBoss(Level))
+            foreach (var id in script.lateElites)
+                if (!spawnedNamed.Contains(id) && Random.value < 0.35f && troops.Count > 0)
+                {
+                    troops[troops.Count - 1] = EnemyDef.Find(id);
+                    spawnedNamed.Add(id);
+                }
+
+        // 앞줄은 근접, 뒷줄은 원거리 · 마법 · 치유
+        troops.Sort((x, y) => (x.IsRanged || x.role == EnemyRole.Healer ? 1 : 0).CompareTo(y.IsRanged || y.role == EnemyRole.Healer ? 1 : 0));
 
         // 배치할 공간: 파티보다 충분히 오른쪽 ~ 화면 오른쪽 끝
         float rightmostHero = -99f;
@@ -263,78 +410,96 @@ public class BattleManager : MonoBehaviour
         if (maxX - minX < 3f) minX = maxX - 3f;
 
         const int rows = 5;
-        int columns = Mathf.CeilToInt(kinds.Count / (float)rows);
+        int columns = Mathf.CeilToInt(troops.Count / (float)rows);
         float colGap = columns > 1 ? Mathf.Min(1.4f, (maxX - minX) / (columns - 1)) : 0f;
-        for (int i = 0; i < kinds.Count; i++)
+        for (int i = 0; i < troops.Count; i++)
         {
             int col = i / rows, row = i % rows;
             float x = minX + col * colGap + Random.Range(-0.25f, 0.25f);
             float y = LaneTop - (row + 0.5f) * (LaneTop - LaneBottom) / rows + Random.Range(-0.35f, 0.35f);
-            SpawnEnemy(kinds[i], new Vector2(Mathf.Min(x, maxX), y));
+            SpawnEnemy(troops[i], new Vector2(Mathf.Min(x, maxX), y), false);
         }
 
-        // 마지막 웨이브: 5라운드는 중간 보스, 10라운드는 스테이지 보스가 진형 맨 뒤 가운데에
-        if (Wave == Stages.WavesPerLevel)
+        // 마지막 웨이브: 5라운드는 중간 보스, 10라운드는 최종 보스(+ 함께 나오는 인물)가 진형 맨 뒤에
+        if (!lastWave) return;
+        float midY = (LaneTop + LaneBottom) / 2f;
+        var bossPos = new Vector2(maxX - 0.6f, midY);
+        if (Stages.HasBoss(Level))
         {
-            var bossPos = new Vector2(maxX - 0.4f, (LaneTop + LaneBottom) / 2f);
-            if (Stages.HasBoss(Level)) SpawnEnemy(EnemyKind.Boss, bossPos);
-            else if (Stages.HasMidBoss(Level)) SpawnEnemy(EnemyKind.MidBoss, bossPos);
+            for (int i = 0; i < script.bossGroup.Length; i++)
+            {
+                float side = i % 2 == 0 ? 1f : -1f;
+                SpawnEnemy(EnemyDef.Find(script.bossGroup[i]), new Vector2(maxX - 2.2f, midY + side * (2.2f + i / 2 * 1.2f)), false);
+            }
+            var def = EnemyDef.Find(script.boss);
+            SpawnEnemy(def, bossPos, true);
+            AudioManager.PlayMusic("boss");
+            StartTalk(def, script.bossLines);
+        }
+        else if (Stages.HasMidBoss(Level))
+        {
+            var def = EnemyDef.Find(script.midBoss);
+            SpawnEnemy(def, bossPos, true);
+            AudioManager.PlayMusic("boss");
+            StartTalk(def, script.midBossLines);
         }
     }
 
-    void SpawnEnemy(EnemyKind kind, Vector2 pos)
-    {
-        bool isBoss = kind == EnemyKind.Boss || kind == EnemyKind.MidBoss;
+    readonly HashSet<string> spawnedNamed = new HashSet<string>(); // 이번 전투에 이미 나온 '(1)' 인물
 
+    void SpawnEnemy(EnemyDef def, Vector2 pos, bool mainBoss)
+    {
+        if (def == null) return;
         float hpMul = 1f + 0.12f * (Level - 1) + 0.1f * (Wave - 1);
         float dmgMul = 1f + 0.05f * (Level - 1);
-
-        int stage = Stages.StageOf(Level);
-        string enemyId =
-            kind == EnemyKind.Boss ? EnemyDef.BossId(stage) :
-            kind == EnemyKind.MidBoss ? EnemyDef.MidBossId(stage) :
-            kind == EnemyKind.Archer ? "goblin_archer" :
-            kind == EnemyKind.Brute ? "ogre" : "goblin";
-        var def = EnemyDef.Find(enemyId);
-        SaveData.SeenEnemies.Add(enemyId); // 도감에 등록
+        if (def.id == EnemyDef.BossId(Stages.StageCount - 1)) { hpMul *= 1.4f; dmgMul *= 1.5f; } // 마왕은 더 강하게
+        SaveData.SeenEnemies.Add(def.id); // 도감에 등록
+        if (def.IsNamed) spawnedNamed.Add(def.id);
 
         var u = CreateUnit(def.name, Team.Enemy, pos);
-        switch (kind)
-        {
-            case EnemyKind.Brute:
-                u.maxHp = 150; u.damage = 12; u.attackRange = 0.5f; u.attackCooldown = 1.2f;
-                u.moveSpeed = 1.0f; u.size = 1.0f; u.goldReward = 10;
-                break;
-            case EnemyKind.Archer:
-                u.maxHp = 20; u.damage = 6; u.attackRange = 4f; u.attackCooldown = 1.5f;
-                u.moveSpeed = 1.3f; u.size = 0.45f; u.goldReward = 4; u.ranged = true;
-                break;
-            case EnemyKind.MidBoss:
-                u.maxHp = 300; u.damage = 14; u.attackRange = 0.7f; u.attackCooldown = 1.2f;
-                u.moveSpeed = 0.8f; u.size = 1.3f; u.goldReward = 60; u.isBoss = true;
-                break;
-            case EnemyKind.Boss:
-                bool demonKing = Level >= Stages.Count;
-                u.maxHp = demonKing ? 900 : 500; u.damage = demonKing ? 30 : 20; u.attackRange = 0.8f;
-                u.attackCooldown = 1.3f; u.moveSpeed = 0.7f; u.size = demonKing ? 2.0f : 1.6f; u.goldReward = 150;
-                u.isBoss = true;
-                break;
-            default:
-                u.maxHp = 30; u.damage = 5; u.attackRange = 0.4f; u.attackCooldown = 1f;
-                u.moveSpeed = 1.6f; u.size = 0.5f; u.goldReward = 3;
-                break;
-        }
-        u.Setup(SpriteFactory.Square(), def.color, isBoss ? new Color(1f, 0.2f, 0.2f) : Color.clear);
-        if (isBoss)
+        u.maxHp = def.Hp * hpMul;
+        u.damage = def.Damage * dmgMul;
+        u.attackRange = def.Range;
+        u.attackCooldown = def.Cooldown;
+        u.moveSpeed = def.Speed;
+        u.size = def.size;
+        u.splashRadius = def.Splash;
+        u.ranged = def.IsRanged;
+        u.healer = def.role == EnemyRole.Healer;
+        u.goldReward = def.Gold;
+        u.isBoss = def.type == EnemyType.Boss || def.type == EnemyType.MidBoss;
+        u.title = def.IsNamed ? def.name : null;
+        u.projectileColor = def.IsRanged ? Color.Lerp(def.accent, Color.white, 0.3f) : def.accent;
+        u.attackSound = EnemySound(def);
+        u.impactSound = def.role == EnemyRole.Caster ? "explode" : null;
+        u.look = EnemyLook.For(def);
+        u.Setup(SpriteFactory.Square(), def.color, Color.clear);
+        if (mainBoss)
         {
             boss = u;
             bossName = def.name;
         }
-        u.maxHp *= hpMul;
-        u.hp = u.maxHp;
-        u.damage *= dmgMul;
-        u.UpdateHpBar();
         enemies.Add(u);
+    }
+
+    static string EnemySound(EnemyDef def)
+    {
+        if (def.role == EnemyRole.Healer) return null; // 치유 소리는 따로 남
+        switch (def.shape)
+        {
+            case EnemyShape.Beast: case EnemyShape.Lynx: case EnemyShape.Bear: case EnemyShape.Shark:
+            case EnemyShape.Worm: case EnemyShape.Wyvern: case EnemyShape.Scorpion:
+                return def.role == EnemyRole.Brute || def.size >= 1f ? "heavy" : "bite";
+            case EnemyShape.Golem: case EnemyShape.Kraken: return def.role == EnemyRole.Caster ? "magic" : "heavy";
+        }
+        switch (def.weapon)
+        {
+            case EnemyWeapon.Bow: case EnemyWeapon.Crossbow: case EnemyWeapon.Sling: return "arrow";
+            case EnemyWeapon.Staff: return "magic";
+            case EnemyWeapon.Spear: return "stab";
+            case EnemyWeapon.Hammer: case EnemyWeapon.Axe: return def.role == EnemyRole.Brute || def.role == EnemyRole.Tank ? "heavy" : "slash";
+            default: return "slash";
+        }
     }
 
     // ================= 동료 =================
@@ -368,6 +533,11 @@ public class BattleManager : MonoBehaviour
         u.splashRadius = c.splash;
         u.size = c.size;
         u.ranged = c.ranged;
+        u.healer = c.healer;
+        u.projectileColor = c.color;
+        u.attackSound = c.healer ? null : c.ranged ? (c.splash > 0f ? "magic" : "arrow")
+            : c == HeroClass.Lancer ? "stab" : c == HeroClass.Porter || c == HeroClass.Knight ? "heavy" : "slash";
+        u.impactSound = c.splash > 0f ? "explode" : null;
         u.art = CharacterArt.For(def.id); // 그림이 있으면 그림으로 나옴
         u.Setup(SpriteFactory.Circle(), c.color, RarityInfo.GetColor(def.rarity));
         heroes.Add(u);
@@ -450,7 +620,7 @@ public class BattleManager : MonoBehaviour
     {
         Unit best = null;
         float lowest = 0.999f;
-        foreach (var h in heroes)
+        foreach (var h in healer.team == Team.Hero ? heroes : enemies)
         {
             if (h == null || !h.IsAlive) continue;
             float pct = h.hp / h.maxHp;
@@ -467,9 +637,9 @@ public class BattleManager : MonoBehaviour
         Unit best = null;
         float bestDist = float.MaxValue;
         Vector2 pos = healer.transform.position;
-        foreach (var h in heroes)
+        foreach (var h in healer.team == Team.Hero ? heroes : enemies)
         {
-            if (h == null || !h.IsAlive || h.heroClass.healer) continue;
+            if (h == null || !h.IsAlive || h.healer) continue;
             float d = ((Vector2)h.transform.position - pos).sqrMagnitude;
             if (d < bestDist) { bestDist = d; best = h; }
         }
@@ -592,7 +762,7 @@ public class BattleManager : MonoBehaviour
         UI.Chip(new Rect(w / 2 - 80, 12, 160, 32), $"웨이브 {Mathf.Max(Wave, 1)} / {Stages.WavesPerLevel}", UI.Neutral, 18);
         UI.Text(new Rect(w - 470, 0, 140, 56), $"+{GoldEarned} 골드", 18, UI.Gold, TextAnchor.MiddleRight, true);
         // 배속: 누를 때마다 x1 → x2 → x3 → x4 → x1
-        if (UI.Button(new Rect(w - 316, 10, 296, 36), $"전투 속도  x{speed}   (눌러서 변경)", UI.Blue, 16, !finished))
+        if (UI.Button(new Rect(w - 316, 10, 296, 36), $"전투 속도  x{speed}   (눌러서 변경)", UI.Blue, 16, !finished && talk == null))
             SetSpeed(speed % 4 + 1);
 
         // 왼쪽: 파티 상태
@@ -613,6 +783,14 @@ public class BattleManager : MonoBehaviour
             UI.Text(new Rect(syn.x + 16, y, 150, 24), $"{sy.faction} {CountOf(sy.faction)} {stars}", 15, col, TextAnchor.MiddleLeft, true);
             UI.Text(new Rect(syn.x + 150, y, syn.width - 166, 24), sy.effect, 14, col, TextAnchor.MiddleRight);
             y += 24;
+        }
+
+        // 이름 있는 적(정예 · 보스)은 머리 위에 이름표
+        foreach (var e in enemies)
+        {
+            if (e == null || e.title == null) continue;
+            var p = UI.WorldToUI(cam, e.NameAnchor);
+            UI.Text(new Rect(p.x - 120, p.y - 26, 240, 24), e.title, 14, e.isBoss ? new Color(1f, 0.55f, 0.5f) : new Color(1f, 0.85f, 0.55f), TextAnchor.MiddleCenter, true);
         }
 
         // 보스 체력 (가운데)
@@ -637,6 +815,7 @@ public class BattleManager : MonoBehaviour
         }
 
         if (upgradeChoices != null) DrawUpgradeChoices(w);
+        if (talk != null && !finished) DrawTalk(w);
 
         if (finished)
         {

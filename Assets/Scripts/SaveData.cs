@@ -280,6 +280,25 @@ public static class SaveData
         set { PlayerPrefs.SetInt(Prefix + "Settings.BattleSpeed", Mathf.Clamp(value, 1, 4)); PlayerPrefs.Save(); }
     }
 
+    // 음량 단계 0~4 (0 = 끔, 4 = 100%)
+    public const int VolumeSteps = 4;
+    static int musicLevel = -1, sfxLevel = -1;
+
+    public static int MusicLevel
+    {
+        get { if (musicLevel < 0) musicLevel = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "Settings.Music", 3), 0, VolumeSteps); return musicLevel; }
+        set { musicLevel = Mathf.Clamp(value, 0, VolumeSteps); PlayerPrefs.SetInt(Prefix + "Settings.Music", musicLevel); PlayerPrefs.Save(); }
+    }
+
+    public static int SfxLevel
+    {
+        get { if (sfxLevel < 0) sfxLevel = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "Settings.Sfx", 3), 0, VolumeSteps); return sfxLevel; }
+        set { sfxLevel = Mathf.Clamp(value, 0, VolumeSteps); PlayerPrefs.SetInt(Prefix + "Settings.Sfx", sfxLevel); PlayerPrefs.Save(); }
+    }
+
+    public static float MusicVolume => MusicLevel / (float)VolumeSteps;
+    public static float SfxVolume => SfxLevel / (float)VolumeSteps;
+
     // ================= 동료 =================
 
     public static Member MemberByUid(int uid) => Roster.Find(m => m.uid == uid);

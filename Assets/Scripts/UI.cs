@@ -191,7 +191,9 @@ public static class UI
         Round(new Rect(r.x + 4f, r.y + 4f, r.width - 8f, r.height * 0.42f), new Color(1f, 0.95f, 0.85f, enabled ? 0.09f : 0.02f)); // 반사광
         RoundFrame(r, enabled ? (hover ? Gold : WithAlpha(Bronze, 0.95f)) : WithAlpha(Bronze, 0.35f));
         Text(r, text, fontSize, enabled ? TextMain : new Color(0.5f, 0.45f, 0.4f), TextAnchor.MiddleCenter, true);
-        return enabled && GUI.Button(r, GUIContent.none, GUIStyle.none);
+        bool clicked = enabled && GUI.Button(r, GUIContent.none, GUIStyle.none);
+        if (clicked) AudioManager.Play("click", 0.5f, 0.03f);
+        return clicked;
     }
 
     // 판: 어두운 가죽 + 청동 테두리 + 안쪽 금색 실선 + 모서리 장식

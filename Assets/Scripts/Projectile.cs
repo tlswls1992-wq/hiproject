@@ -10,8 +10,9 @@ public class Projectile : MonoBehaviour
     float damage;
     float splash;
     Team team;
+    string impactSound;
 
-    public static void Launch(Unit from, Unit target, float damage, float splash, Color color)
+    public static void Launch(Unit from, Unit target, float damage, float splash, Color color, string impactSound = null)
     {
         var go = new GameObject("Projectile");
         go.transform.SetParent(BattleManager.Instance.World, false);
@@ -28,6 +29,7 @@ public class Projectile : MonoBehaviour
         p.damage = damage;
         p.splash = splash;
         p.team = from.team;
+        p.impactSound = impactSound;
     }
 
     void Update()
@@ -43,6 +45,7 @@ public class Projectile : MonoBehaviour
         if ((next - lastTargetPos).sqrMagnitude < 0.0001f)
         {
             battle.ApplyHit(lastTargetPos, target != null && target.IsAlive ? target : null, team, damage, splash);
+            AudioManager.Play(impactSound, 0.4f);
             Destroy(gameObject);
         }
     }
