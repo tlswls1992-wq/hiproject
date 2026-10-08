@@ -69,6 +69,7 @@ public class GameManager : MonoBehaviour
     Page returnPage;         // 저장/불러오기/설정 화면에서 돌아갈 곳
     Page subReturn = Page.Camp; // 도감 · 전승 특전에서 돌아갈 곳 (야영지 또는 타이틀)
     readonly float[] titleButtonHover = new float[5];
+    readonly bool[] titleButtonHovered = new bool[5];
     readonly float[] titleCardHover = new float[3];
     static readonly string[] TitleCardNames = { "엔딩", "도감", "특전" };
 
@@ -243,12 +244,20 @@ public class GameManager : MonoBehaviour
             var r = TitleScene.ButtonRect(i);
             bool enabled = active && (i != 1 || SaveData.HasSave);
             bool hover = enabled && r.Contains(e.mousePosition);
+            // 커서를 올리는 순간 '딸깍' (문 걸쇠가 풀리는 소리)
+            if (e.type == EventType.Repaint)
+            {
+                if (hover && !titleButtonHovered[i]) AudioManager.Play("door_latch", 0.55f, 0.04f);
+                titleButtonHovered[i] = hover;
+            }
             titleButtonHover[i] = Mathf.MoveTowards(titleButtonHover[i], hover ? 1f : 0f, step);
             if (i == 1 && !SaveData.HasSave) TitleScene.DrawButtonDisabled(i);
             TitleScene.DrawButtonHover(i, titleButtonHover[i]);
             if (enabled && GUI.Button(r, GUIContent.none, GUIStyle.none)) clicked = i;
         }
-        if (clicked >= 0) AudioManager.Play("click", 0.5f, 0.03f);
+        // 새로 시작 · 이어하기 · 불러오기: '끼이익' 하고 문이 완전히 열리는 소리. 설정 · 끝내기: 짧은 클릭
+        if (clicked >= 0 && clicked <= 2) AudioManager.Play("door_open", 0.7f, 0.02f);
+        else if (clicked >= 0) AudioManager.Play("click", 0.5f, 0.03f);
         switch (clicked)
         {
             case 0: if (SaveData.HasSave) modal = Modal.ConfirmNewGame; else NewGame(); break;

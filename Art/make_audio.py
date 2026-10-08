@@ -414,9 +414,63 @@ def sfx():
     return out
 
 
+# ---------------------------------------------------------------- 타이틀 문 소리
+
+def door_sfx():
+    """타이틀 메뉴용 문 소리 (귀에 편하도록 부드럽게, 높은 쇳소리는 줄임)"""
+    r = np.random.default_rng(21)
+    out = {}
+
+    # 딸깍: 쇠 걸쇠가 '틱' 하고 풀린 뒤 나무 문이 '탁' 하고 살짝 울림
+    t = t_of(0.3)
+    latch = mix(0.3,
+                (0.0, bell(2100, 0.05, 60), 0.22),
+                (0.0, highpass(r.uniform(-1, 1, int(SR * 0.004)), 2500), 0.25),
+                (0.042, np.sin(2 * np.pi * 310 * t_of(0.12)) * np.exp(-t_of(0.12) * 38), 0.8),
+                (0.042, np.sin(2 * np.pi * 175 * t_of(0.16)) * np.exp(-t_of(0.16) * 26), 0.55),
+                (0.042, lowpass(r.uniform(-1, 1, int(SR * 0.012)), 1800), 0.35))
+    out["door_latch"] = normalize(reverb(lowpass(latch, 4000), 0.6, 0.14, seed=5), 0.55)
+
+    # 끼이익 + 문이 완전히 열림: 경첩이 미끄러지며 내는 부드러운 '끼이익' (음높이가 천천히 올라감)
+    # → 마지막에 문이 멈추며 '쿵' 하는 낮은 나무 소리
+    dur = 1.4
+    n = int(SR * dur)
+    y = np.zeros(n)
+    creak_len = 0.95
+    tt = np.arange(int(SR * creak_len)) / SR
+    rate = 230 + 170 * (tt / creak_len) ** 0.8 + 8 * np.sin(2 * np.pi * 3.3 * tt)   # 마찰 '틱틱'이 이어지는 빠르기 = 느껴지는 음높이
+    phase = np.cumsum(rate / SR)
+    pulses = np.where(np.diff(np.floor(phase), prepend=0) > 0)[0]
+    g = np.arange(int(SR * 0.012)) / SR
+    grain = (np.sin(2 * np.pi * 1450 * g) * 0.6 + np.sin(2 * np.pi * 820 * g)) * np.exp(-g * 260)
+    env = np.clip(tt / 0.12, 0, 1) * np.clip((creak_len - tt) / 0.35, 0, 1)
+    for k in pulses:
+        amp = env[k] * (0.85 + 0.3 * r.uniform())
+        e = min(n, k + len(grain))
+        y[k:e] += grain[:e - k] * amp
+    y = lowpass(y, 3200)  # 날카로운 쇳소리를 덜어 부드럽게
+    air = lowpass(r.uniform(-1, 1, n), 700) * np.sin(np.pi * np.clip(np.arange(n) / (SR * 1.0), 0, 1)) * 0.25
+    stop = mix(dur - 0.9,
+               (0.0, np.sin(2 * np.pi * 105 * t_of(0.5)) * np.exp(-t_of(0.5) * 9), 0.9),
+               (0.0, np.sin(2 * np.pi * 230 * t_of(0.2)) * np.exp(-t_of(0.2) * 30), 0.45),
+               (0.0, lowpass(r.uniform(-1, 1, int(SR * 0.03)), 900), 0.3),
+               (0.09, bell(1900, 0.08, 50), 0.12))
+    y[int(SR * 0.9):int(SR * 0.9) + len(stop)] += stop[:n - int(SR * 0.9)]
+    y += air
+    out["door_open"] = normalize(reverb(y, 1.1, 0.22, seed=9), 0.6)
+    return out
+
+
 if __name__ == "__main__":
+    import sys
+    if "--door" in sys.argv:  # 문 소리만 다시 만들기
+        for name, sound in door_sfx().items():
+            save("sfx_" + name, sound)
+        raise SystemExit
     save("bgm_camp", bgm_camp(), fade=False)    # 배경음악은 반복 재생되도록 끝을 그대로 둠
     save("bgm_battle", bgm_battle(), fade=False)
     save("bgm_boss", bgm_boss(), fade=False)
     for name, sound in sfx().items():
+        save("sfx_" + name, sound)
+    for name, sound in door_sfx().items():
         save("sfx_" + name, sound)
