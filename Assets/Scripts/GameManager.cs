@@ -129,9 +129,15 @@ public class GameManager : MonoBehaviour
         // 화면 비율이 달라도 전장 전체가 보이도록 맞춥니다.
         cam.orthographicSize = Mathf.Max(8f, HalfWorldWidth / cam.aspect);
         FastForwardDialogue();
-        // 전투 중 음악은 BattleManager가 정하고, 결과 화면은 승리/패배 소리만. 나머지 화면은 야영지 음악
-        if (page != Page.Battle && page != Page.Result) AudioManager.PlayMusic("camp");
+        // 전투 중 음악은 BattleManager가 정하고, 결과 화면은 승리/패배 소리만.
+        // 타이틀(과 타이틀에서 연 설정 · 불러오기 · 도감 · 특전)은 오프닝 곡, 나머지 화면은 야영지 음악
+        if (page != Page.Battle && page != Page.Result) AudioManager.PlayMusic(OnTitleScreens ? "title" : "camp");
     }
+
+    bool OnTitleScreens =>
+        page == Page.Title
+        || ((page == Page.Settings || page == Page.SaveLoad) && returnPage == Page.Title)
+        || ((page == Page.Dex || page == Page.Legacy) && subReturn == Page.Title);
 
     void ShowToast(string text)
     {
