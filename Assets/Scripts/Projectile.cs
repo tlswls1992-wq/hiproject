@@ -11,6 +11,7 @@ public class Projectile : MonoBehaviour
     float splash;
     Team team;
     string impactSound;
+    float startX;
 
     public static void Launch(Unit from, Unit target, float damage, float splash, Color color, string impactSound = null)
     {
@@ -30,6 +31,7 @@ public class Projectile : MonoBehaviour
         p.splash = splash;
         p.team = from.team;
         p.impactSound = impactSound;
+        p.startX = from.transform.position.x;
     }
 
     void Update()
@@ -44,7 +46,9 @@ public class Projectile : MonoBehaviour
         transform.position = next;
         if ((next - lastTargetPos).sqrMagnitude < 0.0001f)
         {
-            battle.ApplyHit(lastTargetPos, target != null && target.IsAlive ? target : null, team, damage, splash);
+            bool alive = target != null && target.IsAlive;
+            battle.ApplyHit(lastTargetPos, alive ? target : null, team, damage, splash);
+            if (splash <= 0f) HitFx.Spawn(HitFx.Kind.Spark, alive ? target.HitPoint : lastTargetPos, lastTargetPos.x >= startX);
             AudioManager.Play(impactSound, 0.4f);
             Destroy(gameObject);
         }

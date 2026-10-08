@@ -230,9 +230,26 @@ public static class TitleScene
         float pulse = 0.8f + 0.2f * Mathf.Sin(Now * 5f);
         UI.Glow(r.center, Mathf.Max(r.width, r.height) * 0.75f, new Color(1f, 0.82f, 0.45f, 0.35f * hover * pulse));
         DrawTinted(r, c.tex, new Color(1f, 1f, 1f, 0.8f * hover * pulse));
-        // 문구 (카드 위쪽에서 살짝 떠오름)
-        var label = new Rect(r.center.x - 90f, r.y - 46f - 10f * hover, 180f, 40f);
-        UI.Glow(label.center, 70f, new Color(0f, 0f, 0f, 0.45f * hover));
-        UI.Text(label, caption, 28, UI.WithAlpha(UI.Gold, hover), TextAnchor.MiddleCenter, true);
+        // 문구: 카드 윗변과 같은 각도로, 윗변 가운데 바로 위에 살짝 떠오름 (글자 사이 간격은 고르게)
+        Vector2 a = Map(c.quad[0]), b = Map(c.quad[1]);
+        Vector2 edge = b - a;
+        float angle = Mathf.Atan2(edge.y, edge.x) * Mathf.Rad2Deg;
+        Vector2 up = new Vector2(edge.y, -edge.x).normalized;        // 윗변에서 카드 바깥(위)쪽
+        Vector2 at = (a + b) * 0.5f + up * (20f + 8f * hover);
+        UI.Glow(at, 62f, new Color(0f, 0f, 0f, 0.4f * hover));
+        var label = new Rect(at.x - 90f, at.y - 20f, 180f, 40f);
+        UI.SharpText(label, caption, 26, new Color(1f, 0.88f, 0.58f, hover), new Color(0.16f, 0.08f, 0.03f, 0.85f * hover), angle, 30f);
+    }
+
+    // 버튼 글자 (배경 그림의 흐린 글자를 지우고, 선명한 글꼴로 다시 그림)
+    public static void DrawButtonLabel(int i, string text, float hover, bool enabled)
+    {
+        var r = Map(buttons[i]);
+        var label = new Rect(r.x, r.y + r.height * 0.5f - 22f - 1f * scale, r.width, 44f);
+        Color main = !enabled ? new Color(0.56f, 0.5f, 0.44f)
+            : Color.Lerp(new Color(0.96f, 0.88f, 0.70f), new Color(1f, 0.95f, 0.80f), hover);   // 양피지 금색, 올리면 더 밝게
+        Color edge = new Color(0.13f, 0.07f, 0.03f, enabled ? 0.9f : 0.6f);                     // 짙은 나무색 테두리
+        if (enabled && hover > 0f) UI.Glow(r.center, r.width * 0.32f, new Color(1f, 0.78f, 0.4f, 0.16f * hover));
+        UI.SharpText(label, text, Mathf.RoundToInt(25f * scale + 0.5f), main, edge, 0f, 0f);
     }
 }

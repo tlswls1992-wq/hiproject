@@ -177,6 +177,40 @@ public static class UI
         GUI.Label(r, text, style);
     }
 
+    // 또렷한 글자: 화면 실제 해상도 크기의 글꼴로 그려서 (확대해서 번지지 않게) 테두리를 두릅니다.
+    //  angle   : 글자 칸 가운데를 기준으로 기울이기 (도)
+    //  spacing : 0보다 크면 글자를 한 자씩 이 간격(가상 좌표)으로 고르게 놓음
+    public static void SharpText(Rect r, string text, int size, Color color, Color outline,
+        float angle = 0f, float spacing = 0f)
+    {
+        var saved = GUI.matrix;
+        float s = Scale;
+        GUI.matrix = Matrix4x4.identity;
+        var pr = new Rect(r.x * s, r.y * s, r.width * s, r.height * s);
+        if (angle != 0f) GUIUtility.RotateAroundPivot(angle, pr.center);
+        int px = Mathf.Max(1, Mathf.RoundToInt(size * s));
+        float o = Mathf.Max(1f, size * s / 18f); // 테두리 두께 (글자 크기에 맞춤)
+        int count = spacing > 0f ? text.Length : 1;
+        for (int i = 0; i < count; i++)
+        {
+            string piece = spacing > 0f ? text[i].ToString() : text;
+            if (piece == " ") continue;
+            var cr = pr;
+            if (spacing > 0f) cr.x += (i - (count - 1) * 0.5f) * spacing * s;
+            if (outline.a > 0f)
+            {
+                Text(new Rect(cr.x, cr.y + o * 1.6f, cr.width, cr.height), piece, px, WithAlpha(outline, outline.a * 0.6f), TextAnchor.MiddleCenter, true); // 그림자
+                for (int k = 0; k < 8; k++)
+                {
+                    float a = k * Mathf.PI / 4f;
+                    Text(new Rect(cr.x + Mathf.Cos(a) * o, cr.y + Mathf.Sin(a) * o, cr.width, cr.height), piece, px, outline, TextAnchor.MiddleCenter, true);
+                }
+            }
+            Text(cr, piece, px, color, TextAnchor.MiddleCenter, true);
+        }
+        GUI.matrix = saved;
+    }
+
     // ---------------- 버튼, 판, 막대 ----------------
 
     // 버튼: 가죽 바탕 + 청동/금색 테두리. 마우스를 올리면 금색으로 빛나요. 눌렸으면 true.

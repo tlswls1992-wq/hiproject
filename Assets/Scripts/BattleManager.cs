@@ -389,6 +389,7 @@ public class BattleManager : MonoBehaviour
     {
         Wave++;
         waveInProgress = true;
+        EnemiesAlerted = false;
 
         var script = Stages.Script(Level);
         int round = Stages.SubOf(Level);
@@ -481,7 +482,7 @@ public class BattleManager : MonoBehaviour
         u.isBoss = def.type == EnemyType.Boss || def.type == EnemyType.MidBoss;
         u.title = def.IsNamed ? def.name : null;
         u.projectileColor = def.IsRanged ? Color.Lerp(def.accent, Color.white, 0.3f) : def.accent;
-        u.attackSound = EnemySound(def);
+        SetEnemyAttack(u, def);
         u.impactSound = def.role == EnemyRole.Caster ? "explode" : null;
         u.art = CharacterArt.ForEnemy(def.id); // 진짜 그림이 있으면 그림으로 (Resources/Enemies/<id>)
         if (u.art != null && !u.art.HasBattleSprites) u.art = null;
@@ -495,23 +496,40 @@ public class BattleManager : MonoBehaviour
         enemies.Add(u);
     }
 
-    static string EnemySound(EnemyDef def)
+    // 적의 공격 소리와 맞을 때 효과 (몸 모양과 무기에 맞춤)
+    static void SetEnemyAttack(Unit u, EnemyDef def)
     {
-        if (def.role == EnemyRole.Healer) return null; // 치유 소리는 따로 남
+        u.attackSound = null; u.hitFx = HitFx.Kind.None;
+        if (def.role == EnemyRole.Healer) return; // 치유 소리는 따로 남
+        bool big = def.role == EnemyRole.Brute || def.size >= 1f;
         switch (def.shape)
         {
-            case EnemyShape.Beast: case EnemyShape.Lynx: case EnemyShape.Bear: case EnemyShape.Shark:
-            case EnemyShape.Worm: case EnemyShape.Wyvern: case EnemyShape.Scorpion:
-                return def.role == EnemyRole.Brute || def.size >= 1f ? "heavy" : "bite";
-            case EnemyShape.Golem: case EnemyShape.Kraken: return def.role == EnemyRole.Caster ? "magic" : "heavy";
+            case EnemyShape.Bear:
+                u.attackSound = big ? "heavy" : "claw"; u.hitFx = big ? HitFx.Kind.Impact : HitFx.Kind.Claw; return;
+            case EnemyShape.Beast: case EnemyShape.Lynx: case EnemyShape.Wyvern:
+                u.attackSound = big ? "claw" : "bite"; u.hitFx = HitFx.Kind.Claw; return;
+            case EnemyShape.Shark: case EnemyShape.Worm:
+                u.attackSound = big ? "heavy" : "bite"; u.hitFx = big ? HitFx.Kind.Impact : HitFx.Kind.Claw; return;
+            case EnemyShape.Scorpion:
+                u.attackSound = "stab"; u.hitFx = HitFx.Kind.Thrust; return;
+            case EnemyShape.Golem: case EnemyShape.Kraken:
+                u.attackSound = def.role == EnemyRole.Caster ? "magic" : "heavy"; u.hitFx = HitFx.Kind.Impact; return;
         }
+        bool heavyAxe = big || def.role == EnemyRole.Tank;
         switch (def.weapon)
         {
-            case EnemyWeapon.Bow: case EnemyWeapon.Crossbow: case EnemyWeapon.Sling: return "arrow";
-            case EnemyWeapon.Staff: return "magic";
-            case EnemyWeapon.Spear: return "stab";
-            case EnemyWeapon.Hammer: case EnemyWeapon.Axe: return def.role == EnemyRole.Brute || def.role == EnemyRole.Tank ? "heavy" : "slash";
-            default: return "slash";
+            case EnemyWeapon.Bow: case EnemyWeapon.Crossbow: case EnemyWeapon.Sling: u.attackSound = "arrow"; break;
+            case EnemyWeapon.Staff: u.attackSound = "magic"; u.hitFx = HitFx.Kind.Impact; break;
+            case EnemyWeapon.Spear: u.attackSound = "stab"; u.hitFx = HitFx.Kind.Thrust; break;
+            case EnemyWeapon.Dagger: u.attackSound = "dagger"; u.hitFx = HitFx.Kind.Slash; break;
+            case EnemyWeapon.Hammer: u.attackSound = "heavy"; u.hitFx = HitFx.Kind.Impact; break;
+            case EnemyWeapon.Axe:
+                u.attackSound = heavyAxe ? "heavy" : "slash";
+                u.hitFx = heavyAxe ? HitFx.Kind.Impact : HitFx.Kind.Slash; break;
+            case EnemyWeapon.None: // 맨손·몸통 박치기 (마법·원거리 적은 그 소리)
+                u.attackSound = def.role == EnemyRole.Caster ? "magic" : def.role == EnemyRole.Ranged ? "arrow" : "heavy";
+                u.hitFx = HitFx.Kind.Impact; break;
+            default: u.attackSound = "slash"; u.hitFx = HitFx.Kind.Slash; break;
         }
     }
 
@@ -548,8 +566,11 @@ public class BattleManager : MonoBehaviour
         u.ranged = c.ranged;
         u.healer = c.healer;
         u.projectileColor = c.color;
+        // 무기에 맞는 소리와 맞을 때 효과: 창 = 찌르기, 감찰관 = 단검, 짐꾼 = 둔기, 나머지 근접 = 검
         u.attackSound = c.healer ? null : c.ranged ? (c.splash > 0f ? "magic" : "arrow")
-            : c == HeroClass.Lancer ? "stab" : c == HeroClass.Porter || c == HeroClass.Knight ? "heavy" : "slash";
+            : c == HeroClass.Lancer ? "stab" : c == HeroClass.Inspector ? "dagger" : c == HeroClass.Porter ? "heavy" : "slash";
+        u.hitFx = c.ranged || c.healer ? HitFx.Kind.None
+            : c == HeroClass.Lancer ? HitFx.Kind.Thrust : c == HeroClass.Porter ? HitFx.Kind.Impact : HitFx.Kind.Slash;
         u.impactSound = c.splash > 0f ? "explode" : null;
         u.art = CharacterArt.For(def.id); // 그림이 있으면 그림으로 나옴
         u.Setup(SpriteFactory.Circle(), c.color, RarityInfo.GetColor(def.rarity));
@@ -611,6 +632,36 @@ public class BattleManager : MonoBehaviour
     public float DamageTakenMultiplier(Unit u) => 1f - 0.12f * TierFor(u, "올 왕국");
 
     // ================= 전투 도우미 =================
+
+    // 웨이브의 적 중 하나라도 싸우기 시작하면 나머지 적도 모두 싸우러 옴 (뒤에서 멍하니 서 있지 않게)
+    public bool EnemiesAlerted;
+
+    // 근접 캐릭터 한 명을 동시에 공격할 수 있는 근접 적은 최대 2명.
+    // 가까운 상대부터 보되 이미 2명이 붙어 있으면 그다음 상대로 (앞줄이 막지 못하면 뒷줄을 공격하러 감)
+    public const int MaxMeleeAttackers = 2;
+
+    public Unit FindMeleeTarget(Unit u)
+    {
+        var list = u.team == Team.Hero ? enemies : heroes;
+        var allies = u.team == Team.Hero ? heroes : enemies;
+        Vector2 pos = u.transform.position;
+        Unit best = null, nearest = null;
+        float bestScore = float.MaxValue, nearestDist = float.MaxValue;
+        foreach (var other in list)
+        {
+            if (other == null || !other.IsAlive) continue;
+            float d = ((Vector2)other.transform.position - pos).sqrMagnitude;
+            if (d < nearestDist) { nearestDist = d; nearest = other; }
+            int taken = 0;
+            foreach (var a in allies)
+                if (a != null && a != u && a.IsAlive && a.meleeTarget == other) taken++;
+            if (taken >= MaxMeleeAttackers) continue;
+            // 지금 노리던 상대는 조금 더 가깝게 쳐서 자주 바꾸지 않게
+            float score = other == u.meleeTarget ? d * 0.7f : d;
+            if (score < bestScore) { bestScore = score; best = other; }
+        }
+        return best ?? nearest;
+    }
 
     public Unit FindNearestOpponent(Unit u)
     {

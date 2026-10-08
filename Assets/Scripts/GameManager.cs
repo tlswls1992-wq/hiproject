@@ -71,6 +71,7 @@ public class GameManager : MonoBehaviour
     readonly float[] titleButtonHover = new float[5];
     readonly bool[] titleButtonHovered = new bool[5];
     readonly float[] titleCardHover = new float[3];
+    static readonly string[] TitleButtonNames = { "새로 시작", "이어하기", "불러오기", "설정", "끝내기" };
     static readonly string[] TitleCardNames = { "엔딩", "도감", "특전" };
 
     // 결과 화면 정보
@@ -244,20 +245,20 @@ public class GameManager : MonoBehaviour
             var r = TitleScene.ButtonRect(i);
             bool enabled = active && (i != 1 || SaveData.HasSave);
             bool hover = enabled && r.Contains(e.mousePosition);
-            // 커서를 올리는 순간 '딸깍' (문 걸쇠가 풀리는 소리)
+            // 커서를 올리는 순간 작게 '틱'
             if (e.type == EventType.Repaint)
             {
-                if (hover && !titleButtonHovered[i]) AudioManager.Play("door_latch", 0.55f, 0.04f);
+                if (hover && !titleButtonHovered[i]) AudioManager.Play("hover", 0.45f, 0.04f);
                 titleButtonHovered[i] = hover;
             }
             titleButtonHover[i] = Mathf.MoveTowards(titleButtonHover[i], hover ? 1f : 0f, step);
             if (i == 1 && !SaveData.HasSave) TitleScene.DrawButtonDisabled(i);
             TitleScene.DrawButtonHover(i, titleButtonHover[i]);
+            TitleScene.DrawButtonLabel(i, TitleButtonNames[i], titleButtonHover[i], i != 1 || SaveData.HasSave);
             if (enabled && GUI.Button(r, GUIContent.none, GUIStyle.none)) clicked = i;
         }
-        // 새로 시작 · 이어하기 · 불러오기: '끼이익' 하고 문이 완전히 열리는 소리. 설정 · 끝내기: 짧은 클릭
-        if (clicked >= 0 && clicked <= 2) AudioManager.Play("door_open", 0.7f, 0.02f);
-        else if (clicked >= 0) AudioManager.Play("click", 0.5f, 0.03f);
+        // 누르면 설정 등 다른 버튼과 같은 짧은 클릭 소리
+        if (clicked >= 0) AudioManager.Play("click", 0.5f, 0.03f);
         switch (clicked)
         {
             case 0: if (SaveData.HasSave) modal = Modal.ConfirmNewGame; else NewGame(); break;
@@ -591,7 +592,7 @@ public class GameManager : MonoBehaviour
         // 밤 숲속 공터 배경 (별이 반짝이고 모닥불 빛이 일렁임, CampScene.cs)
         CampScene.DrawBackground();
 
-        UI.TopBar($"야영지   ·   {SaveData.Cycle}회차");
+        UI.TopBar("야영지");
 
         // ---- 가운데: 모닥불과 둘러앉은 동료 ----
         float sceneL = 350f, sceneR = w - 270f;

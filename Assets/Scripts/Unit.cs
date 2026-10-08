@@ -24,11 +24,15 @@ public class Unit : MonoBehaviour
     public CharacterArt art;         // 캐릭터 그림 (있으면 동그라미 대신 그림으로 나옴, Setup 전에 넣기)
     public EnemyLook.Look look;      // 적 모습 (코드로 그린 그림, Setup 전에 넣기)
     public bool healer;              // 공격 대신 아군을 치유
+    public Unit meleeTarget;         // 근접 공격 중인 상대 (한 상대에 근접 2명까지)
     public float bodyHalf = 0.5f;    // 몸의 가로 반폭 (그림 크기 기준, 겹치지 않게 서는 간격과 근접 공격 거리에 사용)
     public string title;             // 이름표 (정예 · 보스만 머리 위에 표시)
     public Color projectileColor = Color.white;
     public string attackSound;       // 공격할 때 효과음 (AudioManager)
     public string impactSound;       // 투사체가 맞을 때 효과음
+    public HitFx.Kind hitFx;         // 근접 공격이 맞을 때 뜨는 효과 모양
+    public float hitY;               // 맞는 효과가 뜨는 높이 (몸 가운데쯤)
+    public Vector2 HitPoint => (Vector2)transform.position + new Vector2(0f, hitY);
 
     const float BarWidth = 1.2f;
     const float CircleScale = 3.15f; // 그림 없는 동료 동그라미 크기 (몸 크기 x 3.15)
@@ -131,6 +135,8 @@ public class Unit : MonoBehaviour
         else bodyHalf = size * CircleScale * 0.5f;
         slot = (slotCounter++ % 3) - 1; // 같은 적을 노릴 때 위·가운데·아래로 나눠 서기
 
+        hitY = -size * 0.5f + (barY + size * 0.5f) * 0.5f; // 몸 가운데쯤 (맞는 효과가 뜨는 높이)
+
         hpBack = MakeBar("HpBack", new Color(0f, 0f, 0f, 0.6f), barY);
         hpBack.transform.localScale = new Vector3(BarWidth, 0.14f, 1f);
         hpFillRenderer = MakeBar("HpFill", team == Team.Hero ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f), barY);
@@ -200,7 +206,7 @@ public class Unit : MonoBehaviour
     {
         if (healer) return HealerThink(pos, battle);
 
-        Unit target = battle.FindNearestOpponent(this);
+        Unit target = ranged ? battle.FindNearestOpponent(this) : (meleeTarget = battle.FindMeleeTarget(this));
         if (target == null) return ToHome(pos);
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
         return Approach(pos, target);
@@ -259,13 +265,16 @@ public class Unit : MonoBehaviour
     {
         Unit target = battle.FindNearestOpponent(this);
         if (target == null) return Vector2.zero;
+        if (!engaged && battle.EnemiesAlerted) engaged = true; // 같은 웨이브 적이 싸우기 시작하면 함께 감
         if (!engaged)
         {
             float aggro = Mathf.Max(EnemyAggroRange, attackRange + 1.5f) + size * 0.5f;
             if (Vector2.Distance(pos, target.transform.position) > aggro) return Vector2.zero; // 아직 대기
             engaged = true;
         }
+        battle.EnemiesAlerted = true;
         if (healer) return HealerThink(pos, battle);
+        if (!ranged) target = meleeTarget = battle.FindMeleeTarget(this);
         if (InRange(pos, target)) { TryAttack(target); return Vector2.zero; }
         return Approach(pos, target);
     }
@@ -420,7 +429,11 @@ public class Unit : MonoBehaviour
 
         AudioManager.Play(attackSound, team == Team.Hero ? 0.55f : 0.4f);
         if (ranged) Projectile.Launch(this, target, dmg, splash, UsesArt || UsesLook ? projectileColor : baseColor, impactSound);
-        else battle.ApplyHit(target.transform.position, target, team, dmg, splash);
+        else
+        {
+            battle.ApplyHit(target.transform.position, target, team, dmg, splash);
+            HitFx.Spawn(hitFx, target.HitPoint, facingRight);
+        }
     }
 
     public void Heal(float amount)

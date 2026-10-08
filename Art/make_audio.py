@@ -414,57 +414,94 @@ def sfx():
     return out
 
 
-# ---------------------------------------------------------------- 타이틀 문 소리
+# ---------------------------------------------------------------- 전투 효과음 (무기별, 게임에서 흔히 쓰는 느낌)
 
-def door_sfx():
-    """타이틀 메뉴용 문 소리 (귀에 편하도록 부드럽게, 높은 쇳소리는 줄임)"""
-    r = np.random.default_rng(21)
+def combat_sfx():
+    """휘두르는 '휙' + 무기마다 다른 타격음. 낮은 '퉁' 소리는 줄이고 날카로운 금속음 · 마찰음을 살림"""
+    r = np.random.default_rng(33)
+
+    def nz(dur):
+        return r.uniform(-1, 1, int(SR * dur))
+
+    def band(x, lo, hi):
+        return lowpass(highpass(x, lo), hi)
+
+    def whoosh(dur, f0, f1, peak=0.35):
+        """칼을 휘두를 때 바람 가르는 소리: 주파수가 내려가며 부풀었다 사라짐"""
+        x = sweep_noise(dur, f0, f1, 0)
+        t = np.linspace(0, 1, len(x))
+        shape = np.where(t < peak, t / peak, 1 - (t - peak) / (1 - peak)) ** 1.6
+        return x * shape
+
+    def ring(freqs, dur, decay):
+        """칼날이 부딪칠 때 '챙' 하는 금속 울림 (배음이 고르지 않은 쇳소리)"""
+        t = t_of(dur)
+        y = np.zeros_like(t)
+        for i, f in enumerate(freqs):
+            y += np.sin(2 * np.pi * f * t + i) * np.exp(-t * decay * (1 + i * 0.35)) / (1 + i * 0.5)
+        return y * env(len(t), 0.001, 0.02, dur)
+
+    def burst(dur, lo, hi, decay):
+        """짧은 타격음 (마찰 · 베임)"""
+        return band(nz(dur), lo, hi) * np.exp(-t_of(dur) * decay)
+
     out = {}
-
-    # 딸깍: 쇠 걸쇠가 '틱' 하고 풀린 뒤 나무 문이 '탁' 하고 살짝 울림
-    t = t_of(0.3)
-    latch = mix(0.3,
-                (0.0, bell(2100, 0.05, 60), 0.22),
-                (0.0, highpass(r.uniform(-1, 1, int(SR * 0.004)), 2500), 0.25),
-                (0.042, np.sin(2 * np.pi * 310 * t_of(0.12)) * np.exp(-t_of(0.12) * 38), 0.8),
-                (0.042, np.sin(2 * np.pi * 175 * t_of(0.16)) * np.exp(-t_of(0.16) * 26), 0.55),
-                (0.042, lowpass(r.uniform(-1, 1, int(SR * 0.012)), 1800), 0.35))
-    out["door_latch"] = normalize(reverb(lowpass(latch, 4000), 0.6, 0.14, seed=5), 0.55)
-
-    # 끼이익 + 문이 완전히 열림: 경첩이 미끄러지며 내는 부드러운 '끼이익' (음높이가 천천히 올라감)
-    # → 마지막에 문이 멈추며 '쿵' 하는 낮은 나무 소리
-    dur = 1.4
-    n = int(SR * dur)
-    y = np.zeros(n)
-    creak_len = 0.95
-    tt = np.arange(int(SR * creak_len)) / SR
-    rate = 230 + 170 * (tt / creak_len) ** 0.8 + 8 * np.sin(2 * np.pi * 3.3 * tt)   # 마찰 '틱틱'이 이어지는 빠르기 = 느껴지는 음높이
-    phase = np.cumsum(rate / SR)
-    pulses = np.where(np.diff(np.floor(phase), prepend=0) > 0)[0]
-    g = np.arange(int(SR * 0.012)) / SR
-    grain = (np.sin(2 * np.pi * 1450 * g) * 0.6 + np.sin(2 * np.pi * 820 * g)) * np.exp(-g * 260)
-    env = np.clip(tt / 0.12, 0, 1) * np.clip((creak_len - tt) / 0.35, 0, 1)
-    for k in pulses:
-        amp = env[k] * (0.85 + 0.3 * r.uniform())
-        e = min(n, k + len(grain))
-        y[k:e] += grain[:e - k] * amp
-    y = lowpass(y, 3200)  # 날카로운 쇳소리를 덜어 부드럽게
-    air = lowpass(r.uniform(-1, 1, n), 700) * np.sin(np.pi * np.clip(np.arange(n) / (SR * 1.0), 0, 1)) * 0.25
-    stop = mix(dur - 0.9,
-               (0.0, np.sin(2 * np.pi * 105 * t_of(0.5)) * np.exp(-t_of(0.5) * 9), 0.9),
-               (0.0, np.sin(2 * np.pi * 230 * t_of(0.2)) * np.exp(-t_of(0.2) * 30), 0.45),
-               (0.0, lowpass(r.uniform(-1, 1, int(SR * 0.03)), 900), 0.3),
-               (0.09, bell(1900, 0.08, 50), 0.12))
-    y[int(SR * 0.9):int(SR * 0.9) + len(stop)] += stop[:n - int(SR * 0.9)]
-    y += air
-    out["door_open"] = normalize(reverb(y, 1.1, 0.22, seed=9), 0.6)
+    out["slash"] = normalize(reverb(mix(0.42,
+        (0.00, whoosh(0.17, 7500, 2600), 1.0),
+        (0.08, burst(0.05, 2500, 9000, 60), 0.55),
+        (0.08, ring([3150, 4720, 6230, 7900], 0.32, 14), 0.30)), 0.4, 0.12, seed=11), 0.7)
+    out["dagger"] = normalize(mix(0.25,
+        (0.00, whoosh(0.09, 9500, 4200, 0.3), 1.0),
+        (0.05, burst(0.03, 3500, 10000, 90), 0.5),
+        (0.05, ring([5200, 7300, 9100], 0.18, 22), 0.2)), 0.6)
+    out["stab"] = normalize(mix(0.3,
+        (0.00, whoosh(0.08, 6000, 3200, 0.5), 0.9),
+        (0.06, burst(0.045, 1400, 4200, 55), 0.9),
+        (0.06, ring([2900, 4350, 6100], 0.22, 20), 0.18)), 0.65)
+    t = t_of(0.18)
+    thump = np.sin(2 * np.pi * np.cumsum(140 * np.exp(-t * 9) + 70) / SR) * np.exp(-t * 18)
+    out["heavy"] = normalize(reverb(mix(0.5,
+        (0.00, whoosh(0.22, 3200, 800, 0.55), 0.9),
+        (0.13, burst(0.22, 300, 2200, 16), 0.85),
+        (0.13, burst(0.06, 2500, 7000, 45), 0.35),
+        (0.13, thump, 0.45)), 0.5, 0.12, seed=12), 0.75)
+    claw = mix(0.32, (0.00, whoosh(0.12, 6500, 2200, 0.4), 0.8))
+    for i in range(3):
+        claw += mix(0.32, (0.09 + i * 0.035, burst(0.03, 2800, 6500, 70), 0.6 - i * 0.12))
+    out["claw"] = normalize(claw, 0.65)
+    t = t_of(0.12)
+    snarl = band(nz(0.12), 300, 1400) * (0.6 + 0.4 * np.sin(2 * np.pi * 34 * t)) * np.exp(-t * 14)
+    out["bite"] = normalize(mix(0.22,
+        (0.00, snarl, 0.6),
+        (0.05, burst(0.035, 1200, 4500, 70), 0.9),
+        (0.05, ring([3600, 5100], 0.06, 60), 0.25),
+        (0.11, burst(0.03, 1200, 4000, 80), 0.6)), 0.65)
+    t = t_of(0.18)
+    twang = np.zeros_like(t)
+    for k in range(1, 7):
+        twang += np.sin(2 * np.pi * 145 * k * t) * np.exp(-t * (22 + k * 10)) / k
+    out["arrow"] = normalize(mix(0.36,
+        (0.00, twang, 0.8),
+        (0.00, burst(0.02, 1500, 6000, 120), 0.4),
+        (0.03, whoosh(0.28, 9000, 4500, 0.25), 0.55)), 0.6)
+    t = t_of(0.5)
+    rise = np.sin(2 * np.pi * np.cumsum(500 + 1400 * (t / t[-1]) ** 0.6) / SR) * np.exp(-t * 4) * env(len(t), 0.03, 0.1, 0.5)
+    sparkle = sum(mix(0.5, (0.04 + i * 0.05, bell(1800 + i * 420, 0.25, 12), 0.25)) for i in range(5))
+    out["magic"] = normalize(reverb(rise * 0.35 + sparkle + band(nz(0.5), 3000, 9000) * np.exp(-t * 6) * 0.15, 0.7, 0.2, seed=13), 0.55)
+    out["explode"] = normalize(reverb(mix(0.5,
+        (0.00, burst(0.4, 200, 2600, 9), 0.8),
+        (0.00, burst(0.08, 3000, 9000, 40), 0.35),
+        (0.02, bell(2400, 0.3, 10), 0.15),
+        (0.05, bell(3100, 0.25, 12), 0.12)), 0.6, 0.18, seed=14), 0.6)
+    # 메뉴 버튼에 커서를 올릴 때: 아주 짧고 부드러운 '톡'
+    out["hover"] = normalize(mix(0.06, (0, bell(1500, 0.05, 70), 0.6), (0, band(nz(0.006), 2000, 6000), 0.2)), 0.35)
     return out
 
 
 if __name__ == "__main__":
     import sys
-    if "--door" in sys.argv:  # 문 소리만 다시 만들기
-        for name, sound in door_sfx().items():
+    if "--combat" in sys.argv:  # 전투 효과음만 다시 만들기
+        for name, sound in combat_sfx().items():
             save("sfx_" + name, sound)
         raise SystemExit
     save("bgm_camp", bgm_camp(), fade=False)    # 배경음악은 반복 재생되도록 끝을 그대로 둠
@@ -472,5 +509,5 @@ if __name__ == "__main__":
     save("bgm_boss", bgm_boss(), fade=False)
     for name, sound in sfx().items():
         save("sfx_" + name, sound)
-    for name, sound in door_sfx().items():
+    for name, sound in combat_sfx().items():  # 같은 이름은 전투 효과음으로 덮어씀
         save("sfx_" + name, sound)
