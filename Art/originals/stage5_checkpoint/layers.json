@@ -1,0 +1,52 @@
+{
+  "name": "포빌리아 왕국 검문소",
+  "description": "커다란 왕국 포빌리아\n올 왕국의 5배가 넘는다는 소문이 있다\n욕망과 배신이 넘치는 무서운 왕국이라던데...",
+  "canvas": [
+    1280,
+    720
+  ],
+  "duration_seconds": 12,
+  "fps": 24,
+  "flag_layers": [
+    {
+      "hoist": [
+        355,
+        22
+      ],
+      "size": [
+        135,
+        58
+      ],
+      "phase": 0
+    },
+    {
+      "hoist": [
+        923,
+        22
+      ],
+      "size": [
+        127,
+        56
+      ],
+      "phase": 0.7
+    }
+  ],
+  "flag_motion": "Pinned left edge. Traveling cloth wave increases towards fly edge; changing fold lighting. No background deformation.",
+  "braziers": [
+    {
+      "baseline": [
+        436,
+        417
+      ],
+      "phase": 0.0
+    },
+    {
+      "baseline": [
+        844,
+        417
+      ],
+      "phase": 0.43
+    }
+  ],
+  "dust_count": 9
+}

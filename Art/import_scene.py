@@ -111,6 +111,19 @@ def main():
     if (src / "water_glints.png").exists():
         emit("glint", sprite("water_glints.png", layout["canvas"][0] / 2), 4.0, 0.35, 1.0)
 
+    # 5) 깃발 (왼쪽 고정, 물결이 펄럭임), 화로 불꽃, 날리는 먼지
+    for fl in layout.get("flag_layers", []):
+        w, h = fl["size"]
+        emit("flag", sprite("flag_cloth.png", w * 2), fl["hoist"][0], fl["hoist"][1], w, h, fl.get("phase", 0))
+    if layout.get("braziers"):
+        flames = sorted((src / "flames").glob("flame_*.png"))
+        for f in flames:
+            sprite(f"flames/{f.name}", 104)
+        for br in layout["braziers"]:
+            emit("flame", "flame_", len(flames), br["baseline"][0], br["baseline"][1], 54, 56, br.get("phase", 0))
+    if layout.get("dust_count"):
+        emit("dust", layout["dust_count"])
+
     (out / "layout.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("saved", out, len(saved), "sprites,", len(lines) - 3, "moving layers")
 

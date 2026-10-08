@@ -1,0 +1,8 @@
+canvas=1280,720
+zoom=1.0
+lanes=535,705
+flag=flag_cloth,355,22,135,58,0
+flag=flag_cloth,923,22,127,56,0.7
+flame=flame_,4,436,417,54,56,0
+flame=flame_,4,844,417,54,56,0.43
+dust=9
