@@ -1,0 +1,8 @@
+canvas=1280,720
+zoom=1.0
+lanes=500,700
+banner=hanging_banner,454,112,42,145,0
+banner=hanging_banner,825,112,42,145,1.25
+flame=flame_,4,413,356,42,55,0,0.51,0.83,1
+flame=flame_,4,869,356,42,55,0.6,0.51,0.83,1
+mist=mist,0,400,1280,224,1

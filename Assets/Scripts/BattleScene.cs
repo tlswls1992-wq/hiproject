@@ -14,6 +14,14 @@ using UnityEngine;
 //     bob=그림,가운데x,가운데y,폭,높이,오르내림픽셀,흔들림각도,주기          물 위에서 출렁이는 배
 //     foam=그림,가운데x,가운데y,폭,높이,각도,주기,위상,투명도              해안으로 밀려오는 물거품
 //     glint=그림,주기,최소투명도,최대투명도                                   화면 전체에 반짝이는 물빛
+//     (sway 줄 끝에 back|front, 기울기(도)를 더 붙일 수 있음. flag 줄 끝의 1 = 깃대가 오른쪽. flame 줄 끝 r,g,b = 불티 · 불빛 색)
+//     beam=그림,왼쪽,위,폭,높이,빛나는곳x,y,땅x,y,위상                         쏟아지는 빛줄기 (살짝 기울며 밝기가 바뀜)
+//     motes=개수                                                              빛줄기 안에서 떠오르는 먼지
+//     sparkle=그림,x,y,크기,주기,위상,빛나는시간                               금화 위에서 반짝 빛나는 빛
+//     blink=그림,왼쪽,위,폭,높이,반복주기,깜빡이는시간,시작초...               어둠 속에서 깜빡이는 눈
+//     hand=그림,x,땅y,폭,높이,반복주기,솟기시작,다솟음,들어가기시작,사라짐     땅에서 솟아올랐다 들어가는 해골 손
+//     banner=그림,위가운데x,y,폭,높이,위상                                    위가 고정되어 아래로 갈수록 펄럭이는 깃발
+//     mist=그림,왼쪽,위,폭,높이,투명도                                        옆으로 흘러가는 바닥 안개
 // 이 폴더가 없는 스테이지는 예전처럼 Backgrounds/battle_<번호>.jpg 한 장을 씁니다.
 public static class BattleScene
 {
@@ -82,6 +90,7 @@ public static class BattleScene
 
         int index = 0;
         Herd herd = null;
+        var beams = new List<KeyValuePair<Vector2, Vector2>>(); // 빛줄기: (빛나는 곳, 땅) 월드 좌표
         foreach (var e in entries)
         {
             var p = e.Value;
@@ -93,12 +102,13 @@ public static class BattleScene
                     if (p.Length < 9) break;
                     float w = F(p[1]), h = F(p[2]);
                     bool bend = p[8].Trim() == "bend";
+                    bool back = p.Length > 9 && p[9].Trim() == "back"; // 먼 곳의 잎: 유닛 뒤에
                     // 고정점(풀은 뿌리, 가지는 붙은 곳)을 중심으로 흔들림. 아래쪽 풀은 유닛보다 앞(가까운 풀), 위쪽 가지도 앞에
-                    var r = place(p[0], F(p[5]), F(p[6]), w, h, new Vector2(F(p[3]) / w, 1f - F(p[4]) / h), (bend ? 1500 : 1400) + index);
+                    var r = place(p[0], F(p[5]), F(p[6]), w, h, new Vector2(F(p[3]) / w, 1f - F(p[4]) / h), back ? -2800 + index : (bend ? 1500 : 1400) + index);
                     if (r == null) break;
                     var sway = r.gameObject.AddComponent<Sway>();
                     sway.phase = F(p[7]);
-                    sway.amplitude = bend ? 4f : 3f;
+                    sway.amplitude = p.Length > 10 ? F(p[10]) : bend ? 4f : 3f;
                     sway.bend = bend;
                     break;
                 }
@@ -187,7 +197,7 @@ public static class BattleScene
                     var go = new GameObject("Flag");
                     go.transform.SetParent(world, false);
                     var flag = go.AddComponent<Flag>();
-                    flag.Build(tex, toWorld(F(p[1]), F(p[2])), F(p[3]) * unit, F(p[4]) * unit, F(p[5]), -2880 + index);
+                    flag.Build(tex, toWorld(F(p[1]), F(p[2])), F(p[3]) * unit, F(p[4]) * unit, F(p[5]), -2880 + index, p.Length > 6 && p[6].Trim() == "1");
                     break;
                 }
                 case "flame":
@@ -206,7 +216,84 @@ public static class BattleScene
                     }
                     fire.phase = F(p[6]);
                     fire.height = F(p[5]) * unit;
+                    if (p.Length > 9) { fire.sparkColor = new Color(F(p[7]), F(p[8]), F(p[9])); fire.glow = true; }
                     fire.Build(-2870 + index);
+                    break;
+                }
+                case "beam":
+                {
+                    if (p.Length < 10) break;
+                    float bx = F(p[1]), by = F(p[2]), w = F(p[3]), h = F(p[4]), sx = F(p[5]), sy = F(p[6]);
+                    var r = place(p[0], sx, sy, w, h, new Vector2((sx - bx) / w, 1f - (sy - by) / h), -2890 + index);
+                    if (r == null) break;
+                    var beam = r.gameObject.AddComponent<Beam>();
+                    beam.phase = F(p[9]);
+                    beams.Add(new KeyValuePair<Vector2, Vector2>(toWorld(sx, sy), toWorld(F(p[7]), F(p[8]))));
+                    break;
+                }
+                case "motes":
+                {
+                    if (p.Length < 1 || beams.Count == 0) break;
+                    var go = new GameObject("Motes");
+                    go.transform.SetParent(world, false);
+                    go.AddComponent<Motes>().Build(Mathf.RoundToInt(F(p[0])), beams, unit, -2885 + index);
+                    break;
+                }
+                case "sparkle":
+                {
+                    if (p.Length < 7) break;
+                    float size = F(p[3]);
+                    var r = place(p[0], F(p[1]), F(p[2]), size, size, new Vector2(0.5f, 0.5f), -2900 + index);
+                    if (r == null) break;
+                    var sp = r.gameObject.AddComponent<Sparkle>();
+                    sp.period = Mathf.Max(0.5f, F(p[4])); sp.phase = F(p[5]); sp.duration = Mathf.Max(0.05f, F(p[6]));
+                    break;
+                }
+                case "blink":
+                {
+                    if (p.Length < 8) break;
+                    float w = F(p[3]), h = F(p[4]);
+                    var r = place(p[0], F(p[1]) + w / 2f, F(p[2]) + h / 2f, w, h, new Vector2(0.5f, 0.5f), -2895 + index);
+                    if (r == null) break;
+                    var blink = r.gameObject.AddComponent<Blink>();
+                    blink.period = Mathf.Max(1f, F(p[5]));
+                    blink.duration = Mathf.Max(0.05f, F(p[6]));
+                    for (int i = 7; i < p.Length; i++) blink.starts.Add(F(p[i]));
+                    break;
+                }
+                case "hand":
+                {
+                    if (p.Length < 10) break;
+                    var tex = Resources.Load<Texture2D>(folder + p[0].Trim());
+                    if (tex == null) break;
+                    var go = new GameObject("Hand");
+                    go.transform.SetParent(world, false);
+                    var hand = go.AddComponent<RisingHand>();
+                    hand.ground = toWorld(F(p[1]), F(p[2]));
+                    hand.unit = unit;
+                    hand.period = Mathf.Max(1f, F(p[5]));
+                    hand.times = new[] { F(p[6]), F(p[7]), F(p[8]), F(p[9]) };
+                    hand.Build(tex, F(p[3]) * unit, -2840 + index);
+                    break;
+                }
+                case "banner":
+                {
+                    if (p.Length < 6) break;
+                    var tex = Resources.Load<Texture2D>(folder + p[0].Trim());
+                    if (tex == null) break;
+                    var go = new GameObject("Banner");
+                    go.transform.SetParent(world, false);
+                    go.AddComponent<HangingBanner>().Build(tex, toWorld(F(p[1]), F(p[2])), F(p[3]) * unit, F(p[4]) * unit, unit, F(p[5]), -2880 + index);
+                    break;
+                }
+                case "mist":
+                {
+                    if (p.Length < 6) break;
+                    var tex = Resources.Load<Texture2D>(folder + p[0].Trim());
+                    if (tex == null) break;
+                    var go = new GameObject("Mist");
+                    go.transform.SetParent(world, false);
+                    go.AddComponent<Mist>().Build(tex, toWorld(F(p[1]), F(p[2])), F(p[3]) * unit, F(p[4]) * unit, F(p[5]), -2850 + index);
                     break;
                 }
                 case "dust":
@@ -359,11 +446,13 @@ public class Flag : MonoBehaviour
     readonly SpriteRenderer[] strips = new SpriteRenderer[Strips];
     readonly Vector3[] basePos = new Vector3[Strips];
     float height, phase, stripW;
+    bool flip; // 깃대가 오른쪽 (오른쪽이 고정, 왼쪽으로 갈수록 크게 펄럭임)
 
-    public void Build(Texture2D tex, Vector2 topLeft, float width, float height, float phase, int order)
+    public void Build(Texture2D tex, Vector2 topLeft, float width, float height, float phase, int order, bool flip = false)
     {
         this.height = height;
         this.phase = phase;
+        this.flip = flip;
         stripW = width / Strips;
         float texStrip = tex.width / (float)Strips;
         float ppu = tex.height / height;
@@ -388,6 +477,7 @@ public class Flag : MonoBehaviour
         for (int i = 0; i < Strips; i++)
         {
             float u = (i + 0.5f) / Strips;              // 0 깃대 쪽 ~ 1 바깥쪽
+            if (flip) u = 1f - u;
             float wave = Mathf.Sin(t - u * 5.5f);
             strips[i].transform.position = basePos[i] + new Vector3(0f, wave * height * 0.09f * u, 0f);
             float shade = 0.86f + 0.14f * Mathf.Cos(t - u * 5.5f) * u + 0.14f * (1f - u);
@@ -401,7 +491,9 @@ public class Brazier : MonoBehaviour
 {
     public readonly List<Sprite> frames = new List<Sprite>();
     public float phase, height = 1f;
-    SpriteRenderer a, b;
+    public Color sparkColor = new Color(1f, 0.75f, 0.35f);
+    public bool glow;            // 불꽃 둘레에 은은한 불빛
+    SpriteRenderer a, b, halo;
     readonly List<SpriteRenderer> sparks = new List<SpriteRenderer>();
     const float PoseSeconds = 0.14f;
 
@@ -410,6 +502,13 @@ public class Brazier : MonoBehaviour
         if (frames.Count == 0) return;
         a = MakeLayer("FlameA", order);
         b = MakeLayer("FlameB", order + 1);
+        if (glow)
+        {
+            halo = MakeLayer("Glow", order - 1);
+            var g = SpriteFactory.GlowTexture();
+            halo.sprite = Sprite.Create(g, new Rect(0, 0, g.width, g.height), new Vector2(0.5f, 0.5f), g.width / (height * 2.4f));
+            halo.transform.localPosition = new Vector3(0f, height * 0.45f, 0f);
+        }
         for (int i = 0; i < 5; i++)
         {
             var go = new GameObject("Spark");
@@ -447,7 +546,12 @@ public class Brazier : MonoBehaviour
         {
             float life = Mathf.Repeat(Time.unscaledTime * 0.6f + k * 0.21f + phase, 1f);
             sparks[k].transform.localPosition = new Vector3(Mathf.Sin(k * 3.1f + life * 5f) * height * 0.18f, height * (0.7f + life * 1.3f), 0f);
-            sparks[k].color = new Color(1f, 0.75f, 0.35f, 0.9f * (1f - life));
+            sparks[k].color = new Color(sparkColor.r, sparkColor.g, sparkColor.b, 0.9f * (1f - life));
+        }
+        if (halo != null)
+        {
+            float strength = 0.8f + 0.12f * Mathf.Sin(Time.unscaledTime * 5.8f + phase) + 0.08f * Mathf.Sin(Time.unscaledTime * 8.9f + phase);
+            halo.color = new Color(sparkColor.r * 0.6f, sparkColor.g * 0.8f, sparkColor.b, 0.32f * strength);
         }
     }
 }
@@ -488,5 +592,256 @@ public class Dust : MonoBehaviour
             motes[i].transform.position = new Vector3(x, y, 0f);
             motes[i].color = new Color(0.92f, 0.86f, 0.72f, 0.28f * Mathf.Sin(life * Mathf.PI));
         }
+    }
+}
+
+
+// 쏟아지는 빛줄기: 빛나는 곳을 중심으로 아주 살짝 기울고, 밝기가 숨 쉬듯 바뀜
+public class Beam : MonoBehaviour
+{
+    public float phase;
+    SpriteRenderer r;
+
+    void Awake() { r = GetComponent<SpriteRenderer>(); }
+
+    void Update()
+    {
+        float t = Time.unscaledTime * Mathf.PI * 2f / 12f + phase;
+        transform.localRotation = Quaternion.Euler(0f, 0f, 1.2f * Mathf.Sin(t) + 0.4f * Mathf.Sin(t * 2f + 0.7f));
+        if (r != null) r.color = new Color(1f, 1f, 1f, 0.82f + 0.18f * Mathf.Sin(t * 2f + phase * 0.6f));
+    }
+}
+
+// 빛줄기 안에서 천천히 떠오르는 먼지 (빛 안에서만 보이고, 위로 갈수록 흐려짐)
+public class Motes : MonoBehaviour
+{
+    class Mote { public SpriteRenderer r; public int beam; public float seed, side, speed; }
+    readonly List<Mote> motes = new List<Mote>();
+    List<KeyValuePair<Vector2, Vector2>> beams;
+    float unit;
+
+    public void Build(int count, List<KeyValuePair<Vector2, Vector2>> beams, float unit, int order)
+    {
+        this.beams = beams;
+        this.unit = unit;
+        for (int i = 0; i < count; i++)
+        {
+            var go = new GameObject("Mote");
+            go.transform.SetParent(transform, false);
+            var r = go.AddComponent<SpriteRenderer>();
+            r.sprite = SpriteFactory.Circle();
+            r.sortingOrder = order;
+            go.transform.localScale = Vector3.one * unit * (2.2f + 1.6f * ((i * 37) % 10) / 10f);
+            motes.Add(new Mote { r = r, beam = i % beams.Count, seed = (i * 0.618f) % 1f, side = ((i * 0.381f) % 1f) * 2f - 1f, speed = 0.8f + 0.4f * ((i * 53) % 10) / 10f });
+        }
+    }
+
+    void Update()
+    {
+        float t = Time.unscaledTime;
+        foreach (var m in motes)
+        {
+            var b = beams[m.beam];
+            float life = Mathf.Repeat(t / 12f * m.speed + m.seed, 1f);
+            float along = 0.05f + life * 0.7f;                         // 땅 쪽에서 빛나는 곳 쪽으로 올라감
+            Vector2 pos = Vector2.Lerp(b.Value, b.Key, along);
+            float width = (1f - along) * 45f * unit;                    // 빛줄기는 땅 쪽이 넓음
+            pos.x += m.side * width + Mathf.Sin(t * 0.8f + m.seed * 20f) * 6f * unit;
+            m.r.transform.position = pos;
+            m.r.color = new Color(1f, 0.95f, 0.78f, 0.75f * Mathf.Pow(Mathf.Sin(life * Mathf.PI), 2f));
+        }
+    }
+}
+
+// 금화 위의 반짝임: 주기마다 잠깐 빛났다 사라짐
+public class Sparkle : MonoBehaviour
+{
+    public float period = 6f, phase, duration = 0.7f;
+    SpriteRenderer r;
+
+    void Awake() { r = GetComponent<SpriteRenderer>(); }
+
+    void Update()
+    {
+        float life = Mathf.Repeat(Time.unscaledTime + phase * period, period) / duration;
+        float k = life < 1f ? Mathf.Pow(Mathf.Sin(Mathf.PI * life), 2f) : 0f;
+        if (r != null) r.color = new Color(1f, 1f, 1f, k);
+    }
+}
+
+// 어둠 속의 눈: 정해진 때에 눈꺼풀이 감겼다 뜸 (위아래로 납작해짐)
+public class Blink : MonoBehaviour
+{
+    public float period = 12f, duration = 0.32f;
+    public readonly List<float> starts = new List<float>();
+    SpriteRenderer r;
+
+    void Awake() { r = GetComponent<SpriteRenderer>(); }
+
+    void Update()
+    {
+        float t = Mathf.Repeat(Time.unscaledTime, period), open = 1f, half = duration * 0.5f;
+        foreach (var s in starts)
+        {
+            float dt = t - s;
+            if (dt >= 0f && dt < duration) open = Mathf.Min(open, Mathf.Abs(dt - half) / half);
+        }
+        transform.localScale = new Vector3(1f, Mathf.Max(0.05f, open), 1f);
+        if (r != null) r.enabled = open > 0.09f;
+    }
+}
+
+// 땅에서 솟아올랐다 다시 들어가는 해골 손. 땅 아래 부분은 보이지 않게, 드러난 만큼만 그림
+public class RisingHand : MonoBehaviour
+{
+    const int Steps = 32;
+    public Vector2 ground;
+    public float unit, period = 12f;
+    public float[] times = { 3f, 3.5f, 6.8f, 8.7f }; // 솟기 시작, 다 솟음, 들어가기 시작, 사라짐
+    readonly Sprite[] sprites = new Sprite[Steps + 1];
+    readonly List<SpriteRenderer> puffs = new List<SpriteRenderer>();
+    SpriteRenderer r;
+
+    public void Build(Texture2D tex, float width, int order)
+    {
+        float ppu = tex.width / width;
+        for (int i = 1; i <= Steps; i++)
+        {
+            float h = tex.height * i / (float)Steps; // 손끝부터 i/Steps 만큼 드러남
+            sprites[i] = Sprite.Create(tex, new Rect(0, tex.height - h, tex.width, h), new Vector2(0.5f, 0f), ppu);
+        }
+        var go = new GameObject("HandSprite");
+        go.transform.SetParent(transform, false);
+        r = go.AddComponent<SpriteRenderer>();
+        r.sortingOrder = order;
+        for (int i = 0; i < 12; i++)
+        {
+            var pg = new GameObject("Soil");
+            pg.transform.SetParent(transform, false);
+            var pr = pg.AddComponent<SpriteRenderer>();
+            pr.sprite = SpriteFactory.Circle();
+            pr.sortingOrder = order + 1;
+            pg.transform.localScale = Vector3.one * unit * (2.4f + (i % 3));
+            puffs.Add(pr);
+        }
+    }
+
+    float Rise(float t)
+    {
+        if (t < times[0] || t >= times[3]) return 0f;
+        if (t < times[1]) { float q = 1f - (t - times[0]) / (times[1] - times[0]); return 1f - q * q * q; }
+        if (t < times[2]) return 1f;
+        return 0.5f + 0.5f * Mathf.Cos(Mathf.PI * (t - times[2]) / (times[3] - times[2]));
+    }
+
+    void Update()
+    {
+        if (r == null) return;
+        float t = Mathf.Repeat(Time.unscaledTime, period);
+        float rise = Rise(t);
+        int step = Mathf.RoundToInt(rise * Steps);
+        r.enabled = step > 0;
+        if (step > 0)
+        {
+            r.sprite = sprites[step];
+            float sway = 1.8f * Mathf.Sin(4f * Mathf.PI * 2f * t / period) * rise;
+            r.transform.position = ground + new Vector2(sway * unit, 0f);
+        }
+        // 솟아오르기 직전 · 직후에 흙이 튐
+        float start = times[0] - 0.35f, end = times[0] + 1.1f;
+        for (int k = 0; k < puffs.Count; k++)
+        {
+            bool on = t > start && t < end;
+            puffs[k].enabled = on;
+            if (!on) continue;
+            float q = (t - start) / (end - start);
+            float ang = k / (float)(puffs.Count - 1) * Mathf.PI;
+            float vx = Mathf.Cos(ang) * (12f + 14f * (k % 3)), vy = Mathf.Sin(ang) * 25f;
+            puffs[k].transform.position = ground + new Vector2(vx * q, 5f + vy * Mathf.Sin(Mathf.PI * q)) * unit;
+            puffs[k].color = new Color(0.49f, 0.41f, 0.31f, 0.75f * (1f - q));
+        }
+    }
+}
+
+// 위가 고정된 채 매달린 깃발: 가로 띠로 잘라, 아래로 갈수록 옆으로 크게 흔들림
+public class HangingBanner : MonoBehaviour
+{
+    const int Strips = 16;
+    readonly SpriteRenderer[] strips = new SpriteRenderer[Strips];
+    readonly Vector3[] basePos = new Vector3[Strips];
+    float unit, phase;
+
+    public void Build(Texture2D tex, Vector2 topCenter, float width, float height, float unit, float phase, int order)
+    {
+        this.unit = unit;
+        this.phase = phase;
+        float texStrip = tex.height / (float)Strips;
+        float ppu = tex.width / width;
+        for (int i = 0; i < Strips; i++)
+        {
+            var go = new GameObject("Strip");
+            go.transform.SetParent(transform, false);
+            var r = go.AddComponent<SpriteRenderer>();
+            // 위에서 i번째 띠 (텍스처는 아래가 0이라 뒤집어 셈). 틈이 보이지 않게 살짝 겹침
+            float y1 = tex.height - i * texStrip;
+            float y0 = Mathf.Max(0f, y1 - texStrip - 1.5f);
+            r.sprite = Sprite.Create(tex, new Rect(0, y0, tex.width, y1 - y0), new Vector2(0.5f, 1f), ppu);
+            r.sortingOrder = order;
+            basePos[i] = new Vector3(topCenter.x, topCenter.y - i * height / Strips, 0f);
+            go.transform.position = basePos[i];
+            strips[i] = r;
+        }
+    }
+
+    void Update()
+    {
+        float p = Time.unscaledTime * Mathf.PI * 2f / 12f;
+        for (int i = 0; i < Strips; i++)
+        {
+            float v = (i + 0.5f) / Strips; // 0 위(고정) ~ 1 아래
+            float dx = Mathf.Pow(v, 1.5f) * (6f * Mathf.Sin(2f * p - v * 4f + phase) + 1.3f * Mathf.Sin(3f * p - v * 6f + phase));
+            strips[i].transform.position = basePos[i] + new Vector3(dx * unit, 0f, 0f);
+            float shade = 0.9f + 0.1f * Mathf.Cos(2f * p - v * 4f + phase) * v;
+            strips[i].color = new Color(shade, shade, shade, 1f);
+        }
+    }
+}
+
+// 바닥 안개: 같은 그림 두 장을 이어 붙여 옆으로 천천히 흘려 보냄 (그림 끝과 처음이 이어지는 그림)
+public class Mist : MonoBehaviour
+{
+    SpriteRenderer a, b;
+    Vector2 topLeft;
+    float width, opacity;
+
+    public void Build(Texture2D tex, Vector2 topLeft, float width, float height, float opacity, int order)
+    {
+        this.topLeft = topLeft;
+        this.width = width;
+        this.opacity = opacity;
+        var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0f, 1f), tex.width / width);
+        a = Make(sprite, order);
+        b = Make(sprite, order);
+    }
+
+    SpriteRenderer Make(Sprite sprite, int order)
+    {
+        var go = new GameObject("MistTile");
+        go.transform.SetParent(transform, false);
+        var r = go.AddComponent<SpriteRenderer>();
+        r.sprite = sprite;
+        r.sortingOrder = order;
+        return r;
+    }
+
+    void Update()
+    {
+        if (a == null) return;
+        float t = Time.unscaledTime;
+        float shift = Mathf.Repeat(t / 24f, 1f) * width; // 24초에 한 화면 폭만큼 흘러감
+        a.transform.position = topLeft + new Vector2(-shift, 0f);
+        b.transform.position = topLeft + new Vector2(width - shift, 0f);
+        float k = opacity * (0.85f + 0.15f * Mathf.Sin(t * Mathf.PI * 2f / 12f));
+        a.color = b.color = new Color(1f, 1f, 1f, k);
     }
 }
