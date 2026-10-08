@@ -57,7 +57,8 @@ public class Unit : MonoBehaviour
         hp = maxHp;
         baseColor = color;
 
-        if (UsesLook) ringColor = new Color(0f, 0f, 0f, 0.6f); // 코드로 그린 적은 발밑에 그림자
+        if (UsesLook || (UsesArt && team == Team.Enemy)) ringColor = new Color(0f, 0f, 0f, 0.55f); // 적은 발밑에 그림자
+        if (UsesArt && art.facesLeft) facingRight = false; // 왼쪽을 보는 그림(몬스터)은 처음에 왼쪽을 봄
         if (ringColor.a > 0f)
         {
             var ringGo = new GameObject("Ring");
@@ -99,7 +100,9 @@ public class Unit : MonoBehaviour
             body.color = Color.white;
             lastX = transform.position.x;
             lastY = transform.position.y;
-            barY = -size * 0.5f + CharacterArt.BattleCanvasHeight * (1f - CharacterArt.FeetPivot) * 0.92f;
+            barY = art.topUnits > 0f
+                ? -size * 0.5f + art.topUnits * CharacterArt.BattleCanvasHeight + 0.25f      // 몬스터: 머리 바로 위
+                : -size * 0.5f + CharacterArt.BattleCanvasHeight * (1f - CharacterArt.FeetPivot) * 0.92f;
         }
         else if (UsesLook)
         {
@@ -123,7 +126,7 @@ public class Unit : MonoBehaviour
         }
 
         // 그림 크기에 맞춘 몸 반폭
-        if (UsesArt) bodyHalf = CharacterArt.BattleCanvasHeight * 0.24f;
+        if (UsesArt) bodyHalf = art.bodyUnits > 0f ? art.bodyUnits * CharacterArt.BattleCanvasHeight * 0.8f : CharacterArt.BattleCanvasHeight * 0.24f;
         else if (UsesLook) bodyHalf = look.CanvasFor(size) * look.width * 0.42f;
         else bodyHalf = size * CircleScale * 0.5f;
         slot = (slotCounter++ % 3) - 1; // 같은 적을 노릴 때 위·가운데·아래로 나눠 서기
@@ -340,7 +343,7 @@ public class Unit : MonoBehaviour
         bodyT.localPosition = basePos;
         bodyT.localScale = scale;
         bodyT.localRotation = rot;
-        body.flipX = !facingRight;
+        body.flipX = art.facesLeft ? facingRight : !facingRight; // 그림이 보는 방향에 따라 뒤집기
     }
 
     // 코드로 그린 적의 움직임: 대기 중엔 숨쉬기, 걸을 땐 통통 걸음, 공격할 땐 앞으로 덤벼듦.

@@ -1,0 +1,71 @@
+{
+  "wolf": {
+    "idle": {
+      "frame_count": 8,
+      "cell_width": 260,
+      "cell_height": 202,
+      "duration_ms": 110,
+      "baseline": 186
+    },
+    "attack": {
+      "frame_count": 8,
+      "cell_width": 351,
+      "cell_height": 247,
+      "duration_ms": 90,
+      "baseline": 231
+    },
+    "run": {
+      "frame_count": 8,
+      "cell_width": 233,
+      "cell_height": 182,
+      "duration_ms": 90,
+      "baseline": 166
+    }
+  },
+  "bear": {
+    "idle": {
+      "frame_count": 8,
+      "cell_width": 219,
+      "cell_height": 161,
+      "duration_ms": 110,
+      "baseline": 145
+    },
+    "attack": {
+      "frame_count": 8,
+      "cell_width": 248,
+      "cell_height": 236,
+      "duration_ms": 90,
+      "baseline": 220
+    },
+    "run": {
+      "frame_count": 8,
+      "cell_width": 241,
+      "cell_height": 156,
+      "duration_ms": 90,
+      "baseline": 140
+    }
+  },
+  "boss_bear": {
+    "idle": {
+      "frame_count": 8,
+      "cell_width": 239,
+      "cell_height": 175,
+      "duration_ms": 110,
+      "baseline": 159
+    },
+    "attack": {
+      "frame_count": 8,
+      "cell_width": 530,
+      "cell_height": 456,
+      "duration_ms": 90,
+      "baseline": 440
+    },
+    "run": {
+      "frame_count": 8,
+      "cell_width": 252,
+      "cell_height": 170,
+      "duration_ms": 90,
+      "baseline": 154
+    }
+  }
+}

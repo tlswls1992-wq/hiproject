@@ -24,6 +24,13 @@ public class CharacterArt
     Sprite[] runSprites;
     Sprite[] attackSprites;
 
+    // 몬스터 그림용 정보 (anim.txt): 그림이 보는 방향, 픽셀 밀도, 발 위치, 키와 몸 폭
+    public bool facesLeft;        // facing=left (몬스터는 왼쪽을 봄)
+    float unitPx;                 // unit=256: 이 그림에서 '캔버스 한 칸(BattleCanvasHeight)'에 해당하는 픽셀 (없으면 그림 높이)
+    float feetPx = -1f;           // feet=16: 그림 아래에서 발까지 픽셀 (없으면 FeetPivot 비율)
+    public float topUnits;        // top=0.47: 발에서 머리끝까지 높이 (캔버스 칸 단위, 0이면 모름)
+    public float bodyUnits;       // body=0.33: 몸의 반폭 (캔버스 칸 단위, 0이면 모름)
+
     // 전투에서 그림 한 장(정사각형 캔버스)의 높이 (게임 세계 단위). 캐릭터가 커 보이면 줄이세요.
     public const float BattleCanvasHeight = 4.68f; // 전투 그림 높이 (월드 단위). 예전 2.6의 2배에서 0.9배로
     // 캔버스 아래에서 발이 있는 높이 비율 (그림의 이 지점이 유닛의 발 위치가 됨)
@@ -37,10 +44,16 @@ public class CharacterArt
     public float AttackLength => Sum(attackTimes);
 
     // 캐릭터 그림 (없으면 null)
-    public static CharacterArt For(string id)
+    public static CharacterArt For(string id) => Load("Characters/", id);
+
+    // 적 그림 (Resources/Enemies/<적 id>/). 없으면 null → 코드로 그린 모습(EnemyLook)을 씀
+    public static CharacterArt ForEnemy(string id) => Load("Enemies/", id);
+
+    static CharacterArt Load(string root, string id)
     {
-        if (cache.TryGetValue(id, out var cached)) return cached;
-        string path = "Characters/" + id + "/";
+        string key = root + id;
+        if (cache.TryGetValue(key, out var cached)) return cached;
+        string path = root + id + "/";
         var art = new CharacterArt
         {
             portrait = Resources.Load<Texture2D>(path + "portrait"),
@@ -51,7 +64,7 @@ public class CharacterArt
         };
         if (art.portrait == null && art.full == null && art.idle.Length == 0 && art.run.Length == 0 && art.attack.Length == 0) art = null;
         else art.ReadTimes(Resources.Load<TextAsset>(path + "anim"));
-        cache[id] = art;
+        cache[key] = art;
         return art;
     }
 
@@ -73,7 +86,15 @@ public class CharacterArt
             var line = raw.Trim();
             int eq = line.IndexOf('=');
             if (eq < 0) continue;
-            var parts = line.Substring(eq + 1).Split(',');
+            string key0 = line.Substring(0, eq).Trim(), value = line.Substring(eq + 1).Trim();
+            float num;
+            float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out num);
+            if (key0 == "facing") { facesLeft = value == "left"; continue; }
+            if (key0 == "unit") { unitPx = num; continue; }
+            if (key0 == "feet") { feetPx = num; continue; }
+            if (key0 == "top") { topUnits = num; continue; }
+            if (key0 == "body") { bodyUnits = num; continue; }
+            var parts = value.Split(',');
             var times = new float[parts.Length];
             for (int i = 0; i < parts.Length; i++)
                 times[i] = (int.TryParse(parts[i].Trim(), out int ms) ? Mathf.Max(ms, 20) : 100) / 1000f;
@@ -150,14 +171,15 @@ public class CharacterArt
         return i >= 0 ? attackSprites[i] : null;
     }
 
-    static Sprite[] MakeSprites(Texture2D[] frames)
+    Sprite[] MakeSprites(Texture2D[] frames)
     {
         var sprites = new Sprite[frames.Length];
         for (int i = 0; i < frames.Length; i++)
         {
             var tex = frames[i];
-            float ppu = tex.height / BattleCanvasHeight;
-            sprites[i] = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, FeetPivot), ppu);
+            float ppu = (unitPx > 0f ? unitPx : tex.height) / BattleCanvasHeight;
+            float pivotY = feetPx >= 0f ? feetPx / tex.height : FeetPivot;
+            sprites[i] = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, pivotY), ppu);
         }
         return sprites;
     }

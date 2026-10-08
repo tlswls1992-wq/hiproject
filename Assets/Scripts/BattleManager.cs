@@ -483,6 +483,8 @@ public class BattleManager : MonoBehaviour
         u.projectileColor = def.IsRanged ? Color.Lerp(def.accent, Color.white, 0.3f) : def.accent;
         u.attackSound = EnemySound(def);
         u.impactSound = def.role == EnemyRole.Caster ? "explode" : null;
+        u.art = CharacterArt.ForEnemy(def.id); // 진짜 그림이 있으면 그림으로 (Resources/Enemies/<id>)
+        if (u.art != null && !u.art.HasBattleSprites) u.art = null;
         u.look = EnemyLook.For(def);
         u.Setup(SpriteFactory.Square(), def.color, Color.clear);
         if (mainBoss)
