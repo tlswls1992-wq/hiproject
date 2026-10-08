@@ -67,6 +67,10 @@ public class GameManager : MonoBehaviour
     int selectedStage = 1;   // 고른 판 번호 (1~100)
     bool saveLoadIsLoad;     // 저장/불러오기 화면: true = 불러오기, false = 저장
     Page returnPage;         // 저장/불러오기/설정 화면에서 돌아갈 곳
+    Page subReturn = Page.Camp; // 도감 · 전승 특전에서 돌아갈 곳 (야영지 또는 타이틀)
+    readonly float[] titleButtonHover = new float[5];
+    readonly float[] titleCardHover = new float[3];
+    static readonly string[] TitleCardNames = { "엔딩", "도감", "특전" };
 
     // 결과 화면 정보
     bool resultVictory;
@@ -149,8 +153,8 @@ public class GameManager : MonoBehaviour
             case Page.Gacha: gacha.Draw(); break;
             case Page.Formation: formation.Draw(() => page = Page.Camp, ShowToast); break;
             case Page.Members: members.Draw(() => page = Page.Camp, ShowToast); break;
-            case Page.Dex: dex.Draw(() => page = Page.Camp); break;
-            case Page.Legacy: legacy.Draw(() => page = Page.Camp, StartNextCycle, ShowToast); break;
+            case Page.Dex: dex.Draw(() => page = subReturn); break;
+            case Page.Legacy: legacy.Draw(() => page = subReturn, StartNextCycle, ShowToast); break;
             case Page.Battle: battle.DrawHUD(); break;
             case Page.Result: DrawResult(); break;
             case Page.SaveLoad: DrawSaveLoad(); break;
@@ -171,6 +175,7 @@ public class GameManager : MonoBehaviour
 
     void DrawTitle()
     {
+        if (TitleScene.Available) { DrawAnimatedTitle(); return; }
         float w = UI.Width;
         // 노을 진 왕국 배경 + 떠다니는 빛가루
         UI.Backdrop("title");
@@ -219,6 +224,87 @@ public class GameManager : MonoBehaviour
         {
             if (DrawConfirm("게임을 끝낼까요?", "끝내기"))
                 QuitGame();
+        }
+    }
+
+    // ---------------- 움직이는 타이틀 (석양의 성) ----------------
+    // 배경 그림에 그려진 버튼 5개와 카드 3장 위치에 보이지 않는 클릭 영역을 둡니다.
+    void DrawAnimatedTitle()
+    {
+        var e = Event.current;
+        TitleScene.DrawBackground();
+        bool active = modal == Modal.None;
+        float step = e.type == EventType.Repaint ? Time.unscaledDeltaTime * 6f : 0f;
+
+        // ---- 메뉴 버튼: 새로 시작 / 이어하기 / 불러오기 / 설정 / 끝내기 ----
+        int clicked = -1;
+        for (int i = 0; i < Mathf.Min(5, TitleScene.ButtonCount); i++)
+        {
+            var r = TitleScene.ButtonRect(i);
+            bool enabled = active && (i != 1 || SaveData.HasSave);
+            bool hover = enabled && r.Contains(e.mousePosition);
+            titleButtonHover[i] = Mathf.MoveTowards(titleButtonHover[i], hover ? 1f : 0f, step);
+            if (i == 1 && !SaveData.HasSave) TitleScene.DrawButtonDisabled(i);
+            TitleScene.DrawButtonHover(i, titleButtonHover[i]);
+            if (enabled && GUI.Button(r, GUIContent.none, GUIStyle.none)) clicked = i;
+        }
+        if (clicked >= 0) AudioManager.Play("click", 0.5f, 0.03f);
+        switch (clicked)
+        {
+            case 0: if (SaveData.HasSave) modal = Modal.ConfirmNewGame; else NewGame(); break;
+            case 1: ContinueGame(); break;
+            case 2: OpenSaveLoad(true, Page.Title); break;
+            case 3: returnPage = Page.Title; page = Page.Settings; break;
+            case 4: modal = Modal.ConfirmQuit; break;
+        }
+
+        // ---- 왼쪽 카드 3장: 엔딩 / 도감 / 특전 (겹친 카드는 위에 있는 카드가 먼저) ----
+        int hoverCard = -1;
+        if (active)
+            for (int i = TitleScene.CardCount - 1; i >= 0; i--)
+                if (TitleScene.CardContains(i, e.mousePosition)) { hoverCard = i; break; }
+        for (int i = 0; i < Mathf.Min(3, TitleScene.CardCount); i++)
+        {
+            titleCardHover[i] = Mathf.MoveTowards(titleCardHover[i], i == hoverCard ? 1f : 0f, step);
+            TitleScene.DrawCardHover(i, titleCardHover[i], TitleCardNames[i]);
+        }
+        if (hoverCard >= 0 && e.type == EventType.MouseDown && e.button == 0)
+        {
+            e.Use();
+            AudioManager.Play("gacha", 0.5f, 0.02f);
+            OpenTitleCard(hoverCard);
+        }
+
+        if (modal == Modal.ConfirmNewGame)
+        {
+            if (DrawConfirm("새로 시작하면 처음(오프닝)부터 시작해요.\n이어하기 기록은 지워져요.\n(불러오기 슬롯에 저장한 기록은 남아요)", "새로 시작"))
+                NewGame();
+        }
+        else if (modal == Modal.ConfirmQuit)
+        {
+            if (DrawConfirm("게임을 끝낼까요?", "끝내기"))
+                QuitGame();
+        }
+    }
+
+    // 타이틀 카드: 0 엔딩 다시 보기, 1 도감, 2 전승 특전
+    void OpenTitleCard(int card)
+    {
+        switch (card)
+        {
+            case 0:
+                if (SaveData.CompletedRuns >= 1) PlayStory(EndingStory, true, () => page = Page.Title);
+                else ShowToast("아직 엔딩을 보지 못했어요. 10-10의 마왕을 쓰러뜨려 보세요!");
+                break;
+            case 1:
+                dex.Open();
+                subReturn = Page.Title;
+                page = Page.Dex;
+                break;
+            case 2:
+                if (SaveData.RunCleared) { legacy.Open(); subReturn = Page.Title; page = Page.Legacy; }
+                else ShowToast("전승 특전은 이번 회차에서 10-10의 마왕을 쓰러뜨리면 열려요.");
+                break;
         }
     }
 
@@ -601,11 +687,11 @@ public class GameManager : MonoBehaviour
         my += 64;
         if (UI.Button(new Rect(mx, my, mw, 54), "동료  (강화 · 판매)", UI.Plum, 18)) { members.Open(); page = Page.Members; }
         my += 64;
-        if (UI.Button(new Rect(mx, my, mw, 54), "도감", UI.Blue, 20)) { dex.Open(); page = Page.Dex; }
+        if (UI.Button(new Rect(mx, my, mw, 54), "도감", UI.Blue, 20)) { dex.Open(); subReturn = Page.Camp; page = Page.Dex; }
         my += 64;
         if (SaveData.RunCleared)
         {
-            if (UI.Button(new Rect(mx, my, mw, 54), "전승 특전", new Color(0.55f, 0.24f, 0.30f), 20)) { legacy.Open(); page = Page.Legacy; }
+            if (UI.Button(new Rect(mx, my, mw, 54), "전승 특전", new Color(0.55f, 0.24f, 0.30f), 20)) { legacy.Open(); subReturn = Page.Camp; page = Page.Legacy; }
             my += 64;
         }
         float half = (mw - 10f) / 2f;

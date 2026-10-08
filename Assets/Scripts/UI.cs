@@ -6,7 +6,7 @@ using UnityEngine;
 public static class UI
 {
     public const float Height = 720f;
-    static float Scale => Screen.height / Height;
+    public static float Scale => Screen.height / Height;
     public static float Width => Screen.width / Scale;
     public static Rect Full => new Rect(0f, 0f, Width, Height);
 

@@ -1,0 +1,122 @@
+{
+  "name": "가챠 용사 오프닝 — 석양의 성",
+  "canvas": [
+    1280,
+    720
+  ],
+  "duration_seconds": 12,
+  "fps": 24,
+  "leaf_layers": [
+    {
+      "anchor": [
+        -18,
+        49
+      ],
+      "width": 150,
+      "flip": false,
+      "phase": 0.1
+    },
+    {
+      "anchor": [
+        -12,
+        170
+      ],
+      "width": 175,
+      "flip": false,
+      "phase": 1.1
+    },
+    {
+      "anchor": [
+        -24,
+        301
+      ],
+      "width": 180,
+      "flip": false,
+      "phase": 2.4
+    },
+    {
+      "anchor": [
+        20,
+        391
+      ],
+      "width": 128,
+      "flip": false,
+      "phase": 3.2
+    },
+    {
+      "anchor": [
+        1295,
+        93
+      ],
+      "width": 159,
+      "flip": true,
+      "phase": 0.7
+    },
+    {
+      "anchor": [
+        1292,
+        233
+      ],
+      "width": 183,
+      "flip": true,
+      "phase": 1.8
+    },
+    {
+      "anchor": [
+        1300,
+        354
+      ],
+      "width": 164,
+      "flip": true,
+      "phase": 3.1
+    },
+    {
+      "anchor": [
+        1289,
+        474
+      ],
+      "width": 146,
+      "flip": true,
+      "phase": 4.2
+    }
+  ],
+  "leaf_motion": "Branch attachment fixed; breeze bends leaf tips in two slow cycles per loop. Only separate RGBA foliage sprites are transformed.",
+  "cloud_motion": "62px slow drift per cloud lifetime; fade before wrap; staggered phases",
+  "sun_glow": "Local low-amplitude warm light",
+  "river": "Mask-limited traveling horizontal light ribbons and fine glints",
+  "fireworks": [
+    {
+      "start": 2.0,
+      "launch": [
+        258,
+        264
+      ],
+      "burst": [
+        238,
+        135
+      ],
+      "color": [
+        255,
+        224,
+        153
+      ]
+    },
+    {
+      "start": 7.3,
+      "launch": [
+        272,
+        272
+      ],
+      "burst": [
+        306,
+        164
+      ],
+      "color": [
+        196,
+        222,
+        255
+      ]
+    }
+  ],
+  "fixed_regions": "Title, menu frames and labels, three summon cards, castle, terrain"
+}
