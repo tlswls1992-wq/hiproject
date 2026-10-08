@@ -164,6 +164,7 @@ public static class EnemyLook
         // 눈 (왼쪽을 봄)
         Color eye = d.type == EnemyType.Normal ? EyeDark : Dark(d.accent, 0.8f);
         if (has(EnemyDeco.Mask)) eye = new Color(1f, 0.9f, 0.7f);
+        if (skin.grayscale < 0.25f) eye = Light(d.accent, 0.3f); // 텅 빈 갑옷처럼 얼굴이 어두우면 눈이 빛남
         p.Circle(hx - 0.075f, hy + 0.005f, 0.017f, eye);
         p.Circle(hx - 0.015f, hy + 0.01f, 0.015f, eye);
         if (has(EnemyDeco.Helmet))
@@ -173,6 +174,23 @@ public static class EnemyLook
             p.Ellipse(hx - 0.02f, hy + 0.085f, 0.03f, 0.015f, Light(Steel, 0.5f));          // 반사광
             if (d.type != EnemyType.Normal) p.Ellipse(hx + 0.05f, hy + 0.14f, 0.07f, 0.025f, d.accent, -20f); // 장식 깃
             p.Box(hx - 0.045f, hy + 0.0f, 0.012f, 0.045f, 0.004f, Dark(Steel, 0.8f));
+        }
+        if (has(EnemyDeco.BeastEars))
+        {
+            // 짐승 귀 (수인): 머리 위에 세모 귀 두 개
+            p.Tri(hx - 0.09f, hy + 0.07f, hx - 0.03f, hy + 0.10f, hx - 0.08f, hy + 0.19f, hair);
+            p.Tri(hx + 0.02f, hy + 0.10f, hx + 0.09f, hy + 0.07f, hx + 0.07f, hy + 0.19f, hair);
+            p.Tri(hx - 0.075f, hy + 0.09f, hx - 0.045f, hy + 0.105f, hx - 0.07f, hy + 0.16f, Color.Lerp(skin, new Color(1f, 0.6f, 0.6f), 0.4f));
+            p.Tri(hx + 0.035f, hy + 0.105f, hx + 0.075f, hy + 0.09f, hx + 0.065f, hy + 0.16f, Color.Lerp(skin, new Color(1f, 0.6f, 0.6f), 0.4f));
+        }
+        if (has(EnemyDeco.Horns))
+        {
+            // 뿔 (마족, 용): 머리 양옆에서 위로 휘어 올라감
+            Color horn = new Color(0.22f, 0.16f, 0.18f);
+            p.Capsule(hx - 0.07f, hy + 0.07f, hx - 0.10f, hy + 0.14f, 0.022f, horn);
+            p.Capsule(hx - 0.10f, hy + 0.14f, hx - 0.08f, hy + 0.20f, 0.014f, horn);
+            p.Capsule(hx + 0.06f, hy + 0.08f, hx + 0.10f, hy + 0.15f, 0.022f, horn);
+            p.Capsule(hx + 0.10f, hy + 0.15f, hx + 0.09f, hy + 0.21f, 0.014f, horn);
         }
         if (has(EnemyDeco.Headband)) p.Box(hx + 0.005f, hy + 0.06f, hr + 0.005f, 0.02f, 0.01f, d.accent, -8f);
         if (has(EnemyDeco.Crown))

@@ -808,22 +808,33 @@ public class GameManager : MonoBehaviour
 
         bool beatDemonKing = resultVictory && resultFirstClear && resultStage >= Stages.Count;
         float bx = w / 2f;
-        if (beatDemonKing)
+        System.Action playEnding = () => PlayStory(EndingStory, true, () =>
         {
-            if (UI.Button(new Rect(bx - 150, 556, 300, 72), "엔딩 보기 ▶", UI.Primary, 24))
-                PlayStory(EndingStory, true, () =>
-                {
-                    SaveData.RunCleared = true; // 전승 특전 열림
-                    SaveData.Save();
-                    selectedStage = Stages.Count;
-                    page = Page.Camp;
-                    ShowToast($"{SaveData.Cycle}회차 클리어! 야영지에서 '전승 특전'을 열 수 있어요");
-                });
+            SaveData.RunCleared = true; // 전승 특전 열림
+            SaveData.Save();
+            selectedStage = Stages.Count;
+            page = Page.Camp;
+            ShowToast($"{SaveData.Cycle}회차 클리어! 야영지에서 '전승 특전'을 열 수 있어요");
+        });
+
+        // 마왕을 쓰러뜨리면: 마지막 스테이지의 엔딩 선택지 → (처음이면) 엔딩
+        var lastChoices = Stages.Script(resultStage).endingChoices;
+        if (resultVictory && resultStage >= Stages.Count)
+        {
+            var r = new Rect(bx - 470, 566, 940, 62);
+            string text = lastChoices.Length > 0 ? "1. " + lastChoices[0].text : "엔딩 보기";
+            if (UI.Button(r, "", UI.Primary, 18))
+            {
+                if (beatDemonKing) playEnding();
+                else { selectedStage = Stages.Count; page = Page.Camp; }
+            }
+            UI.Text(new Rect(r.x + 24, r.y, r.width - 200, r.height - 4), text, 17, UI.TextMain, TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(r.xMax - 180, r.y, 160, r.height - 4), beatDemonKing ? "→ 엔딩" : "→ 야영지", 16, UI.Gold, TextAnchor.MiddleRight, true);
             return;
         }
 
         // 스테이지 보스를 이기면 '스테이지 엔딩 선택지'로 다음 목적지를 고릅니다.
-        var choices = Stages.Script(resultStage).endingChoices;
+        var choices = lastChoices;
         if (resultVictory && Stages.HasBoss(resultStage) && choices.Length > 0)
         {
             UI.Text(new Rect(0, 528, w, 30), "어디로 갈까?", 19, UI.Gold, TextAnchor.MiddleCenter, true);

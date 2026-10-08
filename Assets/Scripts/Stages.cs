@@ -18,21 +18,6 @@ public static class Stages
         "은혜의 땅", "노란 용의 동굴", "붉은 정글", "옛 대전쟁터", "마왕성",
     };
 
-    // 7~10 스테이지의 중간 보스 / 보스 이름과 대사 (아직 대본이 없는 스테이지용, 임시)
-    static readonly string[] legacyMidBossNames = { "", "", "", "", "", "", "새끼 황룡", "정글 주술사", "망령 기사", "마왕군 사천왕" };
-    static readonly string[] legacyBossNames = { "", "", "", "", "", "", "노란 용", "붉은 표범 여왕", "전쟁의 망령 장군", "마왕" };
-    static readonly string[][] legacyBossLines =
-    {
-        null, null, null, null, null, null,
-        new[] { "크하하하! 내 보물을 노리고 왔느냐, 작은 것들아!", "황금빛 불꽃에 타 버려라!" },
-        new[] { "후후... 정글의 사냥꾼은 소리 없이 다가가는 법.", "너희는 이미 내 사냥감이야." },
-        new[] { "아직... 전쟁은... 끝나지 않았다......", "모든 산 자를 이 전쟁터에 묻어 주마!" },
-        new[] { "가챠의 힘을 가진 용사라... 기다리고 있었다.", "운으로 여기까지 왔다면, 운이 다할 때까지 놀아 주마!" },
-    };
-    public static string LegacyMidBossName(int stage) => legacyMidBossNames[stage];
-    public static string LegacyBossName(int stage) => legacyBossNames[stage];
-    public static string[] LegacyBossLines(int stage) => legacyBossLines[stage];
-
     static readonly Color[] skyColors =
     {
         new Color(0.40f, 0.62f, 0.55f), // 외곽 숲

@@ -463,7 +463,7 @@ public class BattleManager : MonoBehaviour
         if (def == null) return;
         float hpMul = 1f + 0.12f * (Level - 1) + 0.1f * (Wave - 1);
         float dmgMul = 1f + 0.05f * (Level - 1);
-        if (def.id == EnemyDef.BossId(Stages.StageCount - 1)) { hpMul *= 1.4f; dmgMul *= 1.5f; } // 마왕은 더 강하게
+        if (def.id == EnemyDef.DemonKingId) { hpMul *= 1.4f; dmgMul *= 1.5f; } // 마왕은 더 강하게
         SaveData.SeenEnemies.Add(def.id); // 도감에 등록
         if (def.IsNamed) spawnedNamed.Add(def.id);
 

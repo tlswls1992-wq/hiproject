@@ -33,6 +33,7 @@ public enum EnemyDeco
 {
     None = 0, Hood = 1, Helmet = 2, ElfEars = 4, Beard = 8, Tusks = 16, Wings = 32, Halo = 64,
     Crown = 128, Shield = 256, Headband = 512, LongHair = 1024, Cape = 2048, Mask = 4096,
+    BeastEars = 8192, Horns = 16384,
 }
 
 public class EnemyDef
@@ -152,7 +153,6 @@ public class EnemyDef
         // ---- 3. 올드락 산맥 ----
         Add(2, "wyvern", "와이번", N, EnemyRole.Melee, EnemyShape.Wyvern, C(0.45f, 0.55f, 0.35f), C(1f, 0.8f, 0.3f), 0.6f);
         Add(2, "scorpion", "산맥 전갈", N, EnemyRole.Tank, EnemyShape.Scorpion, C(0.55f, 0.40f, 0.25f), C(0.9f, 0.3f, 0.2f), 0.6f);
-        Add(2, "lynx", "스라소니", N, EnemyRole.Fast, EnemyShape.Lynx, C(0.70f, 0.58f, 0.40f), C(0.4f, 1f, 0.5f), 0.5f);
         Add(2, "baby_worm", "새끼 산맥 샌드웜", N, EnemyRole.Melee, EnemyShape.Worm, C(0.72f, 0.60f, 0.42f), C(0.9f, 0.3f, 0.3f), 0.55f);
         Add(2, "sandworm", "산맥 샌드웜", M, EnemyRole.Brute, EnemyShape.Worm, C(0.66f, 0.52f, 0.35f), C(0.95f, 0.3f, 0.25f), 1.6f);
         Add(2, "dwarf_guard", "드워프 경비병", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.40f, 0.35f, 0.55f), Steel, 0.5f, EnemyWeapon.Axe, EnemyDeco.Beard | EnemyDeco.Helmet);
@@ -196,22 +196,47 @@ public class EnemyDef
         Add(5, "angel_healer", "천족 치유사", N, EnemyRole.Healer, EnemyShape.Humanoid, white, C(0.5f, 1f, 0.6f), 0.5f, EnemyWeapon.Staff, EnemyDeco.Wings | EnemyDeco.Halo | EnemyDeco.LongHair, AngelSkin);
         Add(5, "belena", "천사장 벨레나", B, EnemyRole.Caster, EnemyShape.Humanoid, C(0.95f, 0.92f, 0.80f), GoldC, 1.1f, EnemyWeapon.Spear, EnemyDeco.Wings | EnemyDeco.Halo | EnemyDeco.LongHair | EnemyDeco.Cape, AngelSkin);
 
-        // ---- 7~10 스테이지 (아직 대본이 없어서 예전 적을 씀) ----
-        Add(-1, "goblin", "고블린", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.45f, 0.35f, 0.25f), Steel, 0.45f, EnemyWeapon.Dagger, EnemyDeco.Tusks, C(0.55f, 0.70f, 0.30f));
-        Add(-1, "goblin_archer", "고블린 궁수", N, EnemyRole.Ranged, EnemyShape.Humanoid, C(0.40f, 0.40f, 0.25f), Wood, 0.45f, EnemyWeapon.Bow, EnemyDeco.Hood, C(0.55f, 0.70f, 0.30f));
-        Add(-1, "ogre", "오우거", N, EnemyRole.Brute, EnemyShape.Humanoid, C(0.45f, 0.30f, 0.25f), Wood, 0.9f, EnemyWeapon.Hammer, EnemyDeco.Tusks, C(0.70f, 0.55f, 0.45f));
-        for (int s = 6; s < Stages.StageCount; s++)
-        {
-            bool demonKing = s == Stages.StageCount - 1;
-            Add(s, MidBossId(s), Stages.LegacyMidBossName(s), M, EnemyRole.Melee, EnemyShape.Humanoid, C(0.40f, 0.20f, 0.45f), C(1f, 0.4f, 0.3f), 1.2f,
-                EnemyWeapon.Sword, EnemyDeco.Helmet | EnemyDeco.Cape, C(0.6f, 0.5f, 0.6f));
-            Add(s, BossId(s), Stages.LegacyBossName(s), B, EnemyRole.Brute, EnemyShape.Humanoid,
-                demonKing ? C(0.15f, 0.04f, 0.08f) : C(0.35f, 0.12f, 0.40f), C(1f, 0.25f, 0.2f), demonKing ? 1.5f : 1.2f,
-                EnemyWeapon.Sword, EnemyDeco.Crown | EnemyDeco.Cape | EnemyDeco.Tusks, C(0.55f, 0.35f, 0.45f));
-        }
+        // ---- 7. 노란 용의 동굴 ----
+        Color bone = C(0.86f, 0.82f, 0.70f);
+        Add(6, "dragontooth_spear", "용아병 창병", N, EnemyRole.Reach, EnemyShape.Humanoid, C(0.55f, 0.48f, 0.30f), GoldC, 0.5f, EnemyWeapon.Spear, EnemyDeco.Helmet, bone);
+        Add(6, "dragontooth_archer", "용아병 궁병", N, EnemyRole.Ranged, EnemyShape.Humanoid, C(0.50f, 0.44f, 0.28f), Wood, 0.5f, EnemyWeapon.Bow, EnemyDeco.Helmet, bone);
+        Add(6, "liandra", "노란 용의 딸 폴리모프 리안드라", M, EnemyRole.Caster, EnemyShape.Humanoid, C(0.85f, 0.65f, 0.20f), C(1f, 0.75f, 0.2f), 1.1f, EnemyWeapon.Staff, EnemyDeco.Horns | EnemyDeco.LongHair | EnemyDeco.Cape);
+        Add(6, "silver_statue", "은 용 동상", N, EnemyRole.Tank, EnemyShape.Golem, C(0.75f, 0.77f, 0.80f), C(0.5f, 0.8f, 1f), 0.7f);
+        Add(6, "gold_statue", "황금 용 동상", N, EnemyRole.Brute, EnemyShape.Golem, C(0.90f, 0.72f, 0.28f), C(1f, 0.4f, 0.2f), 0.75f);
+        Add(6, "oderion", "노란 용 오데리온", B, EnemyRole.Brute, EnemyShape.Wyvern, C(0.92f, 0.72f, 0.22f), C(1f, 0.35f, 0.2f), 1.6f);
+
+        // ---- 8. 붉은 정글 ----
+        Color furSkin = C(0.90f, 0.74f, 0.58f);
+        Add(7, "beast_warrior1", "수인 전사1", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.60f, 0.30f, 0.20f), Steel, 0.5f, EnemyWeapon.Sword, EnemyDeco.BeastEars, furSkin);
+        Add(7, "beast_warrior2", "수인 전사2", N, EnemyRole.Brute, EnemyShape.Humanoid, C(0.50f, 0.28f, 0.18f), Steel, 0.6f, EnemyWeapon.Axe, EnemyDeco.BeastEars | EnemyDeco.Headband, furSkin);
+        Add(7, "beast_archer1", "수인 여자 궁수1", N, EnemyRole.Ranged, EnemyShape.Humanoid, C(0.55f, 0.35f, 0.25f), Wood, 0.5f, EnemyWeapon.Bow, EnemyDeco.BeastEars | EnemyDeco.LongHair, furSkin);
+        Add(7, "imta", "수인 대장 임타", M, EnemyRole.Brute, EnemyShape.Humanoid, C(0.55f, 0.20f, 0.15f), GoldC, 1.1f, EnemyWeapon.Axe, EnemyDeco.BeastEars | EnemyDeco.Cape, furSkin);
+        Add(7, "beast_hunter", "수인 헌터", N, EnemyRole.Fast, EnemyShape.Humanoid, C(0.40f, 0.32f, 0.20f), Steel, 0.5f, EnemyWeapon.Dagger, EnemyDeco.BeastEars | EnemyDeco.Hood, furSkin);
+        Add(7, "beast_healer", "수인 치유사", N, EnemyRole.Healer, EnemyShape.Humanoid, C(0.45f, 0.55f, 0.35f), C(0.5f, 1f, 0.6f), 0.5f, EnemyWeapon.Staff, EnemyDeco.BeastEars | EnemyDeco.LongHair, furSkin);
+        Add(7, "beast_shaman", "수인 주술사", N, EnemyRole.Caster, EnemyShape.Humanoid, C(0.50f, 0.25f, 0.40f), C(1f, 0.5f, 0.3f), 0.5f, EnemyWeapon.Staff, EnemyDeco.BeastEars | EnemyDeco.Mask, furSkin);
+        Add(7, "sisibel", "수인 족장 시시벨", B, EnemyRole.Reach, EnemyShape.Humanoid, C(0.65f, 0.15f, 0.15f), GoldC, 1.1f, EnemyWeapon.Spear, EnemyDeco.BeastEars | EnemyDeco.Crown | EnemyDeco.Cape | EnemyDeco.LongHair, furSkin);
+
+        // ---- 9. 옛 대전쟁터 ----
+        Color dead = C(0.80f, 0.80f, 0.74f);
+        Add(8, "skeleton", "스켈레톤 병사", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.35f, 0.33f, 0.30f), C(1f, 0.3f, 0.2f), 0.5f, EnemyWeapon.Sword, EnemyDeco.None, dead);
+        Add(8, "ghoul", "구울이 된 병사", N, EnemyRole.Fast, EnemyShape.Humanoid, C(0.30f, 0.35f, 0.28f), C(0.7f, 1f, 0.4f), 0.5f, EnemyWeapon.Dagger, EnemyDeco.Helmet, C(0.55f, 0.65f, 0.50f));
+        Add(8, "wraith", "병사의 원혼", N, EnemyRole.Caster, EnemyShape.Humanoid, C(0.55f, 0.65f, 0.80f), C(0.6f, 0.9f, 1f), 0.5f, EnemyWeapon.None, EnemyDeco.Hood, C(0.75f, 0.85f, 0.95f));
+        Add(8, "lich", "리치", M, EnemyRole.Caster, EnemyShape.Humanoid, C(0.25f, 0.20f, 0.35f), C(0.4f, 1f, 0.5f), 1.1f, EnemyWeapon.Staff, EnemyDeco.Hood | EnemyDeco.Crown | EnemyDeco.Cape, dead);
+        Add(8, "empty_armor", "텅 빈 갑옷 병사", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.50f, 0.52f, 0.56f), C(0.5f, 0.8f, 1f), 0.6f, EnemyWeapon.Sword, EnemyDeco.Helmet | EnemyDeco.Shield, C(0.12f, 0.12f, 0.15f));
+        Add(8, "empty_archer", "텅 빈 갑옷 궁수", N, EnemyRole.Ranged, EnemyShape.Humanoid, C(0.48f, 0.50f, 0.54f), Wood, 0.5f, EnemyWeapon.Crossbow, EnemyDeco.Helmet, C(0.12f, 0.12f, 0.15f));
+        Add(8, "ankara", "흑마술사 안카라", B, EnemyRole.Caster, EnemyShape.Humanoid, C(0.20f, 0.12f, 0.28f), C(0.8f, 0.4f, 1f), 1.0f, EnemyWeapon.Staff, EnemyDeco.Hood | EnemyDeco.Cape | EnemyDeco.LongHair);
+
+        // ---- 10. 마왕성 ----
+        Color demonSkin = C(0.72f, 0.55f, 0.65f);
+        Add(9, "demon_warrior", "마족 전사", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.35f, 0.12f, 0.20f), Steel, 0.5f, EnemyWeapon.Sword, EnemyDeco.Horns, demonSkin);
+        Add(9, "demon_mage", "마족 마법사", N, EnemyRole.Caster, EnemyShape.Humanoid, C(0.30f, 0.15f, 0.40f), C(1f, 0.3f, 0.5f), 0.5f, EnemyWeapon.Staff, EnemyDeco.Horns | EnemyDeco.LongHair, demonSkin);
+        Add(9, "demon_shield", "마족 방패병", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.30f, 0.14f, 0.18f), C(0.6f, 0.2f, 0.3f), 0.55f, EnemyWeapon.Sword, EnemyDeco.Horns | EnemyDeco.Shield, demonSkin);
+        Add(9, "hoffman", "마왕의 집사 호프만", M, EnemyRole.Fast, EnemyShape.Humanoid, C(0.10f, 0.10f, 0.12f), Steel, 1.0f, EnemyWeapon.Dagger, EnemyDeco.Horns | EnemyDeco.Cape, demonSkin);
+        Add(9, "demon_knight", "마족 기사", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.25f, 0.10f, 0.15f), C(0.8f, 0.2f, 0.2f), 0.6f, EnemyWeapon.Sword, EnemyDeco.Horns | EnemyDeco.Helmet | EnemyDeco.Shield | EnemyDeco.Cape, demonSkin);
+        Add(9, "demon_general", "마족 장군", N, EnemyRole.Brute, EnemyShape.Humanoid, C(0.40f, 0.08f, 0.12f), GoldC, 0.7f, EnemyWeapon.Axe, EnemyDeco.Horns | EnemyDeco.Cape | EnemyDeco.Helmet, demonSkin);
+        Add(9, "arin", "마왕 아린", B, EnemyRole.Caster, EnemyShape.Humanoid, C(0.15f, 0.04f, 0.10f), C(1f, 0.25f, 0.3f), 1.2f, EnemyWeapon.Staff, EnemyDeco.Horns | EnemyDeco.Crown | EnemyDeco.LongHair | EnemyDeco.Cape, demonSkin);
     }
 
-    // 7~10 스테이지 보스 id (예전 저장의 도감 기록과 맞추기 위해 그대로 둠)
-    public static string MidBossId(int stage) => "mid_" + (stage + 1);
-    public static string BossId(int stage) => "boss_" + (stage + 1);
+    public const string DemonKingId = "arin";
+
 }

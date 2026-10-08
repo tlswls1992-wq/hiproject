@@ -59,15 +59,6 @@ public class StageScript
 
     public static StageScript Of(int stage) => All[UnityEngine.Mathf.Clamp(stage, 0, All.Length - 1)];
 
-    static StageScript legacy(int s) => new StageScript
-    {
-        early = new[] { "goblin", "goblin", "goblin_archer" },
-        late = new[] { "goblin", "goblin_archer", "ogre" },
-        midBoss = EnemyDef.MidBossId(s),
-        boss = EnemyDef.BossId(s),
-        bossLines = L(Stages.LegacyBossLines(s)),
-    };
-
     static StageScript[] all;
     static StageScript[] All => all ?? (all = Build());
 
@@ -114,7 +105,7 @@ public class StageScript
         // ---------------- 3. 올드락 산맥 ----------------
         new StageScript
         {
-            early = new[] { "wyvern", "scorpion", "lynx", "baby_worm" },
+            early = new[] { "wyvern", "scorpion", "baby_worm" },
             midBoss = "sandworm",
             late = new[] { "dwarf_guard", "dwarf_shield", "dwarf_slinger" },
             boss = "talim",
@@ -164,7 +155,57 @@ public class StageScript
             endingChoices = new[] { new StageChoice("불을 뿜고 하늘을 날아다니는 용의 영토를 지나야 하는데... 다들 소리내지 말고 가자!", 7) },
         },
 
-        // ---------------- 7~10: 대본 준비 중 (예전 적과 보스) ----------------
-        legacy(6), legacy(7), legacy(8), legacy(9),
+        // ---------------- 7. 노란 용의 동굴 ----------------
+        new StageScript
+        {
+            early = new[] { "dragontooth_spear", "dragontooth_archer" },
+            midBoss = "liandra",
+            late = new[] { "silver_statue", "gold_statue" },
+            boss = "oderion",
+            entrance = L("탐욕스럽고 똑똑한 용들...!", "용의 동굴엔 어마어마한 금은보화가 숨겨져 있대", "조금은 훔쳐가도 아무도 모르겠지?"),
+            midBossLines = L("너희 인간들 여기가 어딘지 알고 들어온거야?", "제 발로 들어온 인간은 200년 만인가...", "나랑 재미있게 놀다가... 죽어줘."),
+            bossLines = L("용사라... 몇 십년 만이군", "저번 용사는 속임수로 왕이 되었다지?", "너는 정직한 녀석이길 바란다 용사여."),
+            endingChoices = new[] { new StageChoice("노란 용이 무슨 말을 하는거지... 나 이전 용사는 도대체 누구인거야? 지금은 마왕을 처히는데 집중하자!", 8) },
+        },
+
+        // ---------------- 8. 붉은 정글 ----------------
+        new StageScript
+        {
+            early = new[] { "beast_warrior1", "beast_warrior2", "beast_archer1" },
+            midBoss = "imta",
+            late = new[] { "beast_hunter", "beast_healer", "beast_shaman" },
+            boss = "sisibel",
+            entrance = L("원래는 푸른 정글이었다는 이야기기 있어", "대전쟁의 영향으로 나무가 전부 붉게 변했대", "잠깐... 사람이 동물 귀가 있는거 같은데???"),
+            midBossLines = L("인간이 어째서 여기에...", "너희는 맹약을 저버렸다.", "붉은 정글을 벗어날 수 없을 것이다."),
+            bossLines = L("인간, 엘프, 드워프 너희들 모두 우리를 무시하지", "대전쟁에 우리를 끌여들여 놓고, 우리의 터전을 망가뜨렸다.", "그 책임... 용사인 너에게 묻겠다!"),
+            endingChoices = new[] { new StageChoice("이 앞에 수년에 걸쳐 대전쟁이 벌어진 곳이래. 무엇 때문에 그렇게 싸웠을까?", 9) },
+        },
+
+        // ---------------- 9. 옛 대전쟁터 ----------------
+        new StageScript
+        {
+            early = new[] { "skeleton", "ghoul", "wraith" },
+            midBoss = "lich",
+            late = new[] { "empty_armor", "empty_archer" },
+            boss = "ankara",
+            entrance = L("수많은 종족들이 모여서 전쟁을 벌인 곳이야", "도대체 무엇 때문에 싸웠을까?", "잠깐... 누가 땅에서 튀어나왔어!!!"),
+            midBossLines = L("왔구나... 살아있는 자여....", "대전쟁은 끝나지 않았다....", "보이는 모든 것들은 "),
+            bossLines = L("모든 것은 선택의 연속입니다.", "여기는 어리석은 선택의 흔적.", "나는 그 기억을 지키는 마지막 책."),
+            endingChoices = new[] { new StageChoice("과연 이 전쟁의 진실을 아는 사람이 있을까? 그나저나... 마왕성이 눈앞이다!", 10) },
+        },
+
+        // ---------------- 10. 마왕성 ----------------
+        new StageScript
+        {
+            early = new[] { "demon_warrior", "demon_mage", "demon_shield" },
+            midBoss = "hoffman",
+            late = new[] { "demon_mage", "demon_knight", "demon_general" },
+            boss = "arin",
+            entrance = L("드디어 마왕성이다!", "마왕 내가 널 무찌르고 진짜 용사가 되겠어!!", "그런데... 마왕이 어딘가 낯이 익은데?"),
+            midBossLines = L("안녕하십니까. 마왕님을 모시는 호프만입니다.", "엘 왕국에서 오신 분들이라고요... 그렇다면", "마왕님께는 한 발자국도 보내드릴 수 없습니다."),
+            bossLines = L("나를 이렇게 만든 것도 모자라 이젠 죽이겠다고?", "지독하네... 인간이란.", "어울려 줄게. 아무것도 모르는 용사여."),
+            // 마지막 스테이지: 이 선택지를 고르면 엔딩으로
+            endingChoices = new[] { new StageChoice("마왕을 무찔렀다. 모든 것이 끝났다. 이제 올 왕국으로 돌아가자. 하지만 마왕이 한 말은... 무슨 뜻일까?", 10) },
+        },
     };
 }
