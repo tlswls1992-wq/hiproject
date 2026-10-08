@@ -266,8 +266,8 @@ public class GachaScreen
         UI.RoundFrame(r, UI.WithAlpha(rc, 0.85f));
 
         // 성급 (★) 과 레벨
-        UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), FormationScreen.Stars(star),
-            Mathf.RoundToInt(20 * s), FormationScreen.StarColor(star), level > 0 || !string.IsNullOrEmpty(tag) ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, true);
+        StarIcons.Draw(new Rect(r.x + 9f * s, r.y + 11f * s, r.width - 18f * s, 24f * s), star,
+            level > 0 || !string.IsNullOrEmpty(tag) ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter);
         if (level > 0)
             UI.Text(new Rect(r.x + 10f * s, r.y + 10f * s, r.width - 20f * s, 30f * s), "Lv." + level,
                 Mathf.RoundToInt(18 * s), UI.TextMain, TextAnchor.MiddleRight, true);

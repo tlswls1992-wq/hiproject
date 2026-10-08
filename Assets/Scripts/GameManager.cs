@@ -591,7 +591,7 @@ public class GameManager : MonoBehaviour
         UI.Text(new Rect(left.x + 20, left.y + 376, left.width - 40, 40), "스테이지를 클리어할 때마다 출진 인원이 1명 늘어요", 13, UI.TextSub, TextAnchor.UpperLeft);
         UI.Text(new Rect(left.x + 20, left.y + 430, left.width - 40, 24), $"진행도  {SaveData.ClearedStage} / {Stages.Count}", 15, UI.TextSub, TextAnchor.MiddleLeft);
         UI.Bar(new Rect(left.x + 20, left.y + 458, left.width - 40, 14), SaveData.ClearedStage / (float)Stages.Count, UI.Gold);
-        UI.Text(new Rect(left.x + 20, left.y + 484, left.width - 40, 40), $"용사 {FormationScreen.TierName(SaveData.HeroMember.star)} {FormationScreen.Stars(SaveData.HeroMember.star)}  ·  동료 {SaveData.CompanionCount}명", 14, UI.TextSub, TextAnchor.MiddleLeft);
+        UI.Text(new Rect(left.x + 20, left.y + 484, left.width - 40, 40), $"용사 {FormationScreen.Stars(SaveData.HeroMember.star)}  ·  동료 {SaveData.CompanionCount}명", 14, UI.TextSub, TextAnchor.MiddleLeft);
 
         // ---- 오른쪽: 메뉴 ----
         float mx = w - 250f, mw = 230f, my = 80f;

@@ -149,7 +149,7 @@ public static class Portrait
 // ---------------- 동료 화면: 성급 강화 · 판매 ----------------
 public class MemberScreen
 {
-    static string StarText(int star) => (FormationScreen.TierName(star) + " " + FormationScreen.Stars(star)).Trim();
+    static string StarText(int star) => FormationScreen.Stars(star);
 
     enum Confirm { None, Merge, Sell, BulkMerge }
 
@@ -200,7 +200,8 @@ public class MemberScreen
             if (isSel) UI.RoundFrame(r, UI.WithAlpha(UI.Gold, 0.7f));
             Portrait.Draw(new Vector2(r.x + 32, r.center.y), m.Def, 20f, false);
             UI.Text(new Rect(r.x + 62, r.y + 6, r.width - 130, 26), m.Def.name, 18, UI.TextMain, TextAnchor.MiddleLeft, true);
-            UI.Text(new Rect(r.x + 62, r.y + 32, r.width - 130, 22), $"{FormationScreen.Stars(m.star)}  Lv.{m.level}", 14, FormationScreen.StarColor(m.star), TextAnchor.MiddleLeft);
+            StarIcons.Draw(new Rect(r.x + 62, r.y + 34, 100, 17), m.star);
+            UI.Text(new Rect(r.x + 64 + StarIcons.Width(m.star, 17), r.y + 32, 80, 22), $"Lv.{m.level}", 14, UI.TextSub, TextAnchor.MiddleLeft);
             if (SaveData.IsPlaced(m)) UI.Chip(new Rect(r.xMax - 58, r.y + 18, 50, 24), "출진", UI.Green, 13);
             if (active && GUI.Button(r, GUIContent.none, GUIStyle.none)) { selected = m; material = null; }
         }
@@ -217,7 +218,8 @@ public class MemberScreen
         var info = new Rect(card.xMax + 20, 84, rx + rw - card.xMax - 20, 330);
         UI.Panel(info);
         float mul = SaveData.StatMultiplier(selected);
-        UI.Text(new Rect(info.x + 20, info.y + 12, info.width - 40, 34), $"{def.name}  {FormationScreen.TierName(selected.star)} {FormationScreen.Stars(selected.star)}", 24, FormationScreen.StarColor(selected.star), TextAnchor.MiddleLeft, true);
+        UI.Text(new Rect(info.x + 20, info.y + 12, info.width - 40, 34), def.name, 24, UI.TextMain, TextAnchor.MiddleLeft, true);
+        StarIcons.Draw(new Rect(info.x + 20, info.y + 16, info.width - 40, 26), selected.star, TextAnchor.MiddleRight);
         UI.Text(new Rect(info.x + 20, info.y + 46, info.width - 40, 24), def.Profile, 15, new Color(1f, 0.92f, 0.7f), TextAnchor.MiddleLeft);
 
         // 레벨과 경험치
@@ -242,15 +244,15 @@ public class MemberScreen
         // ---- 성급 강화 ----
         var mergeBox = new Rect(rx, 430, rw, 194);
         UI.Panel(mergeBox);
-        UI.Text(new Rect(mergeBox.x + 20, mergeBox.y + 10, mergeBox.width - 40, 28), "성급 강화  ·  같은 캐릭터를 합쳐 ★을 올려요 (★5 다음은 진급)", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
+        UI.Text(new Rect(mergeBox.x + 20, mergeBox.y + 10, mergeBox.width - 40, 28), "성급 강화  ·  같은 캐릭터를 합쳐 ★을 올려요 (★6부터 파란 별, ★11부터 빨간 별)", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
         if (def.IsHero)
         {
             UI.Text(new Rect(mergeBox.x + 20, mergeBox.y + 50, mergeBox.width - 40, 60),
-                selected.star >= SaveData.MaxStar ? "최대 성급 (2차 진급 ★5)이에요!" : "용사는 뽑기에서 용사 카드가 나오면 성급이 올라가요.", 16, UI.TextSub, TextAnchor.UpperLeft);
+                selected.star >= SaveData.MaxStar ? "최대 성급 (★15)이에요!" : "용사는 뽑기에서 용사 카드가 나오면 성급이 올라가요.", 16, UI.TextSub, TextAnchor.UpperLeft);
         }
         else if (selected.star >= SaveData.MaxStar)
         {
-            UI.Text(new Rect(mergeBox.x + 20, mergeBox.y + 50, mergeBox.width - 40, 40), "최대 성급 (2차 진급 ★5)이에요!", 18, UI.Gold, TextAnchor.MiddleLeft, true);
+            UI.Text(new Rect(mergeBox.x + 20, mergeBox.y + 50, mergeBox.width - 40, 40), "최대 성급 (★15)이에요!", 18, UI.Gold, TextAnchor.MiddleLeft, true);
         }
         else
         {
@@ -265,13 +267,13 @@ public class MemberScreen
                 {
                     var b = new Rect(cx, mergeBox.y + 68, 130, 46);
                     if (b.xMax > mergeBox.xMax - 260) break;
-                    string label = $"{FormationScreen.TierName(c.star)} {FormationScreen.Stars(c.star)} Lv.{c.level}" + (SaveData.IsPlaced(c) ? " (출진)" : "");
+                    string label = $"{FormationScreen.Stars(c.star)} Lv.{c.level}" + (SaveData.IsPlaced(c) ? " (출진)" : "");
                     if (UI.Button(b, label, c == material ? UI.Primary : UI.Neutral, 13, active)) material = c;
                     cx += 140;
                 }
             }
             var go = new Rect(mergeBox.xMax - 240, mergeBox.y + 68, 220, 54);
-            if (UI.Button(go, (selected.star % SaveData.StarsPerTier == 0 ? $"{FormationScreen.TierName(selected.star + 1)}!" : $"{FormationScreen.Stars(selected.star)} → {FormationScreen.Stars(selected.star + 1)}") + "  강화", UI.Plum, 18, active && material != null))
+            if (UI.Button(go, $"{FormationScreen.Stars(selected.star)} → {FormationScreen.Stars(selected.star + 1)}  강화", UI.Plum, 18, active && material != null))
                 confirm = Confirm.Merge;
             UI.Text(new Rect(mergeBox.x + 20, mergeBox.yMax - 40, mergeBox.width - 40, 26),
                 $"강화하면 성급 1마다 능력치 +{SaveData.StarBonus * 100:0}% · 재료로 쓴 동료는 사라져요", 14, UI.TextSub, TextAnchor.MiddleLeft);

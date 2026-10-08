@@ -1,0 +1,26 @@
+{
+  "canvas": [
+    512,
+    512
+  ],
+  "frame_size": [
+    256,
+    256
+  ],
+  "fps": 12.5,
+  "duration_seconds": 4,
+  "frame_count": 50,
+  "spritesheet": {
+    "columns": 8,
+    "rows": 7,
+    "width": 2048,
+    "height": 1792,
+    "order": "left to right, top to bottom; cells 50..55 unused"
+  },
+  "colors": [
+    "yellow",
+    "blue",
+    "red"
+  ],
+  "motion": "Fixed star silhouette; short restrained surface light sweep and small surface glint, then pause. Transparent RGBA throughout."
+}
