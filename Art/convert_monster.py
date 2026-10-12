@@ -35,8 +35,12 @@ def main():
     out = ROOT / "Assets" / "Resources" / "Enemies" / enemy_id
     out.mkdir(parents=True, exist_ok=True)
 
-    manifest = json.loads((src.parent / "manifest.json").read_text()) if (src.parent / "manifest.json").exists() else {}
-    info = manifest.get(src.name, {})
+    # manifest.json: 몬스터 폴더 안에 있으면 그 파일, 여러 몬스터를 묶은 폴더에 있으면 그 안의 몬스터 이름 항목
+    if (src / "manifest.json").exists():
+        info = json.loads((src / "manifest.json").read_text())
+    else:
+        manifest = json.loads((src.parent / "manifest.json").read_text()) if (src.parent / "manifest.json").exists() else {}
+        info = manifest.get(src.name, {})
 
     # 기준: 대기 첫 장면의 키를 '용사 키 x rel_height'로
     idle0 = frames(src / "idle", "idle")[0]
