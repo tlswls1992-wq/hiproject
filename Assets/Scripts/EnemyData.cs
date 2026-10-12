@@ -136,8 +136,9 @@ public class EnemyDef
         Add(0, "bandit1", "도적1", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.35f, 0.30f, 0.25f), Steel, 0.5f, EnemyWeapon.Dagger, EnemyDeco.Mask);
         Add(0, "bandit2", "도적2", N, EnemyRole.Fast, EnemyShape.Humanoid, C(0.30f, 0.36f, 0.24f), Steel, 0.5f, EnemyWeapon.Sword, EnemyDeco.Hood); // 그림: 두건 쓴 단검·소검 도적 (빠른 근접)
         Add(0, "bandit3", "도적3", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.45f, 0.32f, 0.22f), Steel, 0.6f, EnemyWeapon.Axe, EnemyDeco.Beard);
-        Add(0, "oslo", "오슬로", E, EnemyRole.Brute, EnemyShape.Humanoid, C(0.55f, 0.25f, 0.18f), Steel, 0.7f, EnemyWeapon.Axe, EnemyDeco.Beard | EnemyDeco.Headband);
-        Add(0, "shilla", "쉴라", E, EnemyRole.Ranged, EnemyShape.Humanoid, C(0.28f, 0.42f, 0.30f), Wood, 0.6f, EnemyWeapon.Bow, EnemyDeco.LongHair | EnemyDeco.Hood);
+        // 오슬로 · 쉴라: 그림에 맞춰 양손 단검 도적 (오슬로 = 근접, 쉴라 = 빠른 근접)
+        Add(0, "oslo", "오슬로", E, EnemyRole.Melee, EnemyShape.Humanoid, C(0.55f, 0.25f, 0.18f), Steel, 0.7f, EnemyWeapon.Dagger, EnemyDeco.Headband);
+        Add(0, "shilla", "쉴라", E, EnemyRole.Fast, EnemyShape.Humanoid, C(0.20f, 0.38f, 0.38f), Steel, 0.6f, EnemyWeapon.Dagger, EnemyDeco.Hood);
         Add(0, "frank", "도적 두목 프랑크", B, EnemyRole.Melee, EnemyShape.Humanoid, C(0.50f, 0.18f, 0.16f), GoldC, 1.0f, EnemyWeapon.Sword, EnemyDeco.Beard | EnemyDeco.Cape);
 
         // ---- 2. 동부 평원 ----

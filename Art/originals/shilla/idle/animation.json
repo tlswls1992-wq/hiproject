@@ -1,0 +1,21 @@
+{
+  "animation": "idle",
+  "direction": "right",
+  "frames": [
+    "idle_01.png",
+    "idle_02.png",
+    "idle_03.png",
+    "idle_02.png",
+    "idle_01.png",
+    "idle_04.png"
+  ],
+  "durations_ms": [
+    350,
+    300,
+    400,
+    300,
+    350,
+    300
+  ],
+  "loop": true
+}

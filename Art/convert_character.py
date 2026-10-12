@@ -10,7 +10,7 @@
   fix.txt     크기 보정 (예: attack_scale=1.22 → 공격 그림을 발 기준으로 1.22배). 동작마다 캐릭터 크기가 다를 때 사용
   run_sheet_4x2.*  달리기 장면표 (가로 4칸 x 세로 2칸처럼 여러 장면을 한 그림에 모은 것). 있으면 run.* 대신 사용
   attack.*    공격 모습 (전투) - 움직이는 이미지
-출력 (Assets/Resources/Characters/<캐릭터 id>/):
+출력 (Assets/Resources/Characters/<캐릭터 id>/, --enemy 이면 Assets/Resources/Enemies/<캐릭터 id>/):
   portrait.png, full.png, idle/idle_00.png..., run/run_00.png..., attack/attack_00.png..., anim.txt (장면별 시간)
 
 - Unity는 webp를 읽지 못하고 gif는 첫 장면만 읽기 때문에 png로 바꿉니다.
@@ -122,6 +122,8 @@ def frames_of_folder(folder: Path):
     """장면별 PNG 폴더 (animation.json에 장면 목록과 시간이 적혀 있음)"""
     info = json.loads((folder / "animation.json").read_text(encoding="utf-8"))
     frames = [Image.open(folder / f).convert("RGBA") for f in info["frames"]]
+    if "durations_ms" in info:  # 장면마다 시간이 다를 때
+        return frames, [int(d) for d in info["durations_ms"]]
     return frames, [int(info.get("frame_duration_ms", 100))] * len(frames)
 
 
@@ -182,9 +184,12 @@ def align_feet(frames):
     return out
 
 
-def convert(char_id: str):
+def convert(char_id: str, enemy: bool = False):
+    """enemy=True: 적으로 나오는 캐릭터 → Assets/Resources/Enemies/<id>/ 에 저장.
+    그림은 오른쪽을 보고 있어서, 전투에서는 게임이 좌우를 뒤집어 왼쪽(동료 쪽)을 보게 해요.
+    대사 · 도감에 나오는 전신 그림도 미리 뒤집어 왼쪽을 보게 저장해요."""
     src = ROOT / "Art" / "originals" / char_id
-    out = ROOT / "Assets" / "Resources" / "Characters" / char_id
+    out = ROOT / "Assets" / "Resources" / ("Enemies" if enemy else "Characters") / char_id
     out.mkdir(parents=True, exist_ok=True)
     anim_lines = []
 
@@ -195,6 +200,8 @@ def convert(char_id: str):
             img = remove_background(Image.open(p))
             if name == "portrait":
                 img = square_top(img)
+            elif enemy:
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
             fit(img, size).save(out / f"{name}.png", optimize=True)
             print("saved", name)
 
@@ -221,8 +228,11 @@ def convert(char_id: str):
         anim_lines.append(f"{folder}=" + ",".join(str(d) for d in durations))
         print("saved", folder, len(frames), "frames")
 
+    if enemy:
+        anim_lines.append("facing=right")  # 그림은 오른쪽을 봄 (적일 때 게임이 뒤집음)
     (out / "anim.txt").write_text("\n".join(anim_lines) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
-    convert(sys.argv[1] if len(sys.argv) > 1 else "hero")
+    # 사용법: python3 Art/convert_character.py <캐릭터 id> [--enemy]
+    convert(sys.argv[1] if len(sys.argv) > 1 else "hero", "--enemy" in sys.argv)

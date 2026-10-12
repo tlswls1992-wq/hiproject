@@ -62,7 +62,7 @@ public class Unit : MonoBehaviour
         baseColor = color;
 
         if (UsesLook || (UsesArt && team == Team.Enemy)) ringColor = new Color(0f, 0f, 0f, 0.55f); // 적은 발밑에 그림자
-        if (UsesArt && art.facesLeft) facingRight = false; // 왼쪽을 보는 그림(몬스터)은 처음에 왼쪽을 봄
+        if (UsesArt && (art.facesLeft || team == Team.Enemy)) facingRight = false; // 적은 처음에 왼쪽(동료 쪽)을 봄. 오른쪽을 보는 그림(오슬로 등)은 뒤집혀 나옴
         if (ringColor.a > 0f)
         {
             var ringGo = new GameObject("Ring");
