@@ -281,24 +281,36 @@ public class BattleManager : MonoBehaviour
         talk = t;
     }
 
+    // 대사는 한 줄씩: 첫 줄만 저절로 나오고, 다음 줄은 클릭 또는 스페이스로. 마지막 줄 뒤에 한 번 더 누르면 전투 재개.
+    // (왼쪽 Ctrl을 누르고 있으면 빨리 감기: 줄이 다 나타나면 저절로 넘어감)
     void UpdateTalk()
     {
-        float speedUp = GameInput.FastForwardHeld() ? 4f : 1f;
-        talk.clock += Time.unscaledDeltaTime * speedUp;
-        if (talk.shownAt.Count < talk.lines.Count)
+        bool fast = GameInput.FastForwardHeld();
+        talk.clock += Time.unscaledDeltaTime * (fast ? 4f : 1f);
+        if (talk.shownAt.Count == 0)
         {
             if (talk.clock >= talk.nextAt) RevealTalkLine();
+            return;
         }
-        else if (talk.clock >= talk.nextAt + 1.8f) talk = null; // 마지막 줄 뒤 잠깐 기다렸다 전투 재개
+        if (GameInput.PausePressed() || (fast && talk.clock >= talk.nextAt)) AdvanceTalk();
     }
+
+    void AdvanceTalk()
+    {
+        if (talk == null) return;
+        if (talk.shownAt.Count < talk.lines.Count) RevealTalkLine();
+        else talk = null; // 마지막 줄까지 읽음 → 전투 재개
+    }
+
+    bool TalkLineReady => talk != null && talk.shownAt.Count > 0 && talk.clock >= talk.nextAt;
 
     void RevealTalkLine()
     {
         string line = talk.lines[talk.shownAt.Count];
         talk.shownAt.Add(talk.clock);
         float cps = TalkCharsPerSecond[Mathf.Clamp(SaveData.TextSpeed, 0, 2)];
-        talk.nextAt = talk.clock + 0.6f + line.Length / cps;
-        AudioManager.Play("whisper", 0.5f, 0.1f);
+        talk.nextAt = talk.clock + 0.35f + line.Length / cps * 0.5f; // 이 시간이 지나면 '다음' 표시(▼)가 깜빡임
+        AudioManager.Play(talk.shownAt.Count == 1 ? "whisper" : "talk_next", 0.5f, 0.02f); // 첫 줄은 사념파 울림, 다음 줄은 맑은 '팅'
     }
 
     void DrawTalk(float w)
@@ -353,17 +365,23 @@ public class BattleManager : MonoBehaviour
             UI.Text(r, line, size, UI.WithAlpha(main, t), anchor, true);
         }
 
-        UI.Text(new Rect(0, 672, w * 0.6f, 28), "클릭: 다음   ·   왼쪽 Ctrl: 빨리 감기", 14, UI.WithAlpha(UI.TextSub, 0.8f * appear));
+        // 다음 줄로 넘어갈 수 있으면 마지막 줄 아래에 ▼가 깜빡임
+        if (TalkLineReady)
+        {
+            float blink = 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 3.2f));
+            float bob = Mathf.Sin(Time.unscaledTime * 3.2f) * 3f;
+            float ay = y + talk.shownAt.Count * lineH + 2f + bob;
+            float ax = anchor == TextAnchor.MiddleCenter ? w / 2f - 12f : x + 6f;
+            UI.Text(new Rect(ax, ay, 24, 24), talk.shownAt.Count < talk.lines.Count ? "▼" : "■", 16,
+                UI.WithAlpha(narration ? UI.Gold : new Color(0.85f, 0.75f, 1f), blink * appear), TextAnchor.MiddleCenter);
+        }
+        UI.Text(new Rect(0, 672, w * 0.6f, 28), "클릭 · 스페이스: 다음   ·   왼쪽 Ctrl: 빨리 감기", 14, UI.WithAlpha(UI.TextSub, 0.8f * appear));
         if (talk.skippable && UI.Button(new Rect(w - 176, 70, 150, 44), "건너뛰기 ▶▶", UI.WithAlpha(UI.Neutral, 0.9f), 17))
         {
             talk = null;
             return;
         }
-        if (UI.ClickedAnywhere())
-        {
-            if (talk.shownAt.Count < talk.lines.Count) RevealTalkLine();
-            else talk = null;
-        }
+        if (UI.ClickedAnywhere() && talk.shownAt.Count > 0) AdvanceTalk();
     }
 
     // ================= 웨이브 =================

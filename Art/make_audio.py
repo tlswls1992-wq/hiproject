@@ -411,6 +411,13 @@ def sfx():
     air = lowpass(noise(0.9), 2500) * np.sin(np.pi * t / t[-1]) ** 2
     tone = (np.sin(2 * np.pi * 1046 * t) + np.sin(2 * np.pi * 1052 * t) + 0.5 * np.sin(2 * np.pi * 1568 * t)) * np.sin(np.pi * t / t[-1]) ** 2
     out["whisper"] = normalize(reverb(air * 0.5 + tone * 0.25, 1.0, 0.35), 0.4)
+    # 대사 다음 줄: 맑고 짧은 '팅' (유리 종 같은 두 음 + 아주 옅은 바람결, 짧은 잔향)
+    t = t_of(0.45)
+    chime = (np.sin(2 * np.pi * 1568 * t) * np.exp(-t * 11)
+             + 0.45 * np.sin(2 * np.pi * 2349 * t + 0.6) * np.exp(-t * 15)
+             + 0.18 * np.sin(2 * np.pi * 3922 * t + 1.1) * np.exp(-t * 26)) * env(len(t), 0.004, 0.05, 0.45)
+    breath = highpass(lowpass(noise(0.45), 9000), 4500) * np.exp(-t * 35)
+    out["talk_next"] = normalize(reverb(chime + breath * 0.12, 0.7, 0.22, seed=17), 0.3)
     return out
 
 
