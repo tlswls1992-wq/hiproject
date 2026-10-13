@@ -544,8 +544,9 @@ if __name__ == "__main__":
         for name, sound in combat_sfx().items():
             save("sfx_" + name, sound)
         raise SystemExit
-    save("bgm_camp", bgm_camp(), fade=False)    # 배경음악은 반복 재생되도록 끝을 그대로 둠
-    save("bgm_battle", bgm_battle(), fade=False)
+    # 야영지 · 전투 배경음악은 받은 곡(「야영지의 저녁」, 「용사의 대결」)을 쓰므로 덮어쓰지 않음
+    # save("bgm_camp", bgm_camp(), fade=False)
+    # save("bgm_battle", bgm_battle(), fade=False)
     save("bgm_boss", bgm_boss(), fade=False)
     for name, sound in sfx().items():
         save("sfx_" + name, sound)

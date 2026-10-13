@@ -84,11 +84,22 @@ public class AudioManager : MonoBehaviour
 
     public static void StopMusic() => PlayMusic(null);
 
+    // 곡은 끊지 않고 잠깐 작게 (승리 · 패배 소리가 잘 들리게). seconds 동안 줄였다가 다시 원래 크기로
+    public static void DuckMusic(float seconds, float level = 0.3f)
+    {
+        var a = Instance;
+        a.duckUntil = Time.unscaledTime + seconds;
+        a.duckLevel = level;
+    }
+
+    float duckUntil, duckLevel = 1f, duck = 1f;
+
     void Update()
     {
         fade = Mathf.Min(1f, fade + Time.unscaledDeltaTime / FadeSeconds);
-        musicA.volume = MusicVolume * fade;   // 새 곡
-        musicB.volume = MusicVolume * (1f - fade); // 이전 곡
+        duck = Mathf.MoveTowards(duck, Time.unscaledTime < duckUntil ? duckLevel : 1f, Time.unscaledDeltaTime * 1.5f);
+        musicA.volume = MusicVolume * fade * duck;   // 새 곡
+        musicB.volume = MusicVolume * (1f - fade) * duck; // 이전 곡
         if (fade >= 1f && musicB.isPlaying) musicB.Stop();
     }
 

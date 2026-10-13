@@ -120,7 +120,7 @@ public class BattleManager : MonoBehaviour
         speed = SaveData.BattleSpeed;
         Time.timeScale = speed;
 
-        AudioManager.PlayMusic("battle");
+        AudioManager.PlayMusic("battle"); // 이미 나오고 있으면 처음부터 다시 틀지 않고 그대로 이어짐
         // 스테이지 첫 라운드: 맵 입장 멘트
         if (Stages.SubOf(level) == 1) StartTalk(null, Stages.Script(level).entrance);
     }
@@ -143,7 +143,8 @@ public class BattleManager : MonoBehaviour
         finishTimer = 2f;
         Time.timeScale = 1f;
         talk = null;
-        AudioManager.StopMusic();
+        // 전투 음악은 끊지 않고(다음 판에서도 이어서 나옴) 승리 · 패배 소리 동안만 작게
+        AudioManager.DuckMusic(2.5f);
         AudioManager.Play(won ? "win" : "lose", 0.8f, 0f);
     }
 
@@ -445,14 +446,12 @@ public class BattleManager : MonoBehaviour
             }
             var def = EnemyDef.Find(script.boss);
             SpawnEnemy(def, bossPos, true);
-            AudioManager.PlayMusic("boss");
-            StartTalk(def, script.bossLines);
+            StartTalk(def, script.bossLines); // 보스가 나와도 전투 음악은 그대로 이어짐
         }
         else if (Stages.HasMidBoss(Level))
         {
             var def = EnemyDef.Find(script.midBoss);
             SpawnEnemy(def, bossPos, true);
-            AudioManager.PlayMusic("boss");
             StartTalk(def, script.midBossLines);
         }
     }
