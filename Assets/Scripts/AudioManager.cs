@@ -3,7 +3,7 @@ using UnityEngine;
 
 // 배경음악과 효과음을 재생합니다. 소리 파일은 Resources/Audio 폴더에 있어요. (Art/make_audio.py로 직접 합성한 소리)
 //   AudioManager.PlayMusic("battle")  → bgm_battle 반복 재생 (이전 곡은 부드럽게 줄어듦)
-//   AudioManager.Play("slash")        → sfx_slash 한 번 재생
+//   AudioManager.Play("hit_slash")    → sfx_hit_slash 한 번 재생
 // 음량은 설정 화면에서 바꿀 수 있어요.
 public class AudioManager : MonoBehaviour
 {

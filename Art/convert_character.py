@@ -8,6 +8,7 @@
   run.*       달리는 모습 (전투 중 이동) - 한 장이면 코드로 위아래 흔들림을 줌
   idle/ run/ attack/  장면별 투명 PNG 폴더 + animation.json (frames, frame_duration_ms) 형식도 됨
   fix.txt     크기 보정 (예: attack_scale=1.22 → 공격 그림을 발 기준으로 1.22배). 동작마다 캐릭터 크기가 다를 때 사용
+              battle_scale=0.95 → 전투에서 그림 전체 크기 배율 (anim.txt의 scale)
   run_sheet_4x2.*  달리기 장면표 (가로 4칸 x 세로 2칸처럼 여러 장면을 한 그림에 모은 것). 있으면 run.* 대신 사용
   attack.*    공격 모습 (전투) - 움직이는 이미지
 출력 (Assets/Resources/Characters/<캐릭터 id>/, --enemy 이면 Assets/Resources/Enemies/<캐릭터 id>/):
@@ -230,6 +231,8 @@ def convert(char_id: str, enemy: bool = False):
 
     if enemy:
         anim_lines.append("facing=right")  # 그림은 오른쪽을 봄 (적일 때 게임이 뒤집음)
+    if "battle_scale" in fixes:
+        anim_lines.append(f"scale={fixes['battle_scale']:g}")  # 전투 크기 배율 (fix.txt의 battle_scale)
     (out / "anim.txt").write_text("\n".join(anim_lines) + "\n", encoding="utf-8")
 
 

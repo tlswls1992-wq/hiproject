@@ -484,6 +484,7 @@ public class BattleManager : MonoBehaviour
         u.projectileColor = def.IsRanged ? Color.Lerp(def.accent, Color.white, 0.3f) : def.accent;
         SetEnemyAttack(u, def);
         u.impactSound = def.role == EnemyRole.Caster ? "explode" : null;
+        WeaponSounds(u);
         u.art = CharacterArt.ForEnemy(def.id); // 진짜 그림이 있으면 그림으로 (Resources/Enemies/<id>)
         if (u.art != null && !u.art.HasBattleSprites) u.art = null;
         u.look = EnemyLook.For(def);
@@ -494,6 +495,22 @@ public class BattleManager : MonoBehaviour
             bossName = def.name;
         }
         enemies.Add(u);
+    }
+
+    // 무기 종류(attackSound에 적어 둔 slash · heavy 등)를 실제 소리 두 개로 나눔:
+    //  attackSound = 휘두를 때 '휙' (공격 시작), hitSound = 무기가 닿는 순간의 타격음
+    static void WeaponSounds(Unit u)
+    {
+        switch (u.attackSound)
+        {
+            case "slash": u.attackSound = "swing"; u.hitSound = "hit_slash"; break;
+            case "dagger": u.attackSound = "swing_fast"; u.hitSound = "hit_dagger"; break;
+            case "stab": u.attackSound = "swing_fast"; u.hitSound = "hit_stab"; break;
+            case "heavy": u.attackSound = "swing_heavy"; u.hitSound = "hit_heavy"; break;
+            case "claw": u.attackSound = "swing"; u.hitSound = "hit_claw"; break;
+            case "bite": u.attackSound = "swing_fast"; u.hitSound = "hit_bite"; break;
+            case "arrow": if (u.impactSound == null) u.impactSound = "hit_arrow"; break; // 활시위 소리 + 꽂히는 '턱'
+        }
     }
 
     // 적의 공격 소리와 맞을 때 효과 (몸 모양과 무기에 맞춤)
@@ -572,6 +589,7 @@ public class BattleManager : MonoBehaviour
         u.hitFx = c.ranged || c.healer ? HitFx.Kind.None
             : c == HeroClass.Lancer ? HitFx.Kind.Thrust : c == HeroClass.Porter ? HitFx.Kind.Impact : HitFx.Kind.Slash;
         u.impactSound = c.splash > 0f ? "explode" : null;
+        WeaponSounds(u);
         u.art = CharacterArt.For(def.id); // 그림이 있으면 그림으로 나옴
         u.Setup(SpriteFactory.Circle(), c.color, RarityInfo.GetColor(def.rarity));
         heroes.Add(u);

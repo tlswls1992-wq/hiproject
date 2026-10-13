@@ -49,7 +49,7 @@ public class Projectile : MonoBehaviour
             bool alive = target != null && target.IsAlive;
             battle.ApplyHit(lastTargetPos, alive ? target : null, team, damage, splash);
             if (splash <= 0f) HitFx.Spawn(HitFx.Kind.Spark, alive ? target.HitPoint : lastTargetPos, lastTargetPos.x >= startX);
-            AudioManager.Play(impactSound, 0.4f);
+            AudioManager.Play(impactSound, 0.42f, 0.07f);
             Destroy(gameObject);
         }
     }

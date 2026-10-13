@@ -417,82 +417,122 @@ def sfx():
 # ---------------------------------------------------------------- 전투 효과음 (무기별, 게임에서 흔히 쓰는 느낌)
 
 def combat_sfx():
-    """휘두르는 '휙' + 무기마다 다른 타격음. 낮은 '퉁' 소리는 줄이고 날카로운 금속음 · 마찰음을 살림"""
+    """전투 효과음. 휘두를 때 '휙'(swing_*)과 맞는 순간의 타격음(hit_*)을 나눠서, 타격음은 무기가 닿는 장면에 맞춰 남.
+    타격음은 게임 사운드에서 흔히 쓰는 층 쌓기 방식:
+      ① 크랙: 아주 짧고 밝은 '딱' (맞았다는 신호)  ② 몸통: 무기 · 살에 맞는 소리 (칼은 금속 울림, 둔기는 '퍽')
+      ③ 저음 붐: 짧게 떨어지는 낮은 음 (무게감)  ④ 꼬리: 아주 짧은 잔향
+    그리고 살짝 찌그러뜨려(saturation) 한 덩어리로 붙이고 또렷하게 만듦"""
     r = np.random.default_rng(33)
 
     def nz(dur):
         return r.uniform(-1, 1, int(SR * dur))
 
     def band(x, lo, hi):
-        return lowpass(highpass(x, lo), hi)
+        """두 번 걸러서 경계를 가파르게 (다른 대역으로 번지지 않게)"""
+        return lowpass(lowpass(highpass(highpass(x, lo), lo), hi), hi)
 
     def whoosh(dur, f0, f1, peak=0.35):
-        """칼을 휘두를 때 바람 가르는 소리: 주파수가 내려가며 부풀었다 사라짐"""
+        """휘두를 때 바람 가르는 소리: 주파수가 내려가며 부풀었다 사라짐"""
         x = sweep_noise(dur, f0, f1, 0)
         t = np.linspace(0, 1, len(x))
         shape = np.where(t < peak, t / peak, 1 - (t - peak) / (1 - peak)) ** 1.6
         return x * shape
 
+    def crack(dur=0.008, lo=2500, decay=450):
+        """① 맞는 순간의 아주 짧은 '딱'"""
+        t = t_of(dur)
+        return highpass(nz(dur), lo) * np.exp(-t * decay)
+
+    def drop(f0, f1, dur, decay):
+        """③ 음이 빠르게 떨어지는 짧은 저음 (무게감). f0 → f1"""
+        t = t_of(dur)
+        f = f1 + (f0 - f1) * np.exp(-t * 30)
+        return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * decay) * env(len(t), 0.001, 0.01, dur)
+
+    def thud(dur, lo, hi, decay):
+        """② 살 · 몸에 맞는 '퍽' (걸러낸 잡음)"""
+        return band(nz(dur), lo, hi) * np.exp(-t_of(dur) * decay)
+
     def ring(freqs, dur, decay):
-        """칼날이 부딪칠 때 '챙' 하는 금속 울림 (배음이 고르지 않은 쇳소리)"""
+        """② 칼날이 닿을 때의 짧은 금속 울림 (배음이 고르지 않은 쇳소리)"""
         t = t_of(dur)
         y = np.zeros_like(t)
         for i, f in enumerate(freqs):
-            y += np.sin(2 * np.pi * f * t + i) * np.exp(-t * decay * (1 + i * 0.35)) / (1 + i * 0.5)
-        return y * env(len(t), 0.001, 0.02, dur)
+            y += np.sin(2 * np.pi * f * t + i) * np.exp(-t * decay * (1 + i * 0.3)) / (1 + i * 0.6)
+        return y * env(len(t), 0.0005, 0.01, dur)
 
-    def burst(dur, lo, hi, decay):
-        """짧은 타격음 (마찰 · 베임)"""
-        return band(nz(dur), lo, hi) * np.exp(-t_of(dur) * decay)
+    def glue(x, drive, room=0.0, peak=0.9):
+        """살짝 찌그러뜨려 층을 하나로 붙이고(saturation), 필요하면 아주 짧은 잔향"""
+        y = np.tanh(x * drive) / np.tanh(drive)
+        if room > 0:
+            y = reverb(y, 0.3, room, seed=21)
+        return normalize(y, peak)
 
     out = {}
-    out["slash"] = normalize(reverb(mix(0.42,
-        (0.00, whoosh(0.17, 7500, 2600), 1.0),
-        (0.08, burst(0.05, 2500, 9000, 60), 0.55),
-        (0.08, ring([3150, 4720, 6230, 7900], 0.32, 14), 0.30)), 0.4, 0.12, seed=11), 0.7)
-    out["dagger"] = normalize(mix(0.25,
-        (0.00, whoosh(0.09, 9500, 4200, 0.3), 1.0),
-        (0.05, burst(0.03, 3500, 10000, 90), 0.5),
-        (0.05, ring([5200, 7300, 9100], 0.18, 22), 0.2)), 0.6)
-    out["stab"] = normalize(mix(0.3,
-        (0.00, whoosh(0.08, 6000, 3200, 0.5), 0.9),
-        (0.06, burst(0.045, 1400, 4200, 55), 0.9),
-        (0.06, ring([2900, 4350, 6100], 0.22, 20), 0.18)), 0.65)
-    t = t_of(0.18)
-    thump = np.sin(2 * np.pi * np.cumsum(140 * np.exp(-t * 9) + 70) / SR) * np.exp(-t * 18)
-    out["heavy"] = normalize(reverb(mix(0.5,
-        (0.00, whoosh(0.22, 3200, 800, 0.55), 0.9),
-        (0.13, burst(0.22, 300, 2200, 16), 0.85),
-        (0.13, burst(0.06, 2500, 7000, 45), 0.35),
-        (0.13, thump, 0.45)), 0.5, 0.12, seed=12), 0.75)
-    claw = mix(0.32, (0.00, whoosh(0.12, 6500, 2200, 0.4), 0.8))
-    for i in range(3):
-        claw += mix(0.32, (0.09 + i * 0.035, burst(0.03, 2800, 6500, 70), 0.6 - i * 0.12))
-    out["claw"] = normalize(claw, 0.65)
+    # ---- 휘두르기 (공격을 시작할 때, 작게) ----
+    out["swing"] = normalize(whoosh(0.16, 6500, 1800, 0.45), 0.7)
+    out["swing_fast"] = normalize(whoosh(0.10, 9000, 3200, 0.4), 0.6)
+    out["swing_heavy"] = normalize(whoosh(0.26, 2800, 600, 0.55), 0.8)
+    # 활: 시위가 '팅' 하고 튕기는 소리 (낮은 '퉁'이 아니게 높은 음, 짧게) + 화살이 날아가는 바람 소리
     t = t_of(0.12)
-    snarl = band(nz(0.12), 300, 1400) * (0.6 + 0.4 * np.sin(2 * np.pi * 34 * t)) * np.exp(-t * 14)
-    out["bite"] = normalize(mix(0.22,
-        (0.00, snarl, 0.6),
-        (0.05, burst(0.035, 1200, 4500, 70), 0.9),
-        (0.05, ring([3600, 5100], 0.06, 60), 0.25),
-        (0.11, burst(0.03, 1200, 4000, 80), 0.6)), 0.65)
-    t = t_of(0.18)
-    twang = np.zeros_like(t)
-    for k in range(1, 7):
-        twang += np.sin(2 * np.pi * 145 * k * t) * np.exp(-t * (22 + k * 10)) / k
-    out["arrow"] = normalize(mix(0.36,
-        (0.00, twang, 0.8),
-        (0.00, burst(0.02, 1500, 6000, 120), 0.4),
-        (0.03, whoosh(0.28, 9000, 4500, 0.25), 0.55)), 0.6)
+    pluck = sum(np.sin(2 * np.pi * 330 * k * t) * np.exp(-t * (38 + k * 14)) / k for k in range(1, 6))
+    out["arrow"] = normalize(mix(0.3, (0.0, pluck, 0.55), (0.0, crack(0.006, 3000), 0.5), (0.02, whoosh(0.24, 9500, 5000, 0.2), 0.6)), 0.6)
+
+    # ---- 타격 (무기가 닿는 순간) ----
+    out["hit_slash"] = glue(mix(0.3,
+        (0.000, crack(0.009, 3000), 0.8),
+        (0.000, thud(0.09, 1200, 6500, 42), 0.9),          # 베이는 '샥'
+        (0.000, thud(0.08, 300, 1500, 50), 3.2),           # 몸통 (살에 닿는 '퍽', 펀치감)
+        (0.002, ring([2380, 3570, 5230, 7010], 0.22, 22), 0.3),
+        (0.000, drop(110, 60, 0.08, 38), 0.3)), 2.6, 0.10)  # 저음 붐 (작게)
+    out["hit_dagger"] = glue(mix(0.2,
+        (0.000, crack(0.006, 3500), 0.75),
+        (0.000, thud(0.06, 2000, 8000, 70), 0.85),
+        (0.000, thud(0.06, 400, 1800, 60), 2.4),
+        (0.000, drop(140, 80, 0.05, 50), 0.2),
+        (0.002, ring([3820, 5610, 7480], 0.14, 38), 0.2)), 2.2, 0.06, 0.8)
+    out["hit_stab"] = glue(mix(0.28,
+        (0.000, crack(0.007, 2500), 0.7),
+        (0.000, thud(0.11, 350, 2200, 38), 1.5),           # 찔러 들어가는 '푹'
+        (0.000, thud(0.03, 2000, 7000, 90), 0.5),
+        (0.000, drop(120, 65, 0.09, 34), 0.18),
+        (0.003, ring([2900, 4400], 0.1, 45), 0.1)), 2.8, 0.08)
+    out["hit_heavy"] = glue(mix(0.45,
+        (0.000, crack(0.010, 1500, 300), 0.85),
+        (0.000, thud(0.18, 200, 1400, 26), 2.4),           # 둔탁한 '퍽'
+        (0.000, drop(110, 55, 0.16, 26), 0.24),            # '쿵' (무게감, 너무 크지 않게)
+        (0.012, thud(0.08, 1800, 6000, 32), 0.45)), 3.2, 0.14)  # 흙 · 파편
+    claw = mix(0.26,
+        (0.000, crack(0.006, 3000), 0.6),
+        (0.000, thud(0.06, 400, 1800, 55), 2.4),
+        (0.000, drop(130, 70, 0.06, 45), 0.22))
+    for i in range(3):  # 세 갈래로 긁는 '촥촥촥'
+        claw += mix(0.26, (i * 0.028, thud(0.045, 1500, 7000, 80), 0.95 - i * 0.18))
+    out["hit_claw"] = glue(claw, 2.4, 0.08)
+    t = t_of(0.12)
+    grains = (r.uniform(0, 1, len(t)) > 0.86).astype(float) * r.uniform(0.5, 1, len(t))   # 으득 하는 잔 부서짐
+    out["hit_bite"] = glue(mix(0.22,
+        (0.000, crack(0.006, 2200), 0.7),
+        (0.000, band(grains, 500, 3500) * np.exp(-t * 28), 1.2),
+        (0.000, thud(0.10, 400, 2400, 40), 1.1),
+        (0.000, drop(120, 70, 0.07, 40), 0.15)), 2.6, 0.06)
+    out["hit_arrow"] = glue(mix(0.2,                      # 화살 · 돌이 꽂히는 '턱'
+        (0.000, crack(0.005, 3000), 0.7),
+        (0.000, thud(0.06, 350, 1600, 60), 1.1),           # 몸에 꽂히는 '턱'
+        (0.000, thud(0.05, 1600, 4500, 70), 0.5),
+        (0.000, drop(160, 90, 0.05, 50), 0.12),
+        (0.002, ring([920, 1390, 2110], 0.12, 35), 0.22)), 2.4, 0.05, 0.8)
+
     t = t_of(0.5)
     rise = np.sin(2 * np.pi * np.cumsum(500 + 1400 * (t / t[-1]) ** 0.6) / SR) * np.exp(-t * 4) * env(len(t), 0.03, 0.1, 0.5)
     sparkle = sum(mix(0.5, (0.04 + i * 0.05, bell(1800 + i * 420, 0.25, 12), 0.25)) for i in range(5))
     out["magic"] = normalize(reverb(rise * 0.35 + sparkle + band(nz(0.5), 3000, 9000) * np.exp(-t * 6) * 0.15, 0.7, 0.2, seed=13), 0.55)
-    out["explode"] = normalize(reverb(mix(0.5,
-        (0.00, burst(0.4, 200, 2600, 9), 0.8),
-        (0.00, burst(0.08, 3000, 9000, 40), 0.35),
-        (0.02, bell(2400, 0.3, 10), 0.15),
-        (0.05, bell(3100, 0.25, 12), 0.12)), 0.6, 0.18, seed=14), 0.6)
+    out["explode"] = glue(mix(0.55,
+        (0.00, crack(0.012, 1500, 250), 0.8),
+        (0.00, thud(0.4, 200, 2600, 9), 1.2),
+        (0.00, drop(90, 45, 0.3, 14), 0.3),
+        (0.00, thud(0.08, 3000, 9000, 40), 0.3),
+        (0.02, bell(2400, 0.3, 10), 0.12)), 3.0, 0.18, 0.75)
     # 메뉴 버튼에 커서를 올릴 때: 아주 짧고 부드러운 '톡'
     out["hover"] = normalize(mix(0.06, (0, bell(1500, 0.05, 70), 0.6), (0, band(nz(0.006), 2000, 6000), 0.2)), 0.35)
     return out

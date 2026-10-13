@@ -18,7 +18,11 @@ public static class EnemyLook
         public float top;   // 그림에서 가장 높은 곳 (0~1, 체력바 위치용)
         public float scale; // 모양별 그림 크기 배율
         // 몸 크기(size)에 맞는 그림 한 변의 길이 (월드 단위)
-        public float CanvasFor(float size) => scale * Mathf.Pow(size, 0.6f);
+        public float CanvasFor(float size) => humanoid
+            ? scale * HumanBase * Mathf.Pow(size / 0.5f, 0.3f)   // 사람 모양: 기본(0.5)은 용사 일행과 같은 키, 커져도 완만하게
+            : scale * Mathf.Pow(size, 0.6f);
+        public bool humanoid; // 사람 · 인어 모양
+        const float HumanBase = 0.62f; // 0.5^0.6(≈0.66)보다 조금 작게: 용사 일행과 키를 맞춤
         public bool hovers; // 공중에 떠 있는 적 (와이번, 상어, 크라켄)
         public float width; // 그림에서 몸이 차지하는 가로 폭 (0~1, 겹치지 않게 간격을 잡을 때 사용)
     }
@@ -50,6 +54,7 @@ public static class EnemyLook
             top = p.Top,
             width = p.Width,
             scale = ScaleOf(def.shape) * VisualScale,
+            humanoid = def.shape == EnemyShape.Humanoid || def.shape == EnemyShape.Mermaid,
             hovers = def.shape == EnemyShape.Wyvern || def.shape == EnemyShape.Shark || def.shape == EnemyShape.Kraken,
         };
         cache[def.id] = look;

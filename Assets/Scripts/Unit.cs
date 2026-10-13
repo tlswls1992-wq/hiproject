@@ -30,6 +30,7 @@ public class Unit : MonoBehaviour
     public Color projectileColor = Color.white;
     public string attackSound;       // 공격할 때 효과음 (AudioManager)
     public string impactSound;       // 투사체가 맞을 때 효과음
+    public string hitSound;          // 근접 무기가 닿는 순간의 타격음
     public HitFx.Kind hitFx;         // 근접 공격이 맞을 때 뜨는 효과 모양
     public float hitY;               // 맞는 효과가 뜨는 높이 (몸 가운데쯤)
     public Vector2 HitPoint => (Vector2)transform.position + new Vector2(0f, hitY);
@@ -106,7 +107,7 @@ public class Unit : MonoBehaviour
             lastY = transform.position.y;
             barY = art.topUnits > 0f
                 ? -size * 0.5f + art.topUnits * CharacterArt.BattleCanvasHeight + 0.25f      // 몬스터: 머리 바로 위
-                : -size * 0.5f + CharacterArt.BattleCanvasHeight * (1f - CharacterArt.FeetPivot) * 0.92f;
+                : -size * 0.5f + CharacterArt.BattleCanvasHeight * art.scale * (1f - CharacterArt.FeetPivot) * 0.92f;
         }
         else if (UsesLook)
         {
@@ -130,7 +131,7 @@ public class Unit : MonoBehaviour
         }
 
         // 그림 크기에 맞춘 몸 반폭
-        if (UsesArt) bodyHalf = art.bodyUnits > 0f ? art.bodyUnits * CharacterArt.BattleCanvasHeight * 0.8f : CharacterArt.BattleCanvasHeight * 0.24f;
+        if (UsesArt) bodyHalf = art.bodyUnits > 0f ? art.bodyUnits * CharacterArt.BattleCanvasHeight * 0.8f : CharacterArt.BattleCanvasHeight * art.scale * 0.24f;
         else if (UsesLook) bodyHalf = look.CanvasFor(size) * look.width * 0.42f;
         else bodyHalf = size * CircleScale * 0.5f;
         slot = (slotCounter++ % 3) - 1; // 같은 적을 노릴 때 위·가운데·아래로 나눠 서기
@@ -192,6 +193,7 @@ public class Unit : MonoBehaviour
         }
         if (UsesArt) Animate(dt);
         else if (UsesLook) AnimateLook(dt);
+        if (pendingAt >= 0f && Time.time >= pendingAt) ResolveAttack();
 
         Vector2 pos = transform.position;
         Vector2 moveDir = team == Team.Hero ? HeroThink(pos, battle) : EnemyThink(pos, battle);
@@ -427,13 +429,41 @@ public class Unit : MonoBehaviour
         float dmg = damage * battle.DamageMultiplier(this);
         float splash = splashRadius * battle.SplashMultiplier(this);
 
-        AudioManager.Play(attackSound, team == Team.Hero ? 0.55f : 0.4f);
-        if (ranged) Projectile.Launch(this, target, dmg, splash, UsesArt || UsesLook ? projectileColor : baseColor, impactSound);
-        else
+        // 휘두르는 '휙'은 지금, 맞는 소리 · 효과 · 피해는 무기가 닿는 장면에 (활은 시위를 놓는 장면에 화살을 쏨)
+        if (!ranged) AudioManager.Play(attackSound, team == Team.Hero ? 0.35f : 0.25f, 0.05f);
+        pendingTarget = target;
+        pendingDamage = dmg;
+        pendingSplash = splash;
+        pendingAt = Time.time + Mathf.Min(ContactDelay(), attackCooldown * battle.CooldownMultiplier(this) * 0.8f);
+    }
+
+    Unit pendingTarget;
+    float pendingAt = -1f, pendingDamage, pendingSplash;
+
+    // 공격을 시작하고 무기가 닿을 때까지의 시간 (그림의 공격 장면에 맞춤)
+    float ContactDelay()
+    {
+        if (UsesArt) return art.ContactTime(Mathf.Max(0.2f, attackCooldown * 0.9f));
+        if (UsesLook) return 0.12f; // 코드로 그린 적: 앞으로 덤비는 동작의 가장 앞
+        return 0.08f;
+    }
+
+    void ResolveAttack()
+    {
+        pendingAt = -1f;
+        var target = pendingTarget;
+        pendingTarget = null;
+        var battle = BattleManager.Instance;
+        if (target == null || !target.IsAlive || battle == null) return; // 그 사이 쓰러졌으면 헛손질
+        if (ranged)
         {
-            battle.ApplyHit(target.transform.position, target, team, dmg, splash);
-            HitFx.Spawn(hitFx, target.HitPoint, facingRight);
+            AudioManager.Play(attackSound, team == Team.Hero ? 0.5f : 0.38f, 0.04f);
+            Projectile.Launch(this, target, pendingDamage, pendingSplash, UsesArt || UsesLook ? projectileColor : baseColor, impactSound);
+            return;
         }
+        battle.ApplyHit(target.transform.position, target, team, pendingDamage, pendingSplash);
+        AudioManager.Play(hitSound, team == Team.Hero ? 0.6f : 0.45f, 0.07f);
+        HitFx.Spawn(hitFx, target.HitPoint, facingRight);
     }
 
     public void Heal(float amount)

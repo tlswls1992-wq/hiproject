@@ -4,5 +4,5 @@ attack=90,90,90,90,90,90,90,90
 facing=left
 unit=256
 feet=16
-top=0.895
-body=0.361
+top=0.766
+body=0.309

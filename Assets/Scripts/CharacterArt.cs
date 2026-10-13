@@ -30,6 +30,7 @@ public class CharacterArt
     float feetPx = -1f;           // feet=16: 그림 아래에서 발까지 픽셀 (없으면 FeetPivot 비율)
     public float topUnits;        // top=0.47: 발에서 머리끝까지 높이 (캔버스 칸 단위, 0이면 모름)
     public float bodyUnits;       // body=0.33: 몸의 반폭 (캔버스 칸 단위, 0이면 모름)
+    public float scale = 1f;      // scale=0.9: 전투에서 그림 크기 배율 (자세 때문에 커 보이는 캐릭터를 용사 일행과 맞출 때)
 
     // 전투에서 그림 한 장(정사각형 캔버스)의 높이 (게임 세계 단위). 캐릭터가 커 보이면 줄이세요.
     public const float BattleCanvasHeight = 4.68f; // 전투 그림 높이 (월드 단위). 예전 2.6의 2배에서 0.9배로
@@ -42,6 +43,18 @@ public class CharacterArt
     public bool HasBattleSprites => idle.Length > 0;
     public bool HasRun => run.Length > 0;
     public float AttackLength => Sum(attackTimes);
+
+    // 공격 그림에서 무기가 닿는 때 (초). 공격 장면의 약 45% 지점(대개 크게 휘두르는 장면)이 시작되는 때.
+    // cooldown: 공격 간격 (그림이 이보다 길면 빨리 재생하므로 같은 비율로 당겨짐)
+    public float ContactTime(float cooldown)
+    {
+        if (attackTimes == null || attackTimes.Length == 0) return 0.1f;
+        float speed = Mathf.Max(1f, AttackLength / cooldown);
+        int contact = Mathf.Max(1, Mathf.FloorToInt(attackTimes.Length * 0.45f));
+        float t = 0f;
+        for (int i = 0; i < contact && i < attackTimes.Length; i++) t += attackTimes[i];
+        return t / speed;
+    }
 
     // 캐릭터 그림 (없으면 null)
     public static CharacterArt For(string id) => Load("Characters/", id);
@@ -94,6 +107,7 @@ public class CharacterArt
             if (key0 == "feet") { feetPx = num; continue; }
             if (key0 == "top") { topUnits = num; continue; }
             if (key0 == "body") { bodyUnits = num; continue; }
+            if (key0 == "scale") { if (num > 0f) scale = num; continue; }
             var parts = value.Split(',');
             var times = new float[parts.Length];
             for (int i = 0; i < parts.Length; i++)
@@ -103,6 +117,8 @@ public class CharacterArt
             if (key == "run" && times.Length == run.Length) runTimes = times;
             if (key == "attack" && times.Length == attack.Length) attackTimes = times;
         }
+        topUnits *= scale;   // 키 · 몸 폭도 같은 배율로
+        bodyUnits *= scale;
     }
 
     static float[] DefaultTimes(int count, float each)
@@ -177,7 +193,7 @@ public class CharacterArt
         for (int i = 0; i < frames.Length; i++)
         {
             var tex = frames[i];
-            float ppu = (unitPx > 0f ? unitPx : tex.height) / BattleCanvasHeight;
+            float ppu = (unitPx > 0f ? unitPx : tex.height) / (BattleCanvasHeight * scale);
             float pivotY = feetPx >= 0f ? feetPx / tex.height : FeetPivot;
             sprites[i] = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, pivotY), ppu);
         }
