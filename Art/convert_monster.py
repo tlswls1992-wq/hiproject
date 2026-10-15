@@ -8,11 +8,14 @@
 - 몬스터 그림은 왼쪽(용사 쪽)을 보고 있어요. (anim.txt에 facing=left)
 - 동작마다 그려진 크기가 다를 수 있어서 scale로 맞춘 뒤, 몬스터마다 정한 키(용사 대비)로 맞춰요.
 
-사용법: python3 Art/convert_monster.py <몬스터 폴더> <적 id> <용사 대비 키> [동작=배율 ...]
+사용법: python3 Art/convert_monster.py <몬스터 폴더> <적 id> <용사 대비 키> [동작=배율 ...] [--clean]
+  --clean  옆 칸 캐릭터 조각이 섞여 든 장면을 정리 (몸에서 떨어져 가장자리에 붙은 조각 제거)
 예)     python3 Art/convert_monster.py monster_set/wolf wolf 0.55 run=1.12 attack=0.78
 """
 import json
 import sys
+
+import numpy as np
 from pathlib import Path
 
 from PIL import Image
@@ -24,14 +27,61 @@ FEET = CANVAS_H - 16                # 발 높이: 아래에서 16픽셀 (용사 
 HERO_HEIGHT = 440 * UNIT / 512      # 용사 대기 그림의 키 (이 그림의 픽셀 기준)
 
 
+def clean_edges(img: Image.Image) -> Image.Image:
+    """장면표에서 잘라낼 때 옆 칸 캐릭터의 조각(칸 가장자리에 붙은 발 · 선 따위)이 섞여 들어온 것을 지웁니다.
+    몸통(가장 큰 덩어리)과 떨어져 있으면서 그림 가장자리에 닿은 덩어리만 지움 (무기 · 방패처럼 몸에 붙은 건 그대로)"""
+    a = np.array(img)
+    solid = a[:, :, 3] > 40
+    h, w = solid.shape
+    bb = img.getbbox()
+    if not bb:
+        return img
+    label = np.zeros((h, w), np.int32)
+    parts = []
+    for y0, x0 in zip(*np.nonzero(solid)):
+        if label[y0, x0]:
+            continue
+        n = len(parts) + 1
+        label[y0, x0] = n
+        stack, pts = [(y0, x0)], []
+        while stack:
+            y, x = stack.pop()
+            pts.append((y, x))
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < h and 0 <= nx < w and solid[ny, nx] and not label[ny, nx]:
+                        label[ny, nx] = n
+                        stack.append((ny, nx))
+        ys, xs = zip(*pts)
+        parts.append((len(pts), min(xs), min(ys), max(xs), max(ys), n))
+    parts.sort(reverse=True)
+    edge = 3
+    for size, x1, y1, x2, y2, n in parts[1:]:
+        if x1 <= bb[0] + edge or x2 >= bb[2] - 1 - edge or y1 <= bb[1] + edge or y2 >= bb[3] - 1 - edge:
+            near = label == n
+            # 투명하게 + 반투명 가장자리 1픽셀도 함께
+            grow = near.copy()
+            grow[1:] |= near[:-1]; grow[:-1] |= near[1:]; grow[:, 1:] |= near[:, :-1]; grow[:, :-1] |= near[:, 1:]
+            a[grow & (label == 0) | near, 3] = 0
+    return Image.fromarray(a)
+
+
+CLEAN = False  # --clean 이면 모든 장면에 clean_edges 적용
+
+
 def frames(folder: Path, motion: str):
     files = sorted(folder.glob(f"{motion}_[0-9][0-9].png"))
-    return [Image.open(f).convert("RGBA") for f in files]
+    imgs = [Image.open(f).convert("RGBA") for f in files]
+    return [clean_edges(i) for i in imgs] if CLEAN else imgs
 
 
 def main():
-    src, enemy_id, rel_height = Path(sys.argv[1]), sys.argv[2], float(sys.argv[3])
-    fixes = {k: float(v) for k, v in (a.split("=") for a in sys.argv[4:])}
+    global CLEAN
+    args = [a for a in sys.argv[1:] if a != "--clean"]
+    CLEAN = "--clean" in sys.argv
+    src, enemy_id, rel_height = Path(args[0]), args[1], float(args[2])
+    fixes = {k: float(v) for k, v in (a.split("=") for a in args[3:])}
     out = ROOT / "Assets" / "Resources" / "Enemies" / enemy_id
     out.mkdir(parents=True, exist_ok=True)
 

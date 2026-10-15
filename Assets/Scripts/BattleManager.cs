@@ -527,6 +527,7 @@ public class BattleManager : MonoBehaviour
             case "claw": u.attackSound = "swing"; u.hitSound = "hit_claw"; break;
             case "bite": u.attackSound = "swing_fast"; u.hitSound = "hit_bite"; break;
             case "arrow": if (u.impactSound == null) u.impactSound = "hit_arrow"; break; // 활시위 소리 + 꽂히는 '턱'
+            case "sling": u.impactSound = "hit_heavy"; break; // 투석끈 '휘휙' + 돌이 맞는 둔탁한 '퍽'
         }
     }
 
@@ -552,7 +553,8 @@ public class BattleManager : MonoBehaviour
         bool heavyAxe = big || def.role == EnemyRole.Tank;
         switch (def.weapon)
         {
-            case EnemyWeapon.Bow: case EnemyWeapon.Crossbow: case EnemyWeapon.Sling: u.attackSound = "arrow"; break;
+            case EnemyWeapon.Bow: case EnemyWeapon.Crossbow: u.attackSound = "arrow"; break;
+            case EnemyWeapon.Sling: u.attackSound = "sling"; break;
             case EnemyWeapon.Staff: u.attackSound = "magic"; u.hitFx = HitFx.Kind.Impact; break;
             case EnemyWeapon.Spear: u.attackSound = "stab"; u.hitFx = HitFx.Kind.Thrust; break;
             case EnemyWeapon.Dagger: u.attackSound = "dagger"; u.hitFx = HitFx.Kind.Slash; break;
