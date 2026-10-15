@@ -1,0 +1,5 @@
+attack_scale=0.76
+run_scale=0.8
+idle_align=1
+attack_clean=1
+battle_scale=0.96

@@ -9,6 +9,8 @@
   idle/ run/ attack/  장면별 투명 PNG 폴더 + animation.json (frames, frame_duration_ms) 형식도 됨
   fix.txt     크기 보정 (예: attack_scale=1.22 → 공격 그림을 발 기준으로 1.22배). 동작마다 캐릭터 크기가 다를 때 사용
               battle_scale=0.95 → 전투에서 그림 전체 크기 배율 (anim.txt의 scale)
+              idle_align=1 → 장면마다 좌우로 밀린 캐릭터를 상체 기준으로 맞춤 (대기 중 '움찔' 방지)
+              attack_clean=1 → 몸에서 떨어진 조각(이미 쏜 화살 등)을 지움 (게임이 화살을 따로 날리므로)
   run_sheet_4x2.*  달리기 장면표 (가로 4칸 x 세로 2칸처럼 여러 장면을 한 그림에 모은 것). 있으면 run.* 대신 사용
   attack.*    공격 모습 (전투) - 움직이는 이미지
 출력 (Assets/Resources/Characters/<캐릭터 id>/, --enemy 이면 Assets/Resources/Enemies/<캐릭터 id>/):
@@ -145,6 +147,63 @@ def rescale_from_feet(frames, scale):
     return out
 
 
+def align_upper(frames):
+    """장면마다 캐릭터가 옆으로 조금씩 밀려 그려진 경우(대기 중 좌우로 '움찔'), 상체가 첫 장면과 같은 자리에 오도록 가로로만 맞춤"""
+    def upper(img):
+        a = np.array(img)[..., 3].astype(np.float32) / 255.0
+        bb = img.getbbox()
+        a[bb[1] + int((bb[3] - bb[1]) * 0.45):, :] = 0
+        return a
+    ref = upper(frames[0])
+    out = [frames[0]]
+    for f in frames[1:]:
+        cur = upper(f)
+        best = min(range(-40, 41), key=lambda dx: np.abs(np.roll(cur, dx, axis=1) - ref).sum())
+        moved = Image.new("RGBA", f.size, (0, 0, 0, 0))
+        moved.paste(f, (best, 0), f)
+        out.append(moved)
+        print("  align dx", best)
+    return out
+
+
+def drop_detached(img, keep=0.06):
+    """몸에서 떨어져 날아가는 조각(쏜 화살 등)을 지움. 가장 큰 덩어리의 keep 비율보다 작은 떨어진 덩어리만"""
+    a = np.array(img)
+    solid = a[..., 3] > 30
+    h, w = solid.shape
+    label = np.zeros((h, w), np.int32)
+    sizes = []
+    for y0, x0 in zip(*np.nonzero(solid)):
+        if label[y0, x0]:
+            continue
+        n = len(sizes) + 1
+        label[y0, x0] = n
+        stack, count = [(y0, x0)], 0
+        while stack:
+            y, x = stack.pop()
+            count += 1
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < h and 0 <= nx < w and solid[ny, nx] and not label[ny, nx]:
+                        label[ny, nx] = n
+                        stack.append((ny, nx))
+        sizes.append(count)
+    if len(sizes) < 2:
+        return img
+    biggest = max(sizes)
+    for n, size in enumerate(sizes, 1):
+        if size < biggest * keep:
+            region = label == n
+            grow = region.copy()  # 반투명 가장자리까지
+            for _ in range(2):
+                g = grow.copy()
+                g[1:] |= grow[:-1]; g[:-1] |= grow[1:]; g[:, 1:] |= grow[:, :-1]; g[:, :-1] |= grow[:, 1:]
+                grow = g
+            a[grow & ~solid | region, 3] = 0
+    return Image.fromarray(a)
+
+
 def read_fixes(src: Path):
     fixes = {}
     p = src / "fix.txt"
@@ -222,6 +281,10 @@ def convert(char_id: str, enemy: bool = False):
             frames, durations = frames_of_sheet(sheet, cols, rows)
         else:
             frames, durations = frames_of(p)
+        if fixes.get(folder + "_clean"):   # 예: attack_clean=1 → 날아가는 화살 같은 떨어진 조각 지움
+            frames = [drop_detached(f) for f in frames]
+        if fixes.get(folder + "_align"):   # 예: idle_align=1 → 장면마다 좌우로 밀린 것을 맞춤
+            frames = align_upper(frames)
         frames = rescale_from_feet(frames, fixes.get(folder + "_scale", 1.0))
         frames = align_feet([fit(remove_background(f), 512) for f in frames])
         for i, f in enumerate(frames):
