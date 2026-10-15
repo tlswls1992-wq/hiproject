@@ -324,6 +324,8 @@ public class BattleManager : MonoBehaviour
         {
             // 오른쪽에 보스 전신
             float h = 640f, iw = h * talk.image.width / talk.image.height;
+            float maxW = w * 0.46f; // 옆으로 긴 몬스터(샌드웜 · 곰 등)는 화면 절반을 넘지 않게 줄여서 대사 자리를 남김
+            if (iw > maxW) { h *= maxW / iw; iw = maxW; }
             var r = new Rect(w - iw - 30f, 720f - h - 10f + (1f - appear) * 30f, iw, h);
             UI.Glow(r.center, h * 0.45f, new Color(0.6f, 0.2f, 0.8f, 0.25f * appear));
             var old = GUI.color;

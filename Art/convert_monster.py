@@ -8,7 +8,7 @@
 - 몬스터 그림은 왼쪽(용사 쪽)을 보고 있어요. (anim.txt에 facing=left)
 - 동작마다 그려진 크기가 다를 수 있어서 scale로 맞춘 뒤, 몬스터마다 정한 키(용사 대비)로 맞춰요.
 
-사용법: python3 Art/convert_monster.py <몬스터 폴더> <적 id> <용사 대비 키> [동작=배율 ...] [--clean]
+사용법: python3 Art/convert_monster.py <몬스터 폴더> <적 id> <용사 대비 키> [동작=배율 ...] [width=768] [--clean]
   --clean  옆 칸 캐릭터 조각이 섞여 든 장면을 정리 (몸에서 떨어져 가장자리에 붙은 조각 제거)
 예)     python3 Art/convert_monster.py monster_set/wolf wolf 0.55 run=1.12 attack=0.78
 """
@@ -82,6 +82,8 @@ def main():
     CLEAN = "--clean" in sys.argv
     src, enemy_id, rel_height = Path(args[0]), args[1], float(args[2])
     fixes = {k: float(v) for k, v in (a.split("=") for a in args[3:])}
+    # width=768: 앞으로 크게 덤비는 큰 몬스터는 캔버스를 넓혀서 잘리지 않게 (게임은 캔버스 가운데를 기준으로 그림)
+    canvas_w = int(fixes.pop("width", CANVAS_W))
     out = ROOT / "Assets" / "Resources" / "Enemies" / enemy_id
     out.mkdir(parents=True, exist_ok=True)
 
@@ -113,8 +115,8 @@ def main():
             old.unlink()
         for i, f in enumerate(fr):
             big = f.resize((max(1, round(f.width * k)), max(1, round(f.height * k))), Image.LANCZOS)
-            canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
-            canvas.paste(big, (round(CANVAS_W / 2 - cx * k), round(FEET - bottom * k)), big)
+            canvas = Image.new("RGBA", (canvas_w, CANVAS_H), (0, 0, 0, 0))
+            canvas.paste(big, (round(canvas_w / 2 - cx * k), round(FEET - bottom * k)), big)
             canvas.save(d / f"{motion}_{i:02d}.png", optimize=True)
             if motion == "idle" and i == 0:
                 b2 = canvas.getbbox()
