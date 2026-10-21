@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 뽑기 종류(일반/고급/전설/신화)와 확률입니다.
+// 보상 카드의 등급 확률표(일반/고급/전설/신화)입니다. 스테이지가 높을수록 좋은 표를 써요 (CardDraft).
+// (예전에는 골드로 사는 뽑기였어요. 이제는 라운드를 이길 때마다 카드 3장 중 1장을 골라요)
 // 확률 배열 순서: 노말, 레어, 슈퍼레어, 유니크, 전설, 신화
 public class GachaBanner
 {
@@ -58,7 +59,7 @@ public class GachaBanner
         return results;
     }
 
-    CompanionDef RollOne(Rarity minRarity)
+    public CompanionDef RollOne(Rarity minRarity)
     {
         float total = 0f;
         int highest = (int)minRarity;
@@ -76,5 +77,39 @@ public class GachaBanner
             roll -= rates[i];
         }
         return CompanionDef.RandomOf((Rarity)highest);
+    }
+}
+
+// 보상 카드 3장 나누기: 라운드를 이기면 3장이 나오고 그중 1장을 골라요.
+public static class CardDraft
+{
+    public const int Count = 3;
+
+    // 스테이지(맵)에 따라 등급 확률표가 좋아짐: 1맵 일반, 2~3맵 고급, 4~6맵 전설, 7맵~ 신화
+    public static GachaBanner TierFor(int level)
+    {
+        int stage = Stages.StageOf(level);
+        return stage <= 0 ? GachaBanner.Normal : stage <= 2 ? GachaBanner.Advanced : stage <= 5 ? GachaBanner.Legendary : GachaBanner.Mythic;
+    }
+
+    // 서로 다른 동료 3장. bonus면(보스 · 중간 보스를 이긴 판) 그 표의 보장 등급 이상이 최소 1장
+    public static List<CompanionDef> Deal(GachaBanner tier, bool bonus)
+    {
+        var cards = new List<CompanionDef>();
+        for (int tries = 0; cards.Count < Count && tries < 40; tries++)
+        {
+            var c = tier.RollOne(Rarity.Normal);
+            if (!cards.Contains(c)) cards.Add(c);
+        }
+        while (cards.Count < Count) cards.Add(tier.RollOne(Rarity.Normal));
+        if (bonus && !cards.Exists(c => c.rarity >= tier.guarantee))
+        {
+            for (int tries = 0; tries < 20; tries++)
+            {
+                var c = tier.RollOne(tier.guarantee);
+                if (!cards.Contains(c)) { cards[Random.Range(0, Count)] = c; break; }
+            }
+        }
+        return cards;
     }
 }

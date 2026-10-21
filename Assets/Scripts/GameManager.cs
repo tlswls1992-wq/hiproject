@@ -77,12 +77,12 @@ public class GameManager : MonoBehaviour
     // 결과 화면 정보
     bool resultVictory;
     int resultStage;
+    bool battlePick;         // 지금 보상 카드 고르기가 전투 승리 보상인지 (음악을 이어 가려고)
     int resultKillGold;
     int resultClearGold;
     bool resultFirstClear;
     int resultExp;
     readonly List<string> resultNotes = new List<string>();
-    string resultUnlock;
 
     string toast;
     float toastUntil;
@@ -131,7 +131,8 @@ public class GameManager : MonoBehaviour
         FastForwardDialogue();
         // 전투 중 음악은 BattleManager가 정하고, 결과 화면은 승리/패배 소리만.
         // 타이틀(과 타이틀에서 연 설정 · 불러오기 · 도감 · 특전)은 오프닝 곡, 나머지 화면은 야영지 음악
-        if (page != Page.Battle && page != Page.Result) AudioManager.PlayMusic(OnTitleScreens ? "title" : "camp");
+        // (전투 뒤 보상 카드 고르기도 전투 음악이 이어짐)
+        if (page != Page.Battle && page != Page.Result && !(page == Page.Gacha && battlePick)) AudioManager.PlayMusic(OnTitleScreens ? "title" : "camp");
     }
 
     bool OnTitleScreens =>
@@ -157,7 +158,6 @@ public class GameManager : MonoBehaviour
             case Page.Title: DrawTitle(); break;
             case Page.Story: DrawStory(); break;
             case Page.Camp: DrawCamp(); break;
-            case Page.GachaSelect: DrawGachaSelect(); break;
             case Page.Gacha: gacha.Draw(); break;
             case Page.Formation: formation.Draw(() => page = Page.Camp, ShowToast); break;
             case Page.Members: members.Draw(() => page = Page.Camp, ShowToast); break;
@@ -363,18 +363,20 @@ public class GameManager : MonoBehaviour
 #endif
     }
 
-    // 처음 동료 두 명은 무료로 고급 뽑기에서 뽑습니다.
+    // 처음 동료 두 명: 고급 확률표로 카드 3장 중 1장 고르기를 두 번
     void StartFirstSummon()
     {
         SaveData.OpeningSeen = true;
         page = Page.Gacha;
-        gacha.Start(GachaBanner.Advanced, 2, () =>
-        {
-            SaveData.AutoArrange();
-            SaveData.Save();
-            page = Page.Camp;
-            ShowToast("동료들과 함께 여정을 떠나요! '편성'을 확인하고 '출격'하세요");
-        });
+        battlePick = false;
+        gacha.StartPick(CardDraft.Deal(GachaBanner.Advanced, false), "첫 동료 고르기  (1 / 2)", "카드 3장 중 1장을 골라 동료로 맞이하세요", () =>
+            gacha.StartPick(CardDraft.Deal(GachaBanner.Advanced, false), "첫 동료 고르기  (2 / 2)", "한 명 더 골라 보세요", () =>
+            {
+                SaveData.AutoArrange();
+                SaveData.Save();
+                page = Page.Camp;
+                ShowToast("동료들과 함께 여정을 떠나요! '편성'을 확인하고 '출격'하세요");
+            }));
     }
 
     // ---------------- 저장 / 불러오기 ----------------
@@ -697,8 +699,6 @@ public class GameManager : MonoBehaviour
 
         // ---- 오른쪽: 메뉴 ----
         float mx = w - 250f, mw = 230f, my = 80f;
-        if (UI.Button(new Rect(mx, my, mw, 70), "소환", UI.Primary, 28)) page = Page.GachaSelect;
-        my += 80;
         if (UI.Button(new Rect(mx, my, mw, 54), "편성", UI.Green, 20)) { formation.Open(); page = Page.Formation; }
         my += 64;
         if (UI.Button(new Rect(mx, my, mw, 54), "동료  (강화 · 판매)", UI.Plum, 18)) { members.Open(); page = Page.Members; }
@@ -753,68 +753,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // ---------------- 소환 선택 ----------------
-
-    void DrawGachaSelect()
-    {
-        float w = UI.Width;
-        UI.Backdrop("menu");
-        UI.TopBar("소환");
-
-        var banners = GachaBanner.All;
-        const float gap = 18f;
-        float pw = (w - 64f - gap * (banners.Length - 1)) / banners.Length;
-        for (int i = 0; i < banners.Length; i++)
-        {
-            var b = banners[i];
-            var r = new Rect(32 + i * (pw + gap), 84, pw, 530);
-            UI.Panel(r);
-            var head = new Rect(r.x + 8, r.y + 8, r.width - 16, 88);
-            UI.Round(head, b.color);
-            UI.Text(new Rect(head.x, head.y + 10, head.width, 38), b.name, 28, Color.white, TextAnchor.MiddleCenter, true);
-            UI.Text(new Rect(head.x + 8, head.y + 50, head.width - 16, 26), b.desc, 14, new Color(1f, 1f, 1f, 0.85f));
-
-            // 확률표
-            float y = r.y + 112;
-            UI.Text(new Rect(r.x + 24, y, r.width - 48, 24), "등장 확률", 15, UI.TextSub, TextAnchor.MiddleLeft, true);
-            for (int k = 0; k < b.rates.Length; k++)
-            {
-                if (b.rates[k] <= 0f) continue;
-                y += 30;
-                var rarity = (Rarity)k;
-                UI.Round(new Rect(r.x + 16, y, r.width - 32, 26), new Color(1f, 1f, 1f, 0.04f));
-                UI.Text(new Rect(r.x + 28, y, r.width - 56, 26), RarityInfo.Name(rarity), 17, RarityInfo.Animated(rarity), TextAnchor.MiddleLeft, true);
-                UI.Text(new Rect(r.x + 28, y, r.width - 56, 26), b.rates[k] + "%", 17, UI.TextMain, TextAnchor.MiddleRight);
-            }
-            UI.Text(new Rect(r.x + 12, r.y + 320, r.width - 24, 40), $"10회 뽑기 시\n{RarityInfo.Name(b.guarantee)} 이상 1명 보장", 14, UI.Gold);
-
-            if (!b.IsUnlocked)
-            {
-                UI.Round(r, new Color(0f, 0f, 0f, 0.72f));
-                UI.Text(new Rect(r.x, r.y + 210, r.width, 40), "잠김", 28, UI.TextMain, TextAnchor.MiddleCenter, true);
-                UI.Text(new Rect(r.x, r.y + 255, r.width, 50), $"{Stages.Label(b.unlockAfterStage)} 클리어 시 열림", 17, UI.TextSub);
-                continue;
-            }
-
-            if (UI.Button(new Rect(r.x + 16, r.y + 378, r.width - 32, 64), $"1회  ·  {b.cost:N0} 골드", b.color, 18, SaveData.Gold >= b.cost))
-                Summon(b, 1, b.cost);
-            if (UI.Button(new Rect(r.x + 16, r.y + 452, r.width - 32, 64), $"10회  ·  {b.TenCost:N0} 골드", UI.Darken(b.color, 0.8f), 18, SaveData.Gold >= b.TenCost))
-                Summon(b, 10, b.TenCost);
-        }
-
-        if (UI.Button(new Rect(32, 636, 170, 50), "◀ 돌아가기", UI.Neutral, 18))
-            page = Page.Camp;
-        UI.Text(new Rect(220, 636, w - 260, 50), "같은 동료가 또 나오면 동료 화면에서 합쳐 성급을 올릴 수 있어요 · 용사 카드가 나오면 용사의 성급이 올라가요", 15, UI.TextSub, TextAnchor.MiddleLeft);
-    }
-
-    void Summon(GachaBanner banner, int count, int cost)
-    {
-        if (SaveData.Gold < cost) return;
-        SaveData.Gold -= cost;
-        page = Page.Gacha;
-        gacha.Start(banner, count, () => page = Page.GachaSelect);
-    }
-
     // ---------------- 전투 & 결과 ----------------
 
     // 맵 입장 멘트와 보스 대사는 전투 화면 위에 사념파처럼 나와요 (BattleManager의 '사념파 대사')
@@ -837,15 +775,12 @@ public class GameManager : MonoBehaviour
         resultKillGold = battle.GoldEarned;
         resultFirstClear = victory && resultStage > SaveData.ClearedStage;
         resultClearGold = victory ? Stages.ClearReward(resultStage) * (resultFirstClear ? 2 : 1) : 0;
-        resultUnlock = null;
         resultNotes.Clear();
 
         int oldCap = SaveData.DeployCap;
         if (resultFirstClear)
         {
             SaveData.ClearedStage = resultStage;
-            foreach (var b in GachaBanner.All)
-                if (b.unlockAfterStage == resultStage) resultUnlock = b.name;
         }
         if (victory && Stages.HasBoss(resultStage)) SaveData.MarkBossBeaten(Stages.StageOf(resultStage));
         if (SaveData.DeployCap > oldCap) resultNotes.Add($"출진 가능 인원 +1  (이제 {SaveData.DeployCap}명)");
@@ -869,6 +804,15 @@ public class GameManager : MonoBehaviour
 
         battle.End();
         page = Page.Result;
+        // 이기면 보상 카드 3장 중 1장 고르기 (보스 · 중간 보스 판은 좋은 카드 1장 보장) → 결과 화면
+        if (victory)
+        {
+            bool bonus = Stages.HasBoss(resultStage) || Stages.HasMidBoss(resultStage);
+            page = Page.Gacha;
+            battlePick = true;
+            gacha.StartPick(CardDraft.Deal(CardDraft.TierFor(resultStage), bonus), $"{Stages.Label(resultStage)} 승리 보상",
+                bonus ? "보스를 쓰러뜨려 좋은 카드가 1장 이상 나왔어요" : "카드 3장 중 1장을 골라 동료로 맞이하세요", () => page = Page.Result);
+        }
     }
 
     void DrawResult()
@@ -897,15 +841,10 @@ public class GameManager : MonoBehaviour
             y += 34;
             UI.Text(new Rect(box.x + 20, y, box.width - 40, 30), note, 17, UI.TextMain);
         }
-        if (resultUnlock != null)
-        {
-            y += 40;
-            UI.Text(new Rect(box.x, y, box.width, 32), $"새로운 소환 해금: {resultUnlock}!", 22, Color.white, TextAnchor.MiddleCenter, true);
-        }
         if (!resultVictory)
         {
             y += 40;
-            UI.Text(new Rect(box.x + 20, y, box.width - 40, 50), "동료를 더 뽑거나 성급 강화, 편성을 바꿔서 다시 도전해 보세요!", 17, UI.TextSub);
+            UI.Text(new Rect(box.x + 20, y, box.width - 40, 50), "라운드를 이겨 동료 카드를 모으고, 성급 강화나 편성을 바꿔서 다시 도전해 보세요!", 17, UI.TextSub);
         }
 
         bool beatDemonKing = resultVictory && resultFirstClear && resultStage >= Stages.Count;

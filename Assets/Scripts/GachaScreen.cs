@@ -1,228 +1,333 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 모바일 게임 스타일의 뽑기 연출입니다.
-// 1) 마법진 소환 (가장 좋은 등급의 색으로 빛이 바뀜) → 2) 뒤집힌 카드 등장 → 3) 클릭해서 카드 뒤집기
+// 보상 카드 고르기 연출입니다. (라운드를 이기면 / 처음 시작할 때)
+//  1) 마법진이 깔리고 카드 3장이 뒤집힌 채 날아와 놓임 → 2) 한 장씩 뒤집힘 (좋은 등급일수록 빛 · 번쩍임이 큼)
+//  3) 마우스를 올리면 떠오름, 눌러서 1장 선택 → 4) 고른 카드가 가운데로 올라오며 빛줄기 · 반짝이 → 확인
 public class GachaScreen
 {
     class Card
     {
         public CompanionDef def;
-        public string tag;            // "NEW", "성급 ★2" 같은 표시 (없으면 null)
-        public float flipStart = -1f; // 뒤집기 시작한 시간 (-1이면 아직 안 뒤집음)
-        public bool sounded;          // 뒤집히는 소리를 냈는지
+        public Vector2 home;          // 놓이는 자리 (가운데)
+        public float dealAt, flipAt;  // 날아오기 · 뒤집기 시작 시간
+        public bool sounded;          // 뒤집힐 때 소리를 냈는지
+        public bool dealt;            // 날아올 때 소리를 냈는지
+        public float hover;           // 0~1 마우스를 올린 정도
     }
 
-    const float PortalDuration = 2.4f;
-    const float FlipDuration = 0.35f;
+    const float CardW = 220f, CardH = 320f;
+    const float DealTime = 0.55f, FlipTime = 0.42f, ChooseTime = 0.7f;
 
     readonly List<Card> cards = new List<Card>();
-    bool inPortal;
-    float phaseStart;
-    float flashStart = -10f;
-    Rarity best;
-    string bannerName;
-    System.Action onClose;
+    float start, chosenAt, flashAt = -10f;
+    int chosen = -1;
+    string title, subtitle, resultTag;
+    System.Action onDone;
+    static Texture2D back, ray;
 
     static float Now => Time.unscaledTime;
 
-    // 뽑기를 실행하고 결과를 바로 저장한 뒤 연출을 시작합니다. (골드 차감은 부르는 쪽에서)
-    public void Start(GachaBanner banner, int count, System.Action onClose)
+    // 카드 3장을 보여 주고 1장을 고르게 합니다. 고른 동료는 바로 저장돼요.
+    public void StartPick(List<CompanionDef> options, string title, string subtitle, System.Action onDone)
     {
-        this.onClose = onClose;
-        bannerName = banner.name;
+        this.title = title;
+        this.subtitle = subtitle;
+        this.onDone = onDone;
         cards.Clear();
-        best = Rarity.Normal;
-
-        foreach (var def in banner.Roll(count))
+        chosen = -1;
+        resultTag = null;
+        start = Now;
+        float w = UI.Width;
+        float dealEnd = 0.3f + (options.Count - 1) * 0.14f + DealTime;
+        for (int i = 0; i < options.Count; i++)
         {
-            cards.Add(new Card { def = def, tag = SaveData.AddPulled(def) });
-            if (def.rarity > best) best = def.rarity;
+            cards.Add(new Card
+            {
+                def = options[i],
+                home = new Vector2(w / 2f + (i - (options.Count - 1) / 2f) * 290f, 330f),
+                dealAt = start + 0.3f + i * 0.14f,
+                flipAt = start + dealEnd + 0.25f + i * 0.32f,
+            });
         }
-        SaveData.Save();
-
-        inPortal = true;
-        phaseStart = Now;
     }
+
+    bool AllRevealed => cards.Count > 0 && Now > cards[cards.Count - 1].flipAt + FlipTime + 0.2f;
 
     public void Draw()
     {
+        if (back == null) back = Resources.Load<Texture2D>("UI/card_back");
+        if (ray == null) ray = MakeRay();
         float w = UI.Width;
-        UI.Gradient(UI.Full, new Color(0.03f, 0.02f, 0.10f), new Color(0.12f, 0.05f, 0.20f));
+        float t = Now - start;
 
-        if (inPortal) DrawPortal(w);
-        else DrawCards(w);
+        // ---- 배경: 짙은 밤하늘색 + 가운데 은은한 빛 + 바닥 마법진 ----
+        UI.Gradient(UI.Full, new Color(0.04f, 0.03f, 0.10f), new Color(0.10f, 0.05f, 0.14f));
+        UI.Glow(new Vector2(w / 2f, 340f), 520f, new Color(0.35f, 0.3f, 0.75f, 0.22f * Mathf.Clamp01(t * 2f)));
+        DrawMagicCircle(new Vector2(w / 2f, 600f), Mathf.Clamp01(t * 1.5f), chosen >= 0 ? RarityInfo.Animated(cards[chosen].def.rarity) : new Color(0.6f, 0.75f, 1f));
+
+        // ---- 제목 ----
+        float ta = Mathf.Clamp01(t * 2f);
+        UI.SharpText(new Rect(0, 40, w, 50), chosen >= 0 ? "새로운 동료!" : title, 34, UI.WithAlpha(UI.Gold, ta), new Color(0.1f, 0.05f, 0.02f, 0.8f * ta));
+        if (chosen < 0 && !string.IsNullOrEmpty(subtitle))
+            UI.Text(new Rect(0, 88, w, 28), subtitle, 17, UI.WithAlpha(UI.TextSub, ta));
+
+        // ---- 카드 ----
+        if (chosen >= 0) DrawChosen(w);
+        else DrawChoices(w);
 
         // 화면 번쩍임
-        float f = 1f - (Now - flashStart) / 0.6f;
-        if (f > 0f) UI.Fill(UI.Full, new Color(1f, 1f, 1f, f));
+        float f = 1f - (Now - flashAt) / 0.5f;
+        if (f > 0f) UI.Fill(UI.Full, new Color(1f, 0.97f, 0.9f, f * 0.85f));
     }
 
-    // 가장 좋은 결과에 따라 마법진 색이 바뀝니다 (모바일 가챠의 '확정 연출')
-    Color HintColor()
+    void DrawChoices(float w)
     {
-        if (best >= Rarity.SuperRare) return RarityInfo.Animated(best);
-        return new Color(0.5f, 0.75f, 1f);
-    }
-
-    void DrawPortal(float w)
-    {
-        float t = Mathf.Clamp01((Now - phaseStart) / PortalDuration);
-        var center = new Vector2(w / 2f, 320f);
-        // 처음에는 하얀 빛 → 절반이 지나면 등급 색으로 변함
-        Color c = Color.Lerp(new Color(0.8f, 0.9f, 1f), HintColor(), Mathf.Clamp01((t - 0.45f) * 3f));
-
-        // 바깥에서 안으로 빨려 들어가는 빛 알갱이
-        for (int i = 0; i < 40; i++)
+        bool ready = AllRevealed;
+        for (int i = 0; i < cards.Count; i++)
         {
-            float p = Mathf.Repeat(Now * 0.8f + i * 0.137f, 1f);
-            float ang = i * 2.39996f;
-            var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
-            UI.Glow(center + dir * (420f * (1f - p)), 10f + 6f * p, UI.WithAlpha(c, p * 0.9f));
-        }
+            var c = cards[i];
+            float d = Now - c.dealAt;
+            if (d < 0f) continue;
+            if (!c.dealt) { c.dealt = true; AudioManager.Play("swing_fast", 0.25f, 0.1f); }
 
-        // 가운데 빛
-        float pulse = 1f + 0.08f * Mathf.Sin(Now * 10f);
-        UI.Glow(center, (90f + 240f * t * t) * pulse, UI.WithAlpha(c, 0.35f + 0.5f * t));
-        UI.Glow(center, 60f * pulse, UI.WithAlpha(Color.white, 0.6f + 0.4f * t));
+            // 날아오기: 아래쪽 카드 더미에서 튀어 올라 자리로 (살짝 넘쳤다 돌아오는 움직임)
+            float k = Mathf.Clamp01(d / DealTime);
+            float e = EaseOutBack(k);
+            var from = new Vector2(w / 2f, 820f);
+            var pos = Vector2.LerpUnclamped(from, c.home, e);
+            float angle = Mathf.LerpUnclamped((i - 1) * -28f, 0f, e);
+            float scale = Mathf.LerpUnclamped(0.55f, 1f, e);
 
-        // 점점 빨라지며 도는 마법진 구슬
-        for (int ring = 0; ring < 2; ring++)
-        {
-            int n = ring == 0 ? 12 : 8;
-            float radius = (ring == 0 ? 170f : 110f) - 30f * t;
-            float speed = (ring == 0 ? 1f : -1.6f) * (1f + 4f * t * t);
-            for (int i = 0; i < n; i++)
+            // 고를 수 있을 때: 둥실둥실 + 마우스를 올리면 떠오름
+            var hit = new Rect(c.home.x - CardW / 2f, c.home.y - CardH / 2f, CardW, CardH);
+            bool over = ready && hit.Contains(Event.current.mousePosition);
+            if (Event.current.type == EventType.Repaint)
             {
-                float a = i / (float)n * Mathf.PI * 2f + Now * speed;
-                var p = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a) * 0.45f) * radius;
-                UI.Glow(p, 26f, UI.WithAlpha(c, 0.8f));
-                UI.Circle(p, 5f, Color.white);
+                if (over && c.hover < 0.05f) AudioManager.Play("hover", 0.35f, 0.04f);
+                c.hover = Mathf.MoveTowards(c.hover, over ? 1f : 0f, Time.unscaledDeltaTime * 6f);
+            }
+            if (ready)
+            {
+                pos.y += Mathf.Sin(Now * 1.8f + i * 1.7f) * 4f - c.hover * 16f;
+                scale *= 1f + c.hover * 0.06f;
+            }
+
+            DrawCard(c, pos, scale, angle, 1f);
+
+            if (ready)
+            {
+                UI.Text(new Rect(c.home.x - 110f, c.home.y + CardH / 2f + 22f, 220f, 28f), "▲ 이 동료 선택", 17,
+                    UI.WithAlpha(over ? UI.Gold : UI.TextSub, 0.6f + 0.4f * c.hover), TextAnchor.MiddleCenter, true);
+                if (GUI.Button(hit, GUIContent.none, GUIStyle.none)) Choose(i);
             }
         }
-
-        UI.Text(new Rect(0, 560, w, 40), bannerName + " 소환 중...", 28, Color.white, TextAnchor.MiddleCenter, true);
-        UI.Text(new Rect(0, 600, w, 30), "(클릭하면 건너뛰기)", 16, new Color(1f, 1f, 1f, 0.5f));
-
-        if (t >= 1f || UI.ClickedAnywhere())
+        if (!ready && UI.ClickedAnywhere()) // 기다리기 싫으면 클릭으로 바로 펼침
         {
-            inPortal = false;
-            phaseStart = Now;
-            flashStart = Now;
+            float dealEnd = Now - 0.01f;
+            for (int i = 0; i < cards.Count; i++)
+            {
+                cards[i].dealAt = Mathf.Min(cards[i].dealAt, dealEnd - DealTime);
+                cards[i].flipAt = Mathf.Min(cards[i].flipAt, Now + i * 0.12f);
+            }
+        }
+        if (ready) UI.Text(new Rect(0, 660, w, 30), "한 장을 골라 동료로 맞이하세요", 18, UI.WithAlpha(UI.TextMain, 0.85f));
+    }
+
+    void Choose(int i)
+    {
+        chosen = i;
+        chosenAt = Now;
+        var def = cards[i].def;
+        resultTag = SaveData.AddPulled(def);
+        SaveData.Save();
+        AudioManager.Play(def.rarity >= Rarity.SuperRare ? "rare" : "gacha", 0.65f, 0.02f);
+        flashAt = Now;
+    }
+
+    void DrawChosen(float w)
+    {
+        float t = Now - chosenAt;
+        float k = EaseOutCubic(Mathf.Clamp01(t / ChooseTime));
+        var center = new Vector2(w / 2f, 330f);
+        var c0 = cards[chosen];
+        Color rc = RarityInfo.Animated(c0.def.rarity);
+
+        // 고르지 않은 카드: 아래로 가라앉으며 흐려짐
+        for (int i = 0; i < cards.Count; i++)
+        {
+            if (i == chosen) continue;
+            var c = cards[i];
+            float a = 1f - Mathf.Clamp01(t / 0.45f);
+            if (a <= 0f) continue;
+            DrawCard(c, c.home + new Vector2(0f, 70f * (1f - a)), 1f - 0.1f * (1f - a), (i < chosen ? -8f : 8f) * (1f - a), a);
+        }
+
+        // 뒤에서 회전하는 빛줄기 + 빛 기둥
+        float glowA = Mathf.Clamp01(t / 0.5f);
+        UI.Glow(center, 330f, UI.WithAlpha(rc, 0.35f * glowA));
+        DrawRays(center, 420f * (0.6f + 0.4f * k), UI.WithAlpha(Color.Lerp(rc, Color.white, 0.4f), 0.32f * glowA), 14, Now * 12f);
+        DrawRays(center, 330f * (0.6f + 0.4f * k), UI.WithAlpha(UI.Gold, 0.22f * glowA), 9, -Now * 7f + 10f);
+        DrawSparkles(center, 260f, rc, glowA);
+
+        var pos = Vector2.Lerp(c0.home, center, k);
+        float scale = Mathf.Lerp(1f, 1.18f, k) + Mathf.Sin(Now * 2f) * 0.01f;
+        DrawCard(c0, pos, scale, 0f, 1f);
+
+        if (t > 0.6f)
+        {
+            float a = Mathf.Clamp01((t - 0.6f) / 0.4f);
+            var def = c0.def;
+            string msg = def.IsHero ? "용사의 성급이 올랐어요!"
+                : resultTag == "NEW" ? $"{def.name} 합류!"
+                : $"{def.name}  성급 상승!  ({resultTag})";
+            UI.SharpText(new Rect(0, 560, w, 44), msg, 30, UI.WithAlpha(new Color(1f, 0.93f, 0.7f), a), new Color(0.12f, 0.06f, 0.02f, 0.85f * a));
+            if (t > 0.9f && UI.Button(new Rect(w / 2f - 110f, 620f, 220f, 58f), "확인", UI.Green, 22))
+                onDone?.Invoke();
         }
     }
 
-    void DrawCards(float w)
+    // 카드 한 장: 가운데 pos, 크기 배율, 기울기(도), 투명도. 뒤집기 중이면 가로로 납작해졌다가 앞면이 나옴
+    void DrawCard(Card c, Vector2 pos, float scale, float angle, float alpha)
     {
-        int n = cards.Count;
-        int perRow = n <= 5 ? n : Mathf.CeilToInt(n / 2f);
-        int rows = Mathf.CeilToInt(n / (float)perRow);
-        float cw = rows == 1 ? (n <= 2 ? 220f : 170f) : 150f;
-        float ch = cw * 1.45f;
-        const float gap = 22f;
-        float top = rows == 1 ? 300f - ch / 2f : 90f;
-
-        bool allFlipped = true;
-        float lastFlipEnd = 0f;
-        for (int i = 0; i < n; i++)
+        float ft = Mathf.Clamp01((Now - c.flipAt) / FlipTime);
+        bool front = ft >= 0.5f;
+        if (front && !c.sounded)
         {
-            int row = i / perRow, col = i % perRow;
-            int inThisRow = Mathf.Min(perRow, n - row * perRow);
-            float x0 = (w - (cw * inThisRow + gap * (inThisRow - 1))) / 2f;
-            var r = new Rect(x0 + col * (cw + gap), top + row * (ch + gap), cw, ch);
-
-            var card = cards[i];
-            float appear = Mathf.Clamp01((Now - phaseStart - i * 0.08f) / 0.3f);
-            if (appear <= 0f) { allFlipped = false; continue; }
-            r.y += 40f * (1f - appear);
-
-            DrawCard(card, r, appear);
-
-            if (card.flipStart < 0f)
-            {
-                allFlipped = false;
-                if (appear >= 1f && GUI.Button(r, GUIContent.none, GUIStyle.none)) Flip(card, 0f);
-            }
-            else lastFlipEnd = Mathf.Max(lastFlipEnd, card.flipStart + FlipDuration);
+            c.sounded = true;
+            var r0 = c.def.rarity;
+            AudioManager.Play(r0 >= Rarity.Unique ? "rare" : "talk_next", r0 >= Rarity.Unique ? 0.55f : 0.5f, 0.03f);
+            if (r0 >= Rarity.Legendary) flashAt = Now;
         }
-
-        if (!allFlipped)
-        {
-            UI.Text(new Rect(0, 560, w, 30), "카드를 눌러서 뒤집으세요", 20, new Color(1f, 1f, 1f, 0.8f));
-            if (UI.Button(new Rect(w / 2f - 110f, 610f, 220f, 60f), "모두 열기", new Color(0.35f, 0.4f, 0.7f)))
-            {
-                float delay = 0f;
-                foreach (var c in cards)
-                {
-                    if (c.flipStart >= 0f) continue;
-                    Flip(c, delay);
-                    delay += 0.12f;
-                }
-            }
-        }
-        else if (Now > lastFlipEnd + 0.3f)
-        {
-            int newCount = 0;
-            bool awakened = false;
-            foreach (var c in cards)
-            {
-                if (c.tag == "NEW") newCount++;
-                if (c.def.IsHero) awakened = true;
-            }
-            string msg = newCount > 0 ? $"새로운 동료 {newCount}명이 합류했어요!" : "동료들이 합류했어요!";
-            if (awakened) msg += "  용사의 성급이 올랐어요!";
-            msg += "  (편성에서 배치하세요)";
-            UI.Text(new Rect(0, 555, w, 40), msg, 24, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleCenter, true);
-            if (UI.Button(new Rect(w / 2f - 110f, 610f, 220f, 60f), "확인", new Color(0.25f, 0.6f, 0.35f)))
-                onClose?.Invoke();
-        }
-    }
-
-    void Flip(Card card, float delay)
-    {
-        card.flipStart = Now + delay;
-        // 전설 이상은 뒤집히는 순간 화면이 번쩍!
-        if (card.def.rarity >= Rarity.Legendary) flashStart = card.flipStart + FlipDuration * 0.5f;
-    }
-
-    void DrawCard(Card card, Rect r, float alpha)
-    {
-        var rarity = card.def.rarity;
+        float squash = Mathf.Abs(Mathf.Cos(ft * Mathf.PI));
+        float lift = Mathf.Sin(ft * Mathf.PI) * 22f;
+        float cw = CardW * scale * Mathf.Max(0.02f, squash) * (1f + Mathf.Sin(ft * Mathf.PI) * 0.06f);
+        float ch = CardH * scale * (1f + Mathf.Sin(ft * Mathf.PI) * 0.06f);
+        var r = new Rect(pos.x - cw / 2f, pos.y - ch / 2f - lift, cw, ch);
+        var rarity = c.def.rarity;
         Color rc = RarityInfo.Animated(rarity);
-        float flipT = card.flipStart < 0f ? 0f : Mathf.Clamp01((Now - card.flipStart) / FlipDuration);
-        bool showFront = flipT >= 0.5f;
-        if (showFront && !card.sounded)
-        {
-            card.sounded = true;
-            AudioManager.Play(rarity >= Rarity.Unique ? "rare" : "gacha", 0.6f, 0.02f);
-        }
-        float widthScale = Mathf.Abs(Mathf.Cos(flipT * Mathf.PI));
-        var rr = new Rect(r.center.x - r.width * widthScale / 2f, r.y, r.width * widthScale, r.height);
 
-        // 슈퍼레어 이상은 뒤집기 전부터 뒤에서 빛이 납니다
+        // 그림자
+        UI.Glow(new Vector2(pos.x, pos.y + CardH * scale * 0.52f), CardW * scale * 0.55f, new Color(0f, 0f, 0f, 0.35f * alpha));
+
+        // 뒤집기 전에도 좋은 등급은 뒤에서 빛이 남 (확정 연출)
         if (rarity >= Rarity.SuperRare)
         {
-            float pulse = 1f + 0.06f * Mathf.Sin(Now * 6f);
-            UI.Glow(r.center, r.width * 0.95f * pulse, UI.WithAlpha(rc, 0.55f * alpha));
+            float pulse = 1f + 0.07f * Mathf.Sin(Now * 5f + pos.x);
+            UI.Glow(pos, CardW * scale * 0.95f * pulse, UI.WithAlpha(rc, (front ? 0.45f : 0.35f) * alpha));
         }
-
-        // 유니크 이상: 뒤집힌 직후 빛이 퍼져 나감
-        float burst = Now - (card.flipStart + FlipDuration);
-        if (card.flipStart >= 0f && rarity >= Rarity.Unique && burst > 0f && burst < 0.9f)
-            UI.Glow(r.center, r.width * (0.6f + burst * 2.5f), UI.WithAlpha(rc, 1f - burst / 0.9f));
-
-        if (!showFront)
+        // 뒤집힌 직후 빛이 터지며 퍼짐
+        float burst = Now - (c.flipAt + FlipTime * 0.5f);
+        if (burst > 0f && burst < 0.8f)
         {
-            Color frame = rarity >= Rarity.SuperRare ? rc : new Color(0.75f, 0.75f, 0.85f);
-            UI.Round(rr, new Color(0.10f, 0.12f, 0.30f, alpha));
-            if (rr.width > 24f) UI.Round(new Rect(rr.x + 8f, rr.y + 8f, rr.width - 16f, rr.height - 16f), new Color(0.16f, 0.18f, 0.42f, alpha));
-            UI.RoundFrame(rr, UI.WithAlpha(frame, alpha));
-            if (widthScale > 0.5f) UI.Text(rr, "?", Mathf.RoundToInt(r.width * 0.4f), UI.WithAlpha(frame, alpha), TextAnchor.MiddleCenter, true);
-            return;
+            float b = burst / 0.8f;
+            UI.Glow(pos, CardW * scale * (0.5f + b * (rarity >= Rarity.Unique ? 2.6f : 1.4f)), UI.WithAlpha(Color.Lerp(Color.white, rc, b), (1f - b) * 0.8f * alpha));
+            if (rarity >= Rarity.Unique) DrawRays(pos, CardH * scale * (0.6f + b), UI.WithAlpha(rc, (1f - b) * 0.5f * alpha), 10, Now * 30f);
         }
 
-        DrawCardFace(rr, card.def, card.tag, widthScale > 0.85f);
+        var saved = UI.BeginRotate(angle, pos);
+        var oldColor = GUI.color;
+        if (!front)
+        {
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            if (back != null) GUI.DrawTexture(r, back, ScaleMode.StretchToFill);
+            else { UI.Round(r, new Color(0.10f, 0.12f, 0.30f, alpha)); UI.RoundFrame(r, UI.WithAlpha(UI.Gold, alpha)); }
+            // 뒷면 위를 지나가는 빛 (반짝)
+            float sheen = Mathf.Repeat(Now * 0.6f + pos.x * 0.002f, 1.6f);
+            if (sheen < 1f && r.width > 30f)
+                UI.Glow(new Vector2(r.x + r.width * sheen, r.y + r.height * (1f - sheen)), r.width * 0.35f, new Color(1f, 0.95f, 0.8f, 0.18f * alpha));
+        }
+        else
+        {
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            DrawCardFace(r, c.def, null, squash > 0.85f && alpha > 0.5f);
+            if (rarity >= Rarity.Legendary && r.width > 40f) // 전설 이상: 금빛 테두리가 반짝
+                UI.RoundFrame(new Rect(r.x - 3f, r.y - 3f, r.width + 6f, r.height + 6f), UI.WithAlpha(rc, (0.6f + 0.4f * Mathf.Sin(Now * 6f)) * alpha));
+        }
+        GUI.color = oldColor;
+        UI.EndRotate(saved);
     }
+
+    // 가운데에서 뻗어 나가는 빛줄기 n개 (spin: 회전 각도)
+    static void DrawRays(Vector2 center, float length, Color color, int n, float spin)
+    {
+        if (ray == null || color.a <= 0.01f) return;
+        var old = GUI.color;
+        GUI.color = color;
+        for (int i = 0; i < n; i++)
+        {
+            float a = spin + i * 360f / n;
+            float wdt = length * (i % 2 == 0 ? 0.16f : 0.10f);
+            var saved = UI.BeginRotate(a, center);
+            GUI.DrawTexture(new Rect(center.x - wdt / 2f, center.y - length, wdt, length), ray, ScaleMode.StretchToFill);
+            UI.EndRotate(saved);
+        }
+        GUI.color = old;
+    }
+
+    // 위로 떠오르며 깜빡이는 반짝이
+    static void DrawSparkles(Vector2 center, float radius, Color color, float alpha)
+    {
+        for (int i = 0; i < 26; i++)
+        {
+            float seed = i * 0.6180339f;
+            float life = Mathf.Repeat(Now * (0.35f + (i % 5) * 0.06f) + seed, 1f);
+            float x = center.x + (Mathf.Repeat(seed * 7.3f, 1f) * 2f - 1f) * radius;
+            float y = center.y + radius * 0.6f - life * radius * 1.5f;
+            float a = Mathf.Sin(life * Mathf.PI) * alpha;
+            var p = new Vector2(x + Mathf.Sin(Now * 2f + i) * 6f, y);
+            UI.Glow(p, 10f + (i % 3) * 5f, UI.WithAlpha(Color.Lerp(color, Color.white, 0.5f), 0.7f * a));
+            UI.Fill(new Rect(p.x - 0.75f, p.y - 5f, 1.5f, 10f), new Color(1f, 1f, 1f, 0.8f * a));
+            UI.Fill(new Rect(p.x - 5f, p.y - 0.75f, 10f, 1.5f), new Color(1f, 1f, 1f, 0.8f * a));
+        }
+    }
+
+    // 바닥에 비스듬히 깔린 마법진: 점으로 된 고리 두 개가 서로 반대로 돌고, 가운데가 빛남
+    static void DrawMagicCircle(Vector2 center, float alpha, Color color)
+    {
+        if (alpha <= 0f) return;
+        UI.Glow(center, 300f, UI.WithAlpha(color, 0.18f * alpha));
+        for (int ring = 0; ring < 3; ring++)
+        {
+            int n = ring == 0 ? 48 : ring == 1 ? 32 : 16;
+            float rad = ring == 0 ? 420f : ring == 1 ? 320f : 200f;
+            float spd = (ring % 2 == 0 ? 6f : -9f) * Mathf.Deg2Rad;
+            for (int i = 0; i < n; i++)
+            {
+                float a = i / (float)n * Mathf.PI * 2f + Now * spd;
+                var p = center + new Vector2(Mathf.Cos(a) * rad, Mathf.Sin(a) * rad * 0.17f);
+                float big = (i % 4 == 0) ? 1f : 0.55f;
+                UI.Glow(p, 9f * big, UI.WithAlpha(color, 0.5f * alpha));
+                UI.Circle(p, 1.6f * big, UI.WithAlpha(Color.white, 0.7f * alpha));
+            }
+        }
+    }
+
+    // 빛줄기 그림: 아래(가운데)가 밝고 끝으로 갈수록, 양옆으로 갈수록 투명
+    static Texture2D MakeRay()
+    {
+        const int w = 32, h = 128;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float across = 1f - Mathf.Abs((x + 0.5f) / w * 2f - 1f);
+                float along = (y + 0.5f) / h;       // 텍스처 아래(0) = 화면에서 아래 = 가운데 쪽(밝음), 위(1) = 빛줄기 끝
+                float a = across * across * Mathf.Pow(1f - along, 1.5f);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        tex.Apply();
+        return tex;
+    }
+
+    static float EaseOutBack(float x)
+    {
+        const float c1 = 1.70158f, c3 = c1 + 1f;
+        return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+    }
+
+    static float EaseOutCubic(float x) => 1f - Mathf.Pow(1f - x, 3f);
 
     // 카드의 캐릭터 그림: 작은 상자 없이 카드 윗부분을 꽉 채움 (그림이 없으면 직업 문양)
     static void DrawCardPicture(Rect r, CompanionDef def, bool usePortrait, float s, Color rc)
