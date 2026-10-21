@@ -236,9 +236,8 @@ public class MemberScreen
             (def.IsHero ? "" : $"  ·  호감도 +{SaveData.AffinityBonus * 100 * SaveData.AffinityOf(def):0}%"),
             14, UI.TextSub, TextAnchor.MiddleLeft);
 
-        // 판매
-        int price = SaveData.SellPrice(selected);
-        if (UI.Button(new Rect(info.x + 20, info.yMax - 70, 220, 54), def.IsHero ? "판매 불가 (용사)" : $"판매  +{price:N0} 골드", UI.Red, 17, active && !def.IsHero))
+        // 내보내기 (보상 없음)
+        if (UI.Button(new Rect(info.x + 20, info.yMax - 70, 220, 54), def.IsHero ? "내보내기 불가 (용사)" : "내보내기", UI.Red, 17, active && !def.IsHero))
             confirm = Confirm.Sell;
 
         // ---- 성급 강화 ----
@@ -311,10 +310,10 @@ public class MemberScreen
         }
         else if (confirm == Confirm.Sell)
         {
-            int result = ConfirmBox($"{def.name} {StarText(selected.star)} Lv.{selected.level}을(를) 판매할까요?\n\n+{price:N0} 골드", "판매");
+            int result = ConfirmBox($"{def.name} {StarText(selected.star)} Lv.{selected.level}을(를) 내보낼까요?\n\n(되돌릴 수 없어요)", "내보내기");
             if (result == 1 && SaveData.Sell(selected))
             {
-                toast($"{def.name}을(를) 판매했어요 (+{price:N0} 골드)");
+                toast($"{def.name}을(를) 내보냈어요");
                 selected = SaveData.HeroMember;
             }
         }
@@ -514,7 +513,7 @@ public class LegacyScreen
             var box = new Rect(w / 2f - 290f, 210f, 580f, 290f);
             UI.Panel(box, UI.WithAlpha(UI.PanelColor, 0.98f));
             UI.Text(new Rect(box.x + 30, box.y + 24, box.width - 60, 160),
-                $"{SaveData.Cycle + 1}회차를 시작할까요?\n\n동료 · 골드 · 스테이지 진행은 처음부터 다시 시작하고,\n호감도와 적 도감만 이어져요.\n(남은 전승 포인트는 사라져요)", 18, UI.TextMain);
+                $"{SaveData.Cycle + 1}회차를 시작할까요?\n\n동료 · 스테이지 진행은 처음부터 다시 시작하고,\n호감도와 적 도감만 이어져요.\n(남은 전승 포인트는 사라져요)", 18, UI.TextMain);
             if (UI.Button(new Rect(box.x + 50, box.y + 206, 220, 58), "시작하기", UI.Primary)) { confirmNewCycle = false; onNewCycle(); }
             if (UI.Button(new Rect(box.xMax - 270, box.y + 206, 220, 58), "취소", UI.Neutral)) confirmNewCycle = false;
         }

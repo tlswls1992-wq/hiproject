@@ -68,7 +68,6 @@ public class EnemyDef
     public float Cooldown => RoleCooldown[(int)role];
     public float Speed => RoleSpeed[(int)role] * (type == EnemyType.Boss || type == EnemyType.MidBoss ? 0.6f : 1f);
     public float Splash => role == EnemyRole.Caster ? 0.9f : 0f;
-    public int Gold => type == EnemyType.Boss ? 150 : type == EnemyType.MidBoss ? 60 : type == EnemyType.Elite ? 20 : RoleGold[(int)role];
 
     float TierHp => type == EnemyType.Boss ? 500f : type == EnemyType.MidBoss ? 300f : 110f;
     float TierDmg => type == EnemyType.Boss ? 20f : type == EnemyType.MidBoss ? 14f : 9f;
@@ -79,7 +78,6 @@ public class EnemyDef
     static readonly float[] RoleRange =     { 0.4f,  0.4f,  0.5f,  0.5f,  1.1f,  4f,    3.8f,  3.5f };
     static readonly float[] RoleCooldown =  { 1.0f,  0.7f,  1.3f,  1.3f,  1.1f,  1.5f,  1.8f,  1.6f };
     static readonly float[] RoleSpeed =     { 1.6f,  2.3f,  1.1f,  1.0f,  1.5f,  1.3f,  1.2f,  1.3f };
-    static readonly int[] RoleGold =        { 3,     3,     6,     10,    4,     4,     5,     5 };
     static readonly float[] RoleHpFactor =  { 1f,    0.75f, 1.4f,  1.3f,  1f,    0.7f,  0.7f,  0.8f };
     static readonly float[] RoleDmgFactor = { 1f,    0.8f,  0.8f,  1.3f,  1f,    1f,    1f,    0.9f };
 

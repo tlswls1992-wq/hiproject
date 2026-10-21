@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 보상 카드의 등급 확률표(일반/고급/전설/신화)입니다. 스테이지가 높을수록 좋은 표를 써요 (CardDraft).
-// (예전에는 골드로 사는 뽑기였어요. 이제는 라운드를 이길 때마다 카드 3장 중 1장을 골라요)
+// (라운드를 이길 때마다 카드 3장 중 1장을 골라요)
 // 확률 배열 순서: 노말, 레어, 슈퍼레어, 유니크, 전설, 신화
 public class GachaBanner
 {

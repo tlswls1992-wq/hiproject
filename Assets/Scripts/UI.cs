@@ -279,7 +279,7 @@ public static class UI
         Text(r, text, size, TextMain, TextAnchor.MiddleCenter, true);
     }
 
-    // 화면 위쪽 제목 막대: 어두운 나무판 + 금색 두 줄 + 마름모 장식 (오른쪽에 골드 표시)
+    // 화면 위쪽 제목 막대: 어두운 나무판 + 금색 두 줄 + 마름모 장식
     public static void TopBar(string title, bool showGold = true)
     {
         float w = Width;
@@ -290,14 +290,6 @@ public static class UI
         for (float x = 40; x < w; x += 160) Diamond(new Vector2(x, 61.5f), 4f, Gold);
         Diamond(new Vector2(22, 32), 6f, Gold);
         Text(new Rect(40, 0, w - 340, 62), title, 25, Gold, TextAnchor.MiddleLeft, true);
-        if (!showGold) return;
-        var goldBox = new Rect(w - 250, 13, 226, 36);
-        Round(goldBox, new Color(0f, 0f, 0f, 0.5f));
-        RoundFrame(goldBox, WithAlpha(Bronze, 0.9f));
-        Circle(new Vector2(goldBox.x + 20, goldBox.center.y), 10f, Gold);
-        Circle(new Vector2(goldBox.x + 20, goldBox.center.y), 6f, Darken(Gold, 0.8f));
-        Text(new Rect(goldBox.x + 38, goldBox.y, goldBox.width - 52, goldBox.height), $"{SaveData.Gold:N0} 골드", 19,
-            Gold, TextAnchor.MiddleRight, true);
     }
 
     // 작은 마름모 장식

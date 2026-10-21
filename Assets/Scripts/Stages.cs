@@ -62,6 +62,4 @@ public static class Stages
     // 0부터 시작하는 스테이지 번호로 이름 얻기 (도감용)
     public static string StageNameByIndex(int stage) => stageNames[stage];
 
-    // 클리어 보상 골드 (처음 클리어하면 2배)
-    public static int ClearReward(int level) => 100 + level * 20;
 }

@@ -17,7 +17,6 @@ public class Unit : MonoBehaviour
     public float splashRadius;
     public float size;
     public bool ranged;
-    public int goldReward;           // 적을 잡았을 때 얻는 골드
     public Vector2 homePosition;     // 편성한 자리 (동료만 사용)
     public bool isBoss;
     public bool isLeader;            // 용사

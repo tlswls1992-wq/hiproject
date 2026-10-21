@@ -27,7 +27,6 @@ public class BattleManager : MonoBehaviour
     public Transform World { get; private set; }
     public int Level { get; private set; }   // 1~100번째 판
     public int Wave { get; private set; }
-    public int GoldEarned { get; private set; }
     public readonly List<int> DeployedUids = new List<int>(); // 이번 전투에 나간 동료 (경험치 지급용)
     public bool IsPaused => World == null || finished || upgradeChoices != null || userPaused || talk != null;
     bool userPaused; // 스페이스 바로 일시정지
@@ -91,7 +90,6 @@ public class BattleManager : MonoBehaviour
         this.onFinished = onFinished;
         Level = level;
         Wave = 0;
-        GoldEarned = 0;
         finished = false;
         upgradeChoices = null;
         waveInProgress = false;
@@ -497,7 +495,6 @@ public class BattleManager : MonoBehaviour
         u.splashRadius = def.Splash;
         u.ranged = def.IsRanged;
         u.healer = def.role == EnemyRole.Healer;
-        u.goldReward = def.Gold;
         u.isBoss = def.type == EnemyType.Boss || def.type == EnemyType.MidBoss;
         u.title = def.IsNamed ? def.name : null;
         u.projectileColor = def.IsRanged ? Color.Lerp(def.accent, Color.white, 0.3f) : def.accent;
@@ -804,7 +801,7 @@ public class BattleManager : MonoBehaviour
     {
         if (u.team == Team.Enemy)
         {
-            if (enemies.Remove(u)) GoldEarned += u.goldReward;
+            enemies.Remove(u);
         }
         else if (heroes.Remove(u))
         {
@@ -814,17 +811,24 @@ public class BattleManager : MonoBehaviour
 
     // ================= 전투 보너스 (로그라이크 요소: 이번 판에서만 유지) =================
 
-    // 웨이브를 이기면 세 가지 중 하나를 골라요: 회복 / 골드 / 출전한 동료 한 명 강화
+    // 웨이브를 이기면 세 가지 중 하나를 골라요: 회복 / 사기 진작(모두 공격 속도) / 출전한 동료 한 명 강화
     void OfferUpgrades()
     {
-        int gold = 15 + Level * 5 / 2;
         upgradeChoices = new List<Upgrade>
         {
             new Upgrade { title = "회복", desc = "살아 있는 모든 동료\n체력 50% 회복", apply = () =>
                 {
                     foreach (var h in heroes) { h.hp = Mathf.Min(h.maxHp, h.hp + h.maxHp * 0.5f); h.UpdateHpBar(); }
                 } },
-            new Upgrade { title = "골드", desc = $"골드 +{gold}", apply = () => GoldEarned += gold },
+            new Upgrade { title = "사기 진작", desc = "살아 있는 모든 동료\n공격 속도 +20%", apply = () =>
+                {
+                    foreach (var h in heroes)
+                    {
+                        if (h == null || !h.IsAlive) continue;
+                        h.attackCooldown /= 1.2f;
+                        SpawnEffect(h.transform.position, h.size + 0.8f, new Color(1f, 0.6f, 0.3f, 0.4f));
+                    }
+                } },
         };
 
         // 강화: 살아 있는 출전 동료 중 한 명을 무작위로 골라 이번 판 동안 강하게
@@ -856,12 +860,11 @@ public class BattleManager : MonoBehaviour
         if (World == null) return;
         float w = UI.Width;
 
-        // 위쪽 정보 막대: 왼쪽 판 정보 / 가운데 웨이브 / 오른쪽 골드와 버튼
+        // 위쪽 정보 막대: 왼쪽 판 정보 / 가운데 웨이브 / 오른쪽 배속 버튼
         UI.Fill(new Rect(0, 0, w, 56), new Color(0.03f, 0.03f, 0.06f, 0.7f));
         UI.Fill(new Rect(0, 55, w, 1), UI.WithAlpha(UI.Gold, 0.35f));
         UI.Text(new Rect(20, 0, w * 0.36f, 56), $"{Stages.Label(Level)}  ·  {Stages.StageName(Level)}", 19, UI.TextMain, TextAnchor.MiddleLeft, true);
         UI.Chip(new Rect(w / 2 - 80, 12, 160, 32), $"웨이브 {Mathf.Max(Wave, 1)} / {Stages.WavesPerLevel}", UI.Neutral, 18);
-        UI.Text(new Rect(w - 470, 0, 140, 56), $"+{GoldEarned} 골드", 18, UI.Gold, TextAnchor.MiddleRight, true);
         // 배속: 누를 때마다 x1 → x2 → x3 → x4 → x1
         if (UI.Button(new Rect(w - 316, 10, 296, 36), $"전투 속도  x{speed}   (눌러서 변경)", UI.Blue, 16, !finished && talk == null))
             SetSpeed(speed % 4 + 1);

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
 
-// 진행 상황(골드, 클리어한 판, 동료, 편성, 호감도, 회차)을 컴퓨터에 저장합니다.
+// 진행 상황(클리어한 판, 동료, 편성, 호감도, 회차)을 컴퓨터에 저장합니다.
 // 저장 칸: 0번 = 자동 저장('이어하기'), 1~3번 = 직접 저장하는 슬롯('불러오기')
 public static class SaveData
 {
@@ -17,7 +17,6 @@ public static class SaveData
     public const float StarBonus = 0.30f;    // 성급 1마다 능력치 +30% (성급 강화가 레벨보다 효과가 큼)
     public const float AffinityBonus = 0.05f; // 호감도 1마다 능력치 +5%
     public const int BaseDeploy = 7;         // 처음 출진 가능 인원 (용사 포함). 스테이지를 클리어할 때마다 +1
-    static readonly int[] sellPrices = { 30, 60, 120, 250, 500, 1000 }; // 등급별 판매 가격 (성급만큼 곱함)
 
     // ---- 편성: 선두 ~ 후미 5개의 줄. 줄 안에서는 자유롭게 위치를 정합니다 ----
     public const int Columns = 5;
@@ -43,7 +42,6 @@ public static class SaveData
         public float fx, fy;  // 줄 안에서의 위치 (0~1). fx: 0 = 앞쪽, fy: 0 = 위쪽
     }
 
-    public static int Gold;
     public static int ClearedStage;     // 이번 회차에서 클리어한 가장 먼 판 번호 (0~100)
     public static int Cycle = 1;        // 회차
     public static bool RunCleared;      // 이번 회차에서 마왕을 쓰러뜨렸는지 (전승 특전이 열림)
@@ -73,7 +71,6 @@ public static class SaveData
         ResetMemory();
         if (!HasSlot(slot)) return;
 
-        Gold = PlayerPrefs.GetInt(Key(slot, "Gold"), 0);
         ClearedStage = PlayerPrefs.GetInt(Key(slot, "ClearedStage"), 0);
         int oldAwaken = PlayerPrefs.GetInt(Key(slot, "HeroAwaken"), 0); // 예전 '각성'은 성급으로 바꿔 줌
         Cycle = Mathf.Max(1, PlayerPrefs.GetInt(Key(slot, "Cycle"), 1));
@@ -96,7 +93,6 @@ public static class SaveData
             if (Party[i].uid != heroUid) Party.RemoveAt(i);
     }
 
-    const int RemovedCharacterRefund = 100;
 
     static void LoadMembers(int slot, string members)
     {
@@ -105,8 +101,8 @@ public static class SaveData
         {
             var f = entry.Split(':');
             if (f.Length != 5) continue;
-            // 이제 게임에 없는 캐릭터(예전 임시 캐릭터)는 골드로 돌려줍니다.
-            if (CompanionDef.Find(f[1]) == null) { Gold += RemovedCharacterRefund; continue; }
+            // 이제 게임에 없는 캐릭터(예전 임시 캐릭터)는 건너뜁니다.
+            if (CompanionDef.Find(f[1]) == null) continue;
             int.TryParse(f[0], out int uid);
             int.TryParse(f[2], out int star);
             int.TryParse(f[3], out int level);
@@ -160,7 +156,6 @@ public static class SaveData
     public static void SaveToSlot(int slot)
     {
         PlayerPrefs.SetInt(Key(slot, "Started"), 1);
-        PlayerPrefs.SetInt(Key(slot, "Gold"), Gold);
         PlayerPrefs.SetInt(Key(slot, "ClearedStage"), ClearedStage);
         PlayerPrefs.SetInt(Key(slot, "HeroAwaken"), 0); // 예전 '각성'은 이미 성급으로 바뀜
         PlayerPrefs.SetInt(Key(slot, "Cycle"), Cycle);
@@ -188,12 +183,11 @@ public static class SaveData
     {
         if (!HasSlot(slot)) return "비어 있음";
         int cleared = PlayerPrefs.GetInt(Key(slot, "ClearedStage"), 0);
-        int gold = PlayerPrefs.GetInt(Key(slot, "Gold"), 0);
         int cycle = Mathf.Max(1, PlayerPrefs.GetInt(Key(slot, "Cycle"), 1));
         string members = PlayerPrefs.GetString(Key(slot, "Members"), PlayerPrefs.GetString(Key(slot, "Roster"), ""));
         int count = members.Length == 0 ? 0 : members.Split(',').Length;
         string progress = cleared == 0 ? "시작 전" : Stages.Label(cleared) + " 클리어";
-        return $"{cycle}회차  ·  {progress}  ·  골드 {gold:N0}  ·  동료 {count}명\n{PlayerPrefs.GetString(Key(slot, "SavedAt"), "")}";
+        return $"{cycle}회차  ·  {progress}  ·  동료 {count}명\n{PlayerPrefs.GetString(Key(slot, "SavedAt"), "")}";
     }
 
     // 새로 시작: 메모리를 비우고 자동 저장을 지웁니다. (직접 저장한 슬롯 1~3은 남아요)
@@ -219,7 +213,6 @@ public static class SaveData
 
     static void ResetMemory()
     {
-        Gold = 0;
         ClearedStage = 0;
         Cycle = 1;
         RunCleared = false;
@@ -325,8 +318,7 @@ public static class SaveData
                 hero.star++;
                 return "성급 " + FormationScreen.Stars(hero.star);
             }
-            Gold += 300; // 최대 성급이면 골드로 돌려받음
-            return "골드 +300";
+            return "최대 성급"; // 이미 ★15
         }
         bool isNew = CountOwned(def) == 0;
         Roster.Add(new Member { uid = nextUid++, id = def.id });
@@ -470,14 +462,12 @@ public static class SaveData
         return plan.Count;
     }
 
-    // ---------------- 판매 ----------------
+    // ---------------- 내보내기 ----------------
 
-    public static int SellPrice(Member m) => sellPrices[(int)m.Def.rarity] * m.star;
-
+    // 동료를 파티에서 내보냄 (보상 없음, 동료 목록 정리용)
     public static bool Sell(Member m)
     {
-        if (m == null || m.Def.IsHero) return false; // 용사는 팔 수 없어요
-        Gold += SellPrice(m);
+        if (m == null || m.Def.IsHero) return false; // 용사는 내보낼 수 없어요
         RemoveMember(m);
         Save();
         return true;

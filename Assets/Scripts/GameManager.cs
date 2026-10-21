@@ -78,8 +78,6 @@ public class GameManager : MonoBehaviour
     bool resultVictory;
     int resultStage;
     bool battlePick;         // 지금 보상 카드 고르기가 전투 승리 보상인지 (음악을 이어 가려고)
-    int resultKillGold;
-    int resultClearGold;
     bool resultFirstClear;
     int resultExp;
     readonly List<string> resultNotes = new List<string>();
@@ -684,9 +682,8 @@ public class GameManager : MonoBehaviour
             : $"라운드 {Stages.SubOf(selectedStage)}  ·  웨이브 {Stages.WavesPerLevel}개";
         UI.Chip(new Rect(left.x + 20, left.y + 174, left.width - 40, 30), roundInfo,
             Stages.HasBoss(selectedStage) ? UI.Red : Stages.HasMidBoss(selectedStage) ? UI.Plum : UI.Neutral, 14);
-        bool firstTime = selectedStage > SaveData.ClearedStage;
-        int reward = Stages.ClearReward(selectedStage) * (firstTime ? 2 : 1);
-        UI.Text(new Rect(left.x, left.y + 212, left.width, 24), $"클리어 보상 {reward:N0} 골드" + (firstTime ? " (최초 2배)" : ""), 15, UI.Gold);
+        bool bossRound = Stages.HasBoss(selectedStage) || Stages.HasMidBoss(selectedStage);
+        UI.Text(new Rect(left.x, left.y + 212, left.width, 24), "승리 보상: 동료 카드 3장 중 1장" + (bossRound ? " (좋은 카드 보장)" : ""), 15, UI.Gold);
 
         if (UI.Button(new Rect(left.x + 24, left.y + 250, left.width - 48, 80), "출격!", UI.Primary, 32))
             StartBattle(selectedStage);
@@ -772,9 +769,7 @@ public class GameManager : MonoBehaviour
     {
         resultVictory = victory;
         resultStage = battle.Level;
-        resultKillGold = battle.GoldEarned;
         resultFirstClear = victory && resultStage > SaveData.ClearedStage;
-        resultClearGold = victory ? Stages.ClearReward(resultStage) * (resultFirstClear ? 2 : 1) : 0;
         resultNotes.Clear();
 
         int oldCap = SaveData.DeployCap;
@@ -799,7 +794,6 @@ public class GameManager : MonoBehaviour
             resultNotes.Add("레벨 업!  " + shown + (levelUps.Count > 5 ? $" 외 {levelUps.Count - 5}명" : ""));
         }
 
-        SaveData.Gold += resultKillGold + resultClearGold;
         SaveData.Save();
 
         battle.End();
@@ -828,13 +822,6 @@ public class GameManager : MonoBehaviour
         var box = new Rect(w / 2f - 330f, 220f, 660f, 300f);
         UI.Panel(box);
         float y = box.y + 20;
-        UI.Text(new Rect(box.x, y, box.width, 30), $"처치 보상  +{resultKillGold:N0} 골드", 21, UI.Gold);
-        if (resultVictory)
-        {
-            y += 36;
-            UI.Text(new Rect(box.x, y, box.width, 30), $"클리어 보상  +{resultClearGold:N0} 골드" + (resultFirstClear ? "  (최초 2배!)" : ""), 21, UI.Gold);
-        }
-        y += 36;
         UI.Text(new Rect(box.x, y, box.width, 30), $"출진한 동료 경험치  +{resultExp}", 19, new Color(0.5f, 0.85f, 1f));
         foreach (var note in resultNotes)
         {
