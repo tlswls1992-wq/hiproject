@@ -231,7 +231,7 @@ public class EnemyDef
         Color demonSkin = C(0.72f, 0.55f, 0.65f);
         Add(9, "demon_warrior", "마족 전사", N, EnemyRole.Melee, EnemyShape.Humanoid, C(0.35f, 0.12f, 0.20f), Steel, 0.5f, EnemyWeapon.Sword, EnemyDeco.Horns, demonSkin);
         Add(9, "demon_mage", "마족 마법사", N, EnemyRole.Caster, EnemyShape.Humanoid, C(0.30f, 0.15f, 0.40f), C(1f, 0.3f, 0.5f), 0.5f, EnemyWeapon.Staff, EnemyDeco.Horns | EnemyDeco.LongHair, demonSkin);
-        Add(9, "demon_shield", "마족 방패병", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.30f, 0.14f, 0.18f), C(0.6f, 0.2f, 0.3f), 0.55f, EnemyWeapon.Sword, EnemyDeco.Horns | EnemyDeco.Shield, demonSkin);
+        Add(9, "demon_shield", "마족 방패병", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.30f, 0.14f, 0.18f), C(0.6f, 0.2f, 0.3f), 0.55f, EnemyWeapon.Hammer, EnemyDeco.Horns | EnemyDeco.Shield, demonSkin); // 그림: 철퇴 + 큰 방패 (방패 밀어치기)
         Add(9, "hoffman", "마왕의 집사 호프만", M, EnemyRole.Fast, EnemyShape.Humanoid, C(0.10f, 0.10f, 0.12f), Steel, 1.0f, EnemyWeapon.Dagger, EnemyDeco.Horns | EnemyDeco.Cape, demonSkin);
         Add(9, "demon_knight", "마족 기사", N, EnemyRole.Tank, EnemyShape.Humanoid, C(0.25f, 0.10f, 0.15f), C(0.8f, 0.2f, 0.2f), 0.6f, EnemyWeapon.Sword, EnemyDeco.Horns | EnemyDeco.Helmet | EnemyDeco.Shield | EnemyDeco.Cape, demonSkin);
         Add(9, "demon_general", "마족 장군", N, EnemyRole.Brute, EnemyShape.Humanoid, C(0.40f, 0.08f, 0.12f), GoldC, 0.7f, EnemyWeapon.Axe, EnemyDeco.Horns | EnemyDeco.Cape | EnemyDeco.Helmet, demonSkin);
