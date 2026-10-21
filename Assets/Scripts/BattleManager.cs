@@ -83,10 +83,15 @@ public class BattleManager : MonoBehaviour
 
     // ================= 전투 시작 / 끝 =================
 
+    public readonly BattleFeel Feel = new BattleFeel(); // 타격감 (피해 숫자 · 멈칫 · 흔들림 · 슬로)
+    float waveEndTimer = -1f;                           // 웨이브 마지막 적을 쓰러뜨린 뒤 슬로 모션이 끝날 때까지
+
     public void Begin(int level, System.Action<bool> onFinished)
     {
         End();
         cam = Camera.main;
+        Feel.Begin(cam);
+        waveEndTimer = -1f;
         this.onFinished = onFinished;
         Level = level;
         Wave = 0;
@@ -125,6 +130,7 @@ public class BattleManager : MonoBehaviour
 
     public void End()
     {
+        Feel.End();
         if (World != null) Destroy(World.gameObject);
         World = null;
         heroes.Clear();
@@ -206,6 +212,7 @@ public class BattleManager : MonoBehaviour
     {
         if (World == null) return;
         HandleKeys();
+        Feel.Update(speed, !finished && !userPaused);
 
         if (finished)
         {
@@ -395,6 +402,19 @@ public class BattleManager : MonoBehaviour
             return;
         }
         if (enemies.Count > 0) return;
+
+        // 웨이브의 마지막 적을 쓰러뜨리면 잠깐 슬로 모션 (마지막 웨이브는 더 길고 화면도 살짝 흔들림)
+        bool lastWave = Wave >= Stages.WavesPerLevel;
+        if (waveEndTimer < 0f)
+        {
+            waveEndTimer = lastWave ? 1.0f : 0.45f;
+            Feel.Slow(waveEndTimer, lastWave ? 0.22f : 0.35f);
+            if (lastWave) Feel.Shake(0.22f);
+            return;
+        }
+        waveEndTimer -= Time.unscaledDeltaTime;
+        if (waveEndTimer > 0f) return;
+        waveEndTimer = -1f;
 
         waveInProgress = false;
         if (Wave >= Stages.WavesPerLevel) Finish(true);
@@ -765,11 +785,13 @@ public class BattleManager : MonoBehaviour
         return push;
     }
 
-    public void ApplyHit(Vector2 point, Unit target, Team attackerTeam, float damage, float splash)
+    // crit: 치명타 (큰 노란 숫자 · 더 크게 밀려남). 맞은 쪽은 공격한 편의 반대 방향으로 살짝 밀려남
+    public void ApplyHit(Vector2 point, Unit target, Team attackerTeam, float damage, float splash, bool crit = false)
     {
+        var away = new Vector2(attackerTeam == Team.Hero ? 1f : -1f, 0f);
         if (splash <= 0f)
         {
-            if (target != null && target.IsAlive) target.TakeDamage(damage);
+            if (target != null && target.IsAlive) target.TakeDamage(damage, crit, away);
             return;
         }
 
@@ -777,9 +799,10 @@ public class BattleManager : MonoBehaviour
         foreach (var u in new List<Unit>(list))
         {
             if (u != null && Vector2.Distance(point, u.transform.position) <= splash)
-                u.TakeDamage(damage);
+                u.TakeDamage(damage, crit, ((Vector2)u.transform.position - point).normalized * 0.7f + away * 0.3f);
         }
         SpawnEffect(point, splash * 2f, new Color(1f, 0.8f, 1f, 0.4f));
+        Feel.Shake(crit ? 0.14f : 0.07f); // 폭발은 화면이 살짝 흔들림
     }
 
     // 잠깐 보였다 사라지는 동그란 효과 (폭발, 치유 등)
@@ -859,6 +882,7 @@ public class BattleManager : MonoBehaviour
     {
         if (World == null) return;
         float w = UI.Width;
+        Feel.Draw(); // 피해 숫자 (위쪽 정보 막대 · 판보다 아래에)
 
         // 위쪽 정보 막대: 왼쪽 판 정보 / 가운데 웨이브 / 오른쪽 배속 버튼
         UI.Fill(new Rect(0, 0, w, 56), new Color(0.03f, 0.03f, 0.06f, 0.7f));

@@ -193,6 +193,12 @@ public class Unit : MonoBehaviour
         if (UsesArt) Animate(dt);
         else if (UsesLook) AnimateLook(dt);
         if (pendingAt >= 0f && Time.time >= pendingAt) ResolveAttack();
+        // 맞아서 밀려나는 움직임은 금방 잦아듦
+        if (knock.sqrMagnitude > 0.0001f)
+        {
+            transform.position = battle.ClampToArena((Vector2)transform.position + knock * dt);
+            knock *= Mathf.Exp(-dt * 12f);
+        }
 
         Vector2 pos = transform.position;
         Vector2 moveDir = team == Team.Hero ? HeroThink(pos, battle) : EnemyThink(pos, battle);
@@ -430,6 +436,9 @@ public class Unit : MonoBehaviour
 
         // 휘두르는 '휙'은 지금, 맞는 소리 · 효과 · 피해는 무기가 닿는 장면에 (활은 시위를 놓는 장면에 화살을 쏨)
         if (!ranged) AudioManager.Play(attackSound, team == Team.Hero ? 0.35f : 0.25f, 0.05f);
+        // 동료의 공격은 가끔 치명타 (치유는 제외)
+        pendingCrit = team == Team.Hero && !healer && Random.value < BattleFeel.CritChance;
+        if (pendingCrit) dmg *= BattleFeel.CritMultiplier;
         pendingTarget = target;
         pendingDamage = dmg;
         pendingSplash = splash;
@@ -438,6 +447,8 @@ public class Unit : MonoBehaviour
 
     Unit pendingTarget;
     float pendingAt = -1f, pendingDamage, pendingSplash;
+    bool pendingCrit;
+    Vector2 knock; // 맞아서 밀려나는 속도
 
     // 공격을 시작하고 무기가 닿을 때까지의 시간 (그림의 공격 장면에 맞춤)
     float ContactDelay()
@@ -457,36 +468,51 @@ public class Unit : MonoBehaviour
         if (ranged)
         {
             AudioManager.Play(attackSound, team == Team.Hero ? 0.5f : 0.38f, 0.04f);
-            Projectile.Launch(this, target, pendingDamage, pendingSplash, UsesArt || UsesLook ? projectileColor : baseColor, impactSound);
+            Projectile.Launch(this, target, pendingDamage, pendingSplash, UsesArt || UsesLook ? projectileColor : baseColor, impactSound, pendingCrit);
             return;
         }
-        battle.ApplyHit(target.transform.position, target, team, pendingDamage, pendingSplash);
-        AudioManager.Play(hitSound, team == Team.Hero ? 0.6f : 0.45f, 0.07f);
-        HitFx.Spawn(hitFx, target.HitPoint, facingRight);
+        battle.ApplyHit(target.transform.position, target, team, pendingDamage, pendingSplash, pendingCrit);
+        AudioManager.Play(hitSound, pendingCrit ? 0.8f : team == Team.Hero ? 0.6f : 0.45f, 0.07f);
+        HitFx.Spawn(hitFx, target.HitPoint, facingRight, pendingCrit ? 1.35f : 1f);
+        // 묵직한 순간: 치명타 · 보스의 공격은 아주 잠깐 멈칫하고 화면이 살짝 흔들림
+        bool heavy = hitSound == "hit_heavy";
+        if (pendingCrit) { battle.Feel.HitStop(heavy ? 0.07f : 0.05f); battle.Feel.Shake(heavy ? 0.12f : 0.06f); }
+        else if (isBoss) { battle.Feel.HitStop(0.06f); battle.Feel.Shake(0.15f); }
+        else if (heavy) battle.Feel.Shake(0.04f);
     }
 
     public void Heal(float amount)
     {
         if (!IsAlive) return;
+        float before = hp;
         hp = Mathf.Min(maxHp, hp + amount);
+        var battle = BattleManager.Instance;
+        if (battle != null) battle.Feel.Heal(HitPoint + new Vector2(0f, 0.6f), hp - before);
         UpdateHpBar();
     }
 
-    public void TakeDamage(float amount)
+    // push: 밀려나는 방향 (크기 1 정도). 보스와 큰 적은 덜 밀림
+    public void TakeDamage(float amount, bool crit = false, Vector2 push = default)
     {
         if (!IsAlive) return;
         var battle = BattleManager.Instance;
-        hp -= amount * (battle != null ? battle.DamageTakenMultiplier(this) : 1f);
+        float taken = amount * (battle != null ? battle.DamageTakenMultiplier(this) : 1f);
+        hp -= taken;
         engaged = true; // 맞으면 바로 싸우기 시작
-        flashTimer = 0.08f;
+        flashTimer = crit ? 0.12f : 0.08f;
+        if (battle != null) battle.Feel.Damage(HitPoint + new Vector2(Random.Range(-0.2f, 0.2f), 0.6f), taken, crit, team == Team.Hero);
+        float resist = isBoss ? 0.25f : 1f / Mathf.Max(1f, size * 1.6f);
+        knock += push * (crit ? 4f : 2.2f) * resist;
         if (hp <= 0f)
         {
             hp = 0f;
             if (battle != null)
             {
                 battle.OnUnitDied(this);
-                // 쓰러질 때 연기처럼 퍼지는 효과
-                battle.SpawnEffect(transform.position, size * 1.6f, new Color(0.9f, 0.85f, 0.8f, 0.45f));
+                // 쓰러질 때: 몸이 뒤로 밀려나며 어두워져 사라지고, 연기가 살짝 퍼짐
+                if (UsesArt || UsesLook) Corpse.From(body, push.sqrMagnitude > 0f ? push.normalized : new Vector2(team == Team.Enemy ? 1f : -1f, 0f));
+                battle.SpawnEffect(transform.position, size * 1.2f, new Color(0.9f, 0.85f, 0.8f, 0.35f));
+                if (isBoss) { battle.Feel.HitStop(0.12f); battle.Feel.Shake(0.3f); }
                 if (team == Team.Enemy) AudioManager.Play("die", 0.35f);
             }
             Destroy(gameObject);

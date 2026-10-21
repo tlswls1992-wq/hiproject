@@ -13,7 +13,9 @@ public class Projectile : MonoBehaviour
     string impactSound;
     float startX;
 
-    public static void Launch(Unit from, Unit target, float damage, float splash, Color color, string impactSound = null)
+    bool crit;
+
+    public static void Launch(Unit from, Unit target, float damage, float splash, Color color, string impactSound = null, bool crit = false)
     {
         var go = new GameObject("Projectile");
         go.transform.SetParent(BattleManager.Instance.World, false);
@@ -32,6 +34,7 @@ public class Projectile : MonoBehaviour
         p.team = from.team;
         p.impactSound = impactSound;
         p.startX = from.transform.position.x;
+        p.crit = crit;
     }
 
     void Update()
@@ -47,9 +50,10 @@ public class Projectile : MonoBehaviour
         if ((next - lastTargetPos).sqrMagnitude < 0.0001f)
         {
             bool alive = target != null && target.IsAlive;
-            battle.ApplyHit(lastTargetPos, alive ? target : null, team, damage, splash);
-            if (splash <= 0f) HitFx.Spawn(HitFx.Kind.Spark, alive ? target.HitPoint : lastTargetPos, lastTargetPos.x >= startX);
-            AudioManager.Play(impactSound, 0.42f, 0.07f);
+            battle.ApplyHit(lastTargetPos, alive ? target : null, team, damage, splash, crit);
+            if (splash <= 0f) HitFx.Spawn(HitFx.Kind.Spark, alive ? target.HitPoint : lastTargetPos, lastTargetPos.x >= startX, crit ? 1.5f : 1f);
+            AudioManager.Play(impactSound, crit ? 0.6f : 0.42f, 0.07f);
+            if (crit) { battle.Feel.HitStop(0.04f); battle.Feel.Shake(0.05f); }
             Destroy(gameObject);
         }
     }

@@ -22,7 +22,7 @@ public class HitFx : MonoBehaviour
     Color color;
 
     // facingRight: 공격한 쪽이 오른쪽을 보고 있는지 (효과 방향을 맞춤)
-    public static void Spawn(Kind kind, Vector2 point, bool facingRight)
+    public static void Spawn(Kind kind, Vector2 point, bool facingRight, float bigger = 1f)
     {
         var battle = BattleManager.Instance;
         if (kind == Kind.None || battle == null || battle.World == null) return;
@@ -37,6 +37,9 @@ public class HitFx : MonoBehaviour
             case Kind.Claw:   size = 0.95f; dur = 0.22f; grow = 1.1f;  angle = Random.Range(-12f, 12f); c = new Color(1f, 0.55f, 0.5f, 0.95f); break;
             case Kind.Spark:  size = 0.55f; dur = 0.16f; grow = 1.5f;  angle = Random.Range(0f, 45f); c = new Color(1f, 0.92f, 0.6f, 0.95f); break;
         }
+
+        size *= bigger; // 치명타는 더 크게
+        if (bigger > 1f) c = Color.Lerp(c, new Color(1f, 0.9f, 0.45f, 1f), 0.5f);
 
         var go = new GameObject("HitFx");
         go.transform.SetParent(battle.World, false);
