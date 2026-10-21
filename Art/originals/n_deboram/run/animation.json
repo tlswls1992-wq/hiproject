@@ -1,0 +1,25 @@
+{
+  "animation": "run",
+  "direction": "right",
+  "frames": [
+    "run_01.png",
+    "run_02.png",
+    "run_03.png",
+    "run_04.png",
+    "run_05.png",
+    "run_06.png",
+    "run_07.png",
+    "run_08.png"
+  ],
+  "durations_ms": [
+    90,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90
+  ],
+  "loop": true
+}
