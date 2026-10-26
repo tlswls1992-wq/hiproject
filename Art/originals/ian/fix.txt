@@ -1,0 +1,2 @@
+idle_align=1
+run_scale=0.95

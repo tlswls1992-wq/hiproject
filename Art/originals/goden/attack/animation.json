@@ -1,0 +1,25 @@
+{
+  "animation": "attack",
+  "direction": "right",
+  "frames": [
+    "attack_01.png",
+    "attack_02.png",
+    "attack_03.png",
+    "attack_04.png",
+    "attack_05.png",
+    "attack_06.png",
+    "attack_07.png",
+    "attack_08.png"
+  ],
+  "durations_ms": [
+    180,
+    100,
+    100,
+    70,
+    80,
+    100,
+    120,
+    240
+  ],
+  "loop": true
+}
