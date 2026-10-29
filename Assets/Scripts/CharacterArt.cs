@@ -219,9 +219,24 @@ public class CharacterArt
     }
 
     // 사각형 안에 그림을 그립니다. crop이면 사각형을 꽉 채우도록 잘라서, 아니면 비율을 유지해서 맞춰 그려요.
+    // crop: 칸을 꽉 채우도록 잘라 그림. 초상화는 머리가 위에 있으므로 위쪽을 기준으로 자름 (머리가 잘리지 않게)
     public static void DrawTexture(Rect r, Texture2D tex, bool crop)
     {
         if (tex == null) return;
-        GUI.DrawTexture(r, tex, crop ? ScaleMode.ScaleAndCrop : ScaleMode.ScaleToFit);
+        if (!crop) { GUI.DrawTexture(r, tex, ScaleMode.ScaleToFit); return; }
+        float boxAspect = r.width / Mathf.Max(1f, r.height), texAspect = tex.width / (float)tex.height;
+        Rect uv;
+        if (boxAspect > texAspect)
+        {
+            // 칸이 더 넓음: 위아래를 잘라야 함 → 위쪽은 남기고 아래쪽을 많이 자름 (위 15%, 아래 85%)
+            float h = texAspect / boxAspect, cut = 1f - h;
+            uv = new Rect(0f, cut * 0.85f, 1f, h); // UV는 아래가 0
+        }
+        else
+        {
+            float w = boxAspect / texAspect;     // 칸이 더 좁음: 좌우를 똑같이 자름
+            uv = new Rect((1f - w) / 2f, 0f, w, 1f);
+        }
+        GUI.DrawTextureWithTexCoords(r, tex, uv);
     }
 }

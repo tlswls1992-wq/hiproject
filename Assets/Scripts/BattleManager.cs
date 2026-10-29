@@ -28,6 +28,8 @@ public class BattleManager : MonoBehaviour
     public int Level { get; private set; }   // 1~100번째 판
     public int Wave { get; private set; }
     public readonly List<int> DeployedUids = new List<int>(); // 이번 전투에 나간 동료 (경험치 지급용)
+    public bool IsFinished => finished && World != null;
+    public int EnemyCount => enemies.Count;
     public bool IsPaused => World == null || finished || upgradeChoices != null || userPaused || talk != null;
     bool userPaused; // 스페이스 바로 일시정지
     public bool HasEnemies => enemies.Count > 0;

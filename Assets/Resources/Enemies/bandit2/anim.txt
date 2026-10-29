@@ -6,3 +6,4 @@ unit=256
 feet=16
 top=0.699
 body=0.303
+scale=0.9

@@ -180,7 +180,16 @@ public class Unit : MonoBehaviour
     void Update()
     {
         var battle = BattleManager.Instance;
-        if (!IsAlive || battle == null || battle.IsPaused) return;
+        if (!IsAlive || battle == null) return;
+        if (battle.IsFinished)
+        {
+            // 전투가 끝나면: 그 자리에 선 채로 (오른쪽을 본 채) 자연스럽게 대기 동작으로 돌아감
+            if (team == Team.Hero) facingRight = true;
+            if (UsesArt) Animate(Time.unscaledDeltaTime);
+            else if (UsesLook) AnimateLook(Time.unscaledDeltaTime);
+            return;
+        }
+        if (battle.IsPaused) return;
 
         float dt = Time.deltaTime;
         cooldownTimer -= dt;
@@ -211,6 +220,8 @@ public class Unit : MonoBehaviour
     // 적이 없으면 편성한 자리로 돌아갑니다.
     Vector2 HeroThink(Vector2 pos, BattleManager battle)
     {
+        // 남은 적이 없으면 (웨이브 · 전투가 끝남) 뒤로 돌아가지 않고 그 자리에서 오른쪽을 보며 멈춤
+        if (battle.EnemyCount == 0) { facingRight = true; return Vector2.zero; }
         if (healer) return HealerThink(pos, battle);
 
         Unit target = ranged ? battle.FindNearestOpponent(this) : (meleeTarget = battle.FindMeleeTarget(this));

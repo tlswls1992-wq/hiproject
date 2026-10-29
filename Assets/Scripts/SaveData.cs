@@ -20,7 +20,8 @@ public static class SaveData
 
     // ---- 편성: 선두 ~ 후미 5개의 줄. 줄 안에서는 자유롭게 위치를 정합니다 ----
     public const int Columns = 5;
-    public const int MaxPerColumn = 5;   // 한 줄에 놓을 수 있는 최대 인원
+    public const int MaxPerColumn = 4;   // 한 줄에 놓을 수 있는 최대 인원 (= 격자의 칸 수)
+    public const int Rows = MaxPerColumn; // 편성 격자: 줄(선두~후미) 5개 × 칸 4개 (위 → 아래)
     public static readonly string[] ColumnNames = { "선두", "전열", "중열", "후열", "후미" }; // 0 = 맨 앞
 
     // 가지고 있는 동료 한 명 (같은 캐릭터도 한 명 한 명 따로 성급/레벨을 가짐)
@@ -91,6 +92,7 @@ public static class SaveData
         int heroUid = HeroMember.uid;
         for (int i = Party.Count - 1; i >= 0 && Party.Count > DeployCap; i--)
             if (Party[i].uid != heroUid) Party.RemoveAt(i);
+        SnapToGrid();
     }
 
 
@@ -523,29 +525,79 @@ public static class SaveData
         return n;
     }
 
-    // 동료를 줄에 놓습니다. 놓을 수 없으면 이유를 돌려주고, 성공하면 null.
-    public static string Place(Member m, int column, float fx, float fy)
+    // ---------------- 편성 격자 (줄 5개 × 칸 4개) ----------------
+    // 칸 하나에 한 명. 저장은 예전처럼 (줄, fx, fy)로 하고, fy가 칸 번호를 나타내요: fy = (칸 + 0.5) / 4
+
+    public static int RowOf(Placement p) => Mathf.Clamp(Mathf.FloorToInt(p.fy * Rows), 0, Rows - 1);
+    static float RowY(int row) => (row + 0.5f) / Rows;
+    public static Placement At(int column, int row) => Party.Find(p => p.column == column && RowOf(p) == row);
+
+    static void SetCell(Placement p, int column, int row)
+    {
+        p.column = column;
+        p.fx = 0.5f;
+        p.fy = RowY(row);
+    }
+
+    // 동료를 칸에 놓습니다. 놓을 수 없으면 이유를 돌려주고, 성공하면 null.
+    //  - 빈 칸: 그 자리에 놓음 (편성 중이던 동료면 옮김)
+    //  - 차 있는 칸: 편성 중인 동료끼리는 자리를 바꿈. 목록에서 가져왔으면 원래 있던 동료는 목록으로 돌아감
+    public static string PlaceAt(Member m, int column, int row)
     {
         var existing = FindPlacement(m.uid);
+        var occupant = At(column, row);
+        if (occupant != null && occupant == existing) return null; // 같은 자리
         if (existing == null)
         {
-            if (Party.Count >= DeployCap) return $"출진 가능 인원은 {DeployCap}명이에요 (스테이지를 클리어하면 늘어나요)";
-            // 이름이 있는 캐릭터는 같은 인물을 두 명 배치할 수 없어요
-            if (m.Def.IsNamed && Party.Exists(p => MemberByUid(p.uid).id == m.id))
+            // 이름이 있는 캐릭터는 같은 인물을 두 명 배치할 수 없어요 (그 칸의 같은 인물과 바꾸는 건 괜찮음)
+            if (m.Def.IsNamed && Party.Exists(p => p != occupant && MemberByUid(p.uid).id == m.id))
                 return $"{m.Def.name}은(는) 이미 배치되어 있어요 (같은 인물은 한 명만)";
+            if (occupant == null && Party.Count >= DeployCap) return $"출진 가능 인원은 {DeployCap}명이에요 (스테이지를 클리어하면 늘어나요)";
+            if (occupant != null)
+            {
+                if (MemberByUid(occupant.uid).Def.IsHero) return "용사 자리예요 (용사는 뺄 수 없어요)";
+                Party.Remove(occupant); // 원래 있던 동료는 목록으로
+            }
+            var placed = new Placement { uid = m.uid };
+            SetCell(placed, column, row);
+            Party.Add(placed);
+            return null;
         }
-        bool sameColumn = existing != null && existing.column == column;
-        if (!sameColumn && CountInColumn(column) >= MaxPerColumn) return $"{ColumnNames[column]}은(는) 꽉 찼어요 (최대 {MaxPerColumn}명)";
-
-        if (existing == null)
-        {
-            existing = new Placement { uid = m.uid };
-            Party.Add(existing);
-        }
-        existing.column = column;
-        existing.fx = Mathf.Clamp01(fx);
-        existing.fy = Mathf.Clamp01(fy);
+        if (occupant != null) SetCell(occupant, existing.column, RowOf(existing)); // 서로 자리 바꾸기
+        SetCell(existing, column, row);
         return null;
+    }
+
+    // 예전 저장(한 줄에 5명, 자유 위치)을 격자에 맞춤: 줄마다 위에서부터 가까운 빈 칸으로, 넘치면 옆 줄 빈 칸으로
+    public static void SnapToGrid()
+    {
+        var overflow = new List<Placement>();
+        for (int col = 0; col < Columns; col++)
+        {
+            var members = Party.FindAll(p => p.column == col);
+            members.Sort((x, y) => x.fy.CompareTo(y.fy));
+            var used = new bool[Rows];
+            foreach (var p in members)
+            {
+                int want = RowOf(p), best = -1;
+                for (int d = 0; d < Rows && best < 0; d++)
+                {
+                    if (want + d < Rows && !used[want + d]) best = want + d;
+                    else if (want - d >= 0 && !used[want - d]) best = want - d;
+                }
+                if (best < 0) { overflow.Add(p); continue; }
+                used[best] = true;
+                SetCell(p, col, best);
+            }
+        }
+        foreach (var p in overflow)
+        {
+            bool placed = false;
+            for (int col = 0; col < Columns && !placed; col++)
+                for (int row = 0; row < Rows && !placed; row++)
+                    if (At(col, row) == null) { SetCell(p, col, row); placed = true; }
+            if (!placed) Party.Remove(p);
+        }
     }
 
     // 편성에서 뺍니다. 용사는 뺄 수 없어요.
@@ -553,6 +605,17 @@ public static class SaveData
     {
         if (m.Def.IsHero) return;
         Party.RemoveAll(p => p.uid == m.uid);
+    }
+
+    // 그 줄에서 비어 있는 칸 (want에서 가까운 순서). 없으면 -1
+    static int FreeRow(int column, int want)
+    {
+        for (int d = 0; d < Rows; d++)
+        {
+            if (want + d < Rows && At(column, want + d) == null) return want + d;
+            if (want - d >= 0 && At(column, want - d) == null) return want - d;
+        }
+        return -1;
     }
 
     public static void ClearParty()
@@ -566,7 +629,15 @@ public static class SaveData
     {
         var hero = HeroMember;
         if (hero == null || FindPlacement(hero.uid) != null) return;
-        Party.Insert(0, new Placement { uid = hero.uid, column = 0, fx = 0.5f, fy = 0.5f });
+        var p = new Placement { uid = hero.uid };
+        SetCell(p, 0, 1);
+        var occupant = At(0, 1);
+        if (occupant != null) // 그 칸에 누가 있으면 비켜 줌 (줄이 꽉 찼으면 목록으로)
+        {
+            int free = FreeRow(0, 1);
+            if (free >= 0) SetCell(occupant, 0, free); else Party.Remove(occupant);
+        }
+        Party.Insert(0, p);
     }
 
     // 직업별로 알맞은 줄에 강한 동료부터 자동으로 배치합니다. (출진 인원, 같은 인물 규칙을 지킴)
@@ -582,25 +653,12 @@ public static class SaveData
         foreach (var m in order)
         {
             if (Party.Count >= DeployCap) break;
+            if (m.Def.IsNamed && Party.Exists(p => MemberByUid(p.uid).id == m.id)) continue;
             int[] columns = m.Def.job.preferredColumns; // 근접은 앞, 원거리는 가운데/뒤, 치유는 맨 뒤
             foreach (int col in columns)
-                if (Place(m, col, 0.5f, 0.5f) == null) break;
-        }
-
-        // 줄마다 위에서 아래로 고르게 배치 (용사는 선두 가운데)
-        for (int col = 0; col < Columns; col++)
-        {
-            var members = Party.FindAll(p => p.column == col);
-            var hero = members.Find(p => p.uid == HeroMember.uid);
-            if (hero != null)
             {
-                members.Remove(hero);
-                members.Insert(members.Count / 2, hero);
-            }
-            for (int i = 0; i < members.Count; i++)
-            {
-                members[i].fx = 0.5f;
-                members[i].fy = (i + 0.5f) / members.Count;
+                int row = FreeRow(col, 1);
+                if (row >= 0) { PlaceAt(m, col, row); break; }
             }
         }
     }

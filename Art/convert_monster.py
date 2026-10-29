@@ -84,6 +84,8 @@ def main():
     fixes = {k: float(v) for k, v in (a.split("=") for a in args[3:])}
     # width=768: 앞으로 크게 덤비는 큰 몬스터는 캔버스를 넓혀서 잘리지 않게 (게임은 캔버스 가운데를 기준으로 그림)
     canvas_w = int(fixes.pop("width", CANVAS_W))
+    # scale=0.9: 전투에서 그림 전체 크기 배율 (anim.txt의 scale, 다시 변환해도 남도록)
+    battle_scale = fixes.pop("scale", None)
     out = ROOT / "Assets" / "Resources" / "Enemies" / enemy_id
     out.mkdir(parents=True, exist_ok=True)
 
@@ -133,6 +135,8 @@ def main():
             img.thumbnail((size, size), Image.LANCZOS)
             img.save(out / f"{name}.png", optimize=True)
     anim += ["facing=left", f"unit={UNIT}", f"feet={CANVAS_H - FEET}", f"top={top_frac:.3f}", f"body={body_half:.3f}"]
+    if battle_scale:
+        anim.append(f"scale={battle_scale:g}")
     (out / "anim.txt").write_text("\n".join(anim) + "\n", encoding="utf-8")
     print("anim:", anim[-3:])
 

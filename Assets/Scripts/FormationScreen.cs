@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 편성 화면: 선두 ~ 후미 5개의 줄에 동료를 끌어다 원하는 위치에 놓습니다.
-// - 목록 → 줄: 그 위치에 배치 (한 줄 최대 5명, 출진 가능 인원까지)
-// - 줄 안이나 다른 줄로 끌기: 위치 옮기기
-// - 줄 → 목록: 편성에서 빼기 (용사는 뺄 수 없음)
+// 편성 화면: 선두 ~ 후미 5개 줄 × 칸 4개 격자에 동료를 끌어다 놓습니다. (칸 하나에 한 명)
+// - 목록 → 빈 칸: 배치 (출진 가능 인원까지) · 목록 → 차 있는 칸: 바꿔 넣기 (원래 동료는 목록으로)
+// - 칸 → 다른 칸: 옮기기 (차 있으면 서로 자리 바꾸기)
+// - 칸 → 목록: 편성에서 빼기 (용사는 뺄 수 없음)
 // - 이름이 있는 캐릭터는 같은 인물을 두 명 배치할 수 없어요
 public class FormationScreen
 {
@@ -13,7 +13,6 @@ public class FormationScreen
     const float ZoneGap = 8f;
     const float GridX = 40f;
     const float GridY = 110f;
-    const float Pad = 30f;          // 줄 가장자리 여백
     const float TokenRadius = 26f;
 
     SaveData.Member dragging;       // 끌고 있는 동료 (없으면 null)
@@ -35,17 +34,19 @@ public class FormationScreen
         return new Rect(GridX + screenCol * (ZoneW + ZoneGap), GridY, ZoneW, ZoneH);
     }
 
-    // fx 0 = 줄의 앞쪽(오른쪽), fy 0 = 위쪽
+    // 칸 안의 동료 위치 (발이 칸 아래쪽에 오도록)
     static Vector2 TokenCenter(SaveData.Placement p)
     {
-        var z = ZoneRect(p.column);
-        return new Vector2(z.x + Pad + (1f - p.fx) * (z.width - Pad * 2f), z.y + Pad + p.fy * (z.height - Pad * 2f));
+        var c = CellRect(p.column, SaveData.RowOf(p));
+        return new Vector2(c.center.x, c.yMax - TokenRadius - 26f);
     }
 
-    static void ToPlacement(Rect z, Vector2 mouse, out float fx, out float fy)
+    // 격자 칸 (줄 column, 위에서 row번째)
+    static Rect CellRect(int column, int row)
     {
-        fx = Mathf.Clamp01(1f - (mouse.x - z.x - Pad) / (z.width - Pad * 2f));
-        fy = Mathf.Clamp01((mouse.y - z.y - Pad) / (z.height - Pad * 2f));
+        var z = ZoneRect(column);
+        float h = z.height / SaveData.Rows;
+        return new Rect(z.x + 5f, z.y + row * h + 5f, z.width - 10f, h - 10f);
     }
 
     // onExit: 나가기 버튼, toast: 짧은 안내 문구 띄우기
@@ -57,18 +58,26 @@ public class FormationScreen
         UI.Backdrop("menu");
         UI.TopBar($"편성   출진 {SaveData.Party.Count} / {SaveData.DeployCap}명", false);
 
-        // ---- 줄 (선두 ~ 후미) ----
-        int hoverZone = -1;
+        // ---- 격자 (줄 선두 ~ 후미 × 칸 4개) ----
+        int hoverCol = -1, hoverRow = -1;
         for (int col = 0; col < SaveData.Columns; col++)
         {
             var z = ZoneRect(col);
-            bool hover = z.Contains(mouse);
-            if (hover) hoverZone = col;
             int count = SaveData.CountInColumn(col);
-            UI.Round(z, hover && dragging != null ? new Color(1f, 1f, 1f, 0.16f) : new Color(0f, 0f, 0f, col % 2 == 0 ? 0.35f : 0.25f));
-            UI.RoundFrame(z, hover && dragging != null ? UI.WithAlpha(UI.Gold, 0.6f) : new Color(1f, 1f, 1f, 0.10f));
+            UI.Round(z, new Color(0f, 0f, 0f, col % 2 == 0 ? 0.30f : 0.22f));
             UI.Text(new Rect(z.x, GridY - 32, ZoneW, 28), $"{SaveData.ColumnNames[col]} {count}/{SaveData.MaxPerColumn}", 17,
                 col == 0 ? new Color(1f, 0.6f, 0.5f) : Color.white, TextAnchor.MiddleCenter, true);
+            for (int row = 0; row < SaveData.Rows; row++)
+            {
+                var c = CellRect(col, row);
+                bool hover = c.Contains(mouse);
+                if (hover) { hoverCol = col; hoverRow = row; }
+                bool empty = SaveData.At(col, row) == null;
+                Color fill = hover && dragging != null ? new Color(1f, 0.85f, 0.45f, 0.20f) : new Color(1f, 1f, 1f, empty ? 0.04f : 0.07f);
+                UI.Round(c, fill);
+                UI.RoundFrame(c, hover && dragging != null ? UI.WithAlpha(UI.Gold, 0.8f) : new Color(1f, 1f, 1f, 0.12f));
+                if (empty) UI.Text(c, "+", 22, new Color(1f, 1f, 1f, 0.12f));
+            }
         }
         UI.Text(new Rect(GridX, GridY + ZoneH + 4, 5 * (ZoneW + ZoneGap), 24), "적이 오는 방향 →", 16,
             new Color(1f, 0.6f, 0.5f), TextAnchor.MiddleRight);
@@ -80,7 +89,7 @@ public class FormationScreen
             var m = SaveData.MemberByUid(p.uid);
             if (m == null || (dragFromParty && m == dragging)) continue;
             var center = TokenCenter(p);
-            if (Vector2.Distance(center, mouse) <= TokenRadius + 2f) hoverToken = m;
+            if (CellRect(p.column, SaveData.RowOf(p)).Contains(mouse)) hoverToken = m;
             DrawToken(center, m, TokenRadius);
         }
 
@@ -88,7 +97,7 @@ public class FormationScreen
         float listX = GridX + 5 * (ZoneW + ZoneGap) + 22f;
         var listRect = new Rect(listX, 80, w - listX - 30, 400);
         UI.Panel(listRect);
-        UI.Text(new Rect(listRect.x + 14, listRect.y + 6, listRect.width - 28, 28), "대기 중인 동료 (끌어서 줄에 놓기)", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
+        UI.Text(new Rect(listRect.x + 14, listRect.y + 6, listRect.width - 28, 28), "대기 중인 동료 (끌어서 칸에 놓기)", 17, UI.TextMain, TextAnchor.MiddleLeft, true);
 
         var waiting = SaveData.SortedMembers().FindAll(m => !SaveData.IsPlaced(m));
 
@@ -116,7 +125,7 @@ public class FormationScreen
         }
         GUI.EndGroup();
         if (waiting.Count == 0)
-            UI.Text(inner, SaveData.CompanionCount == 0 ? "아직 동료가 없어요.\n소환에서 뽑아 보세요!" : "모든 동료가 배치되었어요", 18, UI.TextSub);
+            UI.Text(inner, SaveData.CompanionCount == 0 ? "아직 동료가 없어요.\n라운드를 이겨 보상 카드에서 골라 보세요!" : "모든 동료가 배치되었어요", 18, UI.TextSub);
         if (maxScroll > 0f)
             UI.Text(new Rect(listRect.x, listRect.yMax - 24, listRect.width - 14, 22), "마우스 휠로 스크롤", 13, UI.TextSub, TextAnchor.MiddleRight);
 
@@ -168,10 +177,9 @@ public class FormationScreen
         }
         else if (e.type == EventType.MouseUp && dragging != null)
         {
-            if (hoverZone >= 0)
+            if (hoverCol >= 0)
             {
-                ToPlacement(ZoneRect(hoverZone), mouse, out float fx, out float fy);
-                string error = SaveData.Place(dragging, hoverZone, fx, fy);
+                string error = SaveData.PlaceAt(dragging, hoverCol, hoverRow);
                 if (error != null) toast(error);
             }
             else if (dragFromParty && listRect.Contains(mouse))
@@ -203,7 +211,7 @@ public class FormationScreen
         {
             // 대기 그림: 발밑에 등급 색 원, 발이 동그라미 아래쪽에 오도록
             UI.Glow(center + new Vector2(0, radius * 0.7f), radius * 1.2f, UI.WithAlpha(rc, 0.7f));
-            art.DrawStanding(new Vector2(center.x, center.y + radius), radius * 3.6f, Time.unscaledTime + center.x * 0.37f, false);
+            art.DrawStanding(new Vector2(center.x, center.y + radius), radius * 3.3f, Time.unscaledTime + center.x * 0.37f, false);
         }
         else
         {

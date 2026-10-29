@@ -22,7 +22,7 @@ public static class EnemyLook
             ? scale * HumanBase * Mathf.Pow(size / 0.5f, 0.3f)   // 사람 모양: 기본(0.5)은 용사 일행과 같은 키, 커져도 완만하게
             : scale * Mathf.Pow(size, 0.6f);
         public bool humanoid; // 사람 · 인어 모양
-        const float HumanBase = 0.62f; // 0.5^0.6(≈0.66)보다 조금 작게: 용사 일행과 키를 맞춤
+        const float HumanBase = 0.56f; // 0.5^0.6(≈0.66)보다 작게: 용사 일행(평균 키)과 맞춤
         public bool hovers; // 공중에 떠 있는 적 (와이번, 상어, 크라켄)
         public float width; // 그림에서 몸이 차지하는 가로 폭 (0~1, 겹치지 않게 간격을 잡을 때 사용)
     }

@@ -1,1 +1,1 @@
-battle_scale=0.94
+battle_scale=0.85
